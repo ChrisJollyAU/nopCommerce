@@ -1,0 +1,1101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<definitions xmlns:tns="http://api.temando.com/schema/2009_06/server.wsdl" xmlns:server="http://api.temando.com/schema/2009_06/server.xsd" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:com="http://api.temando.com/schema/2009_06/common.xsd" xmlns:wsse="http://schemas.xmlsoap.org/ws/2002/04/secext" xmlns:xsd="http://www.w3.org/2001/XMLSchema" name="quoting" targetNamespace="http://api.temando.com/schema/2009_06/server.wsdl" xmlns="http://schemas.xmlsoap.org/wsdl/">
+  <types>
+    <xsd:schema xmlns:tns="http://api.temando.com/schema/2009_06/server.xsd" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" attributeFormDefault="unqualified" elementFormDefault="unqualified" targetNamespace="http://api.temando.com/schema/2009_06/server.xsd">
+      <xsd:element name="getRequestIdByReference">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="reference" type="com:ClientReference" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getRequestIdByReferenceResponse">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="requestId" type="xsd:positiveInteger" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="lodgeRequest">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="anythings">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element maxOccurs="10" name="anything" type="com:Anything" />
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="anywhere" type="com:Anywhere" />
+            <xsd:element name="anytime" type="com:Anytime" />
+            <xsd:element minOccurs="0" name="comments" type="com:Comments" />
+            <xsd:element name="origin" type="com:Location" />
+            <xsd:element name="destination" type="com:Location" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="lodgeRequestResponse">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="requestId" type="xsd:positiveInteger" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getQuotesByRequest">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="anythings">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element maxOccurs="10" name="anything" type="com:Anything" />
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="anywhere" type="com:Anywhere" />
+            <xsd:element name="anytime" type="com:Anytime" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getQuotesByRequestResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element minOccurs="0" maxOccurs="unbounded" name="quote" type="com:AvailableQuote" />
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="makeBookingByRequest">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="anythings">
+              <xsd:complexType>
+                <xsd:sequence>
+                  <xsd:element maxOccurs="10" name="anything" type="com:Anything" />
+                </xsd:sequence>
+              </xsd:complexType>
+            </xsd:element>
+            <xsd:element name="anywhere" type="com:Anywhere" />
+            <xsd:element name="anytime" type="com:Anytime" />
+            <xsd:element name="origin" type="com:Location" />
+            <xsd:element name="destination" type="com:Location" />
+            <xsd:element name="quote" type="com:BookingQuote" />
+            <xsd:element name="payment" type="com:Payment" />
+            <xsd:element minOccurs="0" name="comments" type="com:Comments" />
+            <xsd:element minOccurs="0" name="promotionCode" type="com:PromotionCode" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="makeBookingByRequestResponse">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="requestId" type="xsd:positiveInteger" />
+            <xsd:element minOccurs="0" name="bookingNumber" type="com:BookingNumber" />
+            <xsd:element minOccurs="0" name="consignmentNumber" type="com:ConsignmentNumber" />
+            <xsd:element minOccurs="0" name="consignmentDocument" type="com:ConsignmentDocument" />
+            <xsd:element minOccurs="0" name="consignmentDocumentType" type="com:ConsignmentDocumentType" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="makeBookingById">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="requestId" type="xsd:positiveInteger" />
+            <xsd:element minOccurs="0" name="quoteId" type="xsd:positiveInteger" />
+            <xsd:element name="payment" type="com:Payment" />
+            <xsd:element minOccurs="0" name="promotionCode" type="com:PromotionCode" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="makeBookingByIdResponse">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element minOccurs="0" name="bookingNumber" type="com:BookingNumber" />
+            <xsd:element minOccurs="0" name="consignmentNumber" type="com:ConsignmentNumber" />
+            <xsd:element minOccurs="0" name="consignmentDocument" type="com:ConsignmentDocument" />
+            <xsd:element minOccurs="0" name="consignmentDocumentType" type="com:ConsignmentDocumentType" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getRequest">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="requestId" type="xsd:positiveInteger" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getRequestResponse">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="request" type="com:Request" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getRequestsRequiringBooking" />
+      <xsd:element name="getRequestsRequiringBookingResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="request" type="com:Request" />
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="addBookingDetails">
+        <xsd:complexType>
+          <xsd:all>
+            <xsd:element name="requestId" type="xsd:positiveInteger" />
+            <xsd:element name="bookingNumber" type="com:BookingNumber" />
+            <xsd:element minOccurs="0" name="consignmentNumber" type="com:ConsignmentNumber" />
+            <xsd:element minOccurs="0" name="consignmentDocument" type="com:ConsignmentDocument" />
+            <xsd:element minOccurs="0" name="consignmentDocumentType" type="com:ConsignmentDocumentType" />
+          </xsd:all>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="addBookingDetailsResponse" />
+    </xsd:schema>
+    <xsd:schema xmlns:tns="http://api.temando.com/schema/2009_06/common.xsd" xmlns:soapenc="http://schemas.xmlsoap.org/soap/encoding/" attributeFormDefault="unqualified" elementFormDefault="unqualified" targetNamespace="http://api.temando.com/schema/2009_06/common.xsd">
+      <xsd:import namespace="http://www.w3.org/2001/XMLSchema" />
+      <xsd:complexType name="Request">
+        <xsd:all>
+          <xsd:element name="status" type="tns:RequestStatus" />
+          <xsd:element name="anythings">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element maxOccurs="10" name="anything" type="tns:Anything" />
+              </xsd:sequence>
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="anywhere" type="tns:Anywhere" />
+          <xsd:element name="anytime" type="tns:Anytime" />
+          <xsd:element name="origin" type="tns:Location" />
+          <xsd:element name="destination" type="tns:Location" />
+          <xsd:element name="quotes">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element minOccurs="0" maxOccurs="unbounded" name="quote" type="tns:AvailableQuote" />
+              </xsd:sequence>
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element minOccurs="0" name="comments" type="tns:Comments" />
+        </xsd:all>
+        <xsd:attribute name="id" type="xsd:positiveInteger" />
+      </xsd:complexType>
+      <xsd:complexType name="Anything">
+        <xsd:all>
+          <xsd:element name="class" type="tns:Class" />
+          <xsd:element minOccurs="0" name="subclass" type="tns:Subclass" />
+          <xsd:element minOccurs="0" name="mode" type="tns:Mode" />
+          <xsd:element minOccurs="0" name="tlSubclass" type="tns:TlSubclass" />
+          <xsd:element minOccurs="0" name="packaging" type="tns:Packaging" />
+          <xsd:element minOccurs="0" name="palletType" type="tns:PalletType" />
+          <xsd:element minOccurs="0" name="palletNature" type="tns:PalletNature" />
+          <xsd:element minOccurs="0" name="containerDimensions" type="tns:ContainerDimensions" />
+          <xsd:element minOccurs="0" name="containerNature" type="tns:ContainerNature" />
+          <xsd:element minOccurs="0" name="containerRegistered" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierFreightGeneralDangerousGoods" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierFreightGeneralFragile" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierFreightGeneralRefrigerated" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierVehicleMake" type="tns:VehicleMake" />
+          <xsd:element minOccurs="0" name="qualifierVehicleModel" type="tns:VehicleModel" />
+          <xsd:element minOccurs="0" name="qualifierVehicleDescription" type="tns:VehicleDescription" />
+          <xsd:element minOccurs="0" name="qualifierVehicleRunning" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierVehicleRegistered" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierVehicleYear" type="tns:VehicleYear" />
+          <xsd:element minOccurs="0" name="qualifierVehicleRegistration" type="tns:VehicleRegistration" />
+          <xsd:element minOccurs="0" name="qualifierBoatMake" type="tns:BoatMake" />
+          <xsd:element minOccurs="0" name="qualifierBoatModel" type="tns:BoatModel" />
+          <xsd:element minOccurs="0" name="qualifierBoatSeaworthy" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierBoatTrailer" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierBoatHullType" type="tns:BoatHullType" />
+          <xsd:element minOccurs="0" name="qualifierLivestockType" type="tns:LivestockType" />
+          <xsd:element minOccurs="0" name="qualifierAnimalVaccinated" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierAnimalRegistered" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="qualifierAnimalType" type="tns:AnimalType" />
+          <xsd:element minOccurs="0" name="qualifierAnimalBreed" type="tns:AnimalBreed" />
+          <xsd:element minOccurs="0" name="qualifierAnimalSex" type="tns:Sex" />
+          <xsd:element minOccurs="0" name="qualifierAnimalAge" type="tns:AnimalAge" />
+          <xsd:element minOccurs="0" name="qualifierAnimalCrate" type="tns:AnimalCrate" />
+          <xsd:element minOccurs="0" name="distanceMeasurementType" type="tns:DistanceMeasurementType" />
+          <xsd:element minOccurs="0" name="weightMeasurementType" type="tns:WeightMeasurementType" />
+          <xsd:element minOccurs="0" name="length" type="tns:Length" />
+          <xsd:element minOccurs="0" name="width" type="tns:Width" />
+          <xsd:element minOccurs="0" name="height" type="tns:Height" />
+          <xsd:element minOccurs="0" name="weight" type="tns:Weight" />
+          <xsd:element name="quantity" type="tns:Quantity" />
+          <xsd:element minOccurs="0" name="description" type="tns:ItemDescription" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:complexType name="Anywhere">
+        <xsd:all>
+          <xsd:element name="itemNature" type="tns:DeliveryNature" />
+          <xsd:element name="itemMethod" type="tns:DeliveryType" />
+          <xsd:element name="originCountry" type="tns:CountryCode" />
+          <xsd:element minOccurs="0" name="originCode" type="tns:PostalCode" />
+          <xsd:element minOccurs="0" name="originSuburb" type="tns:Suburb" />
+          <xsd:element minOccurs="0" name="originState" type="tns:State" />
+          <xsd:element minOccurs="0" name="originCity" type="tns:City" />
+          <xsd:element minOccurs="0" name="originPort" type="tns:PortName" />
+          <xsd:element name="destinationCountry" type="tns:CountryCode" />
+          <xsd:element minOccurs="0" name="destinationCode" type="tns:PostalCode" />
+          <xsd:element minOccurs="0" name="destinationSuburb" type="tns:Suburb" />
+          <xsd:element minOccurs="0" name="destinationState" type="tns:State" />
+          <xsd:element minOccurs="0" name="destinationCity" type="tns:City" />
+          <xsd:element minOccurs="0" name="destinationPort" type="tns:PortName" />
+          <xsd:element minOccurs="0" name="portType" type="tns:PortType" />
+          <xsd:element name="destinationIs" type="tns:LocationType" />
+          <xsd:element minOccurs="0" name="destinationBusPostalBox" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusUnattended" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusDock" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusForklift" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusLoadingFacilities" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusInside" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusNotifyBefore" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusLimitedAccess" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusHeavyLift" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusTailgateLifter" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationBusContainerSwingLifter" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationResPostalBox" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationResUnattended" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationResInside" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationResNotifyBefore" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationResLimitedAccess" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationResHeavyLift" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="destinationResTailgateLifter" type="tns:YesNoOption" />
+          <xsd:element name="originIs" type="tns:LocationType" />
+          <xsd:element minOccurs="0" name="originBusUnattended" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originBusDock" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originBusForklift" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originBusLoadingFacilities" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originBusInside" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originBusNotifyBefore" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originBusLimitedAccess" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originBusHeavyLift" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originBusTailgateLifter" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originBusContainerSwingLifter" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originResUnattended" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originResInside" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originResNotifyBefore" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originResLimitedAccess" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originResHeavyLift" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="originResTailgateLifter" type="tns:YesNoOption" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:complexType name="Anytime">
+        <xsd:all>
+          <xsd:element name="readyDate" type="tns:Date" />
+          <xsd:element name="readyTime" type="tns:ReadyTime" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:complexType name="AvailableQuote">
+        <xsd:all>
+          <xsd:element name="generated" type="tns:GeneratedType" />
+          <xsd:element name="accepted" type="tns:YesNoOption" />
+          <xsd:element minOccurs="0" name="bookingNumber" type="tns:BookingNumber" />
+          <xsd:element minOccurs="0" name="consignmentNumber" type="tns:ConsignmentNumber" />
+          <xsd:element minOccurs="0" name="consignmentDocument" type="tns:ConsignmentDocument" />
+          <xsd:element minOccurs="0" name="consignmentDocumentType" type="tns:ConsignmentDocumentType" />
+          <xsd:element minOccurs="0" name="trackingStatus" type="tns:TrackingStatus" />
+          <xsd:element minOccurs="0" name="trackingStatusOccurred" type="tns:Datetime" />
+          <xsd:element minOccurs="0" name="trackingLastChecked" type="tns:Datetime" />
+          <xsd:element minOccurs="0" name="trackingFurtherDetails" type="tns:TrackingFurtherDetails" />
+          <xsd:element name="totalPrice" type="tns:CurrencyAmount" />
+          <xsd:element name="basePrice" type="tns:CurrencyAmount" />
+          <xsd:element name="tax" type="tns:CurrencyAmount" />
+          <xsd:element name="currency" type="tns:CurrencyType" />
+          <xsd:element name="deliveryMethod" type="tns:DeliveryMethod" />
+          <xsd:element name="usingGeneralRail" type="tns:YesNoOption" />
+          <xsd:element name="usingGeneralRoad" type="tns:YesNoOption" />
+          <xsd:element name="usingGeneralSea" type="tns:YesNoOption" />
+          <xsd:element name="usingExpressAir" type="tns:YesNoOption" />
+          <xsd:element name="usingExpressRoad" type="tns:YesNoOption" />
+          <xsd:element name="etaFrom" type="tns:Eta" />
+          <xsd:element name="etaTo" type="tns:Eta" />
+          <xsd:element name="guaranteedEta" type="tns:YesNoOption" />
+          <xsd:element name="adjustments">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element minOccurs="0" maxOccurs="unbounded" name="adjustment" type="tns:Adjustment" />
+              </xsd:sequence>
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="inclusions">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element minOccurs="0" maxOccurs="unbounded" name="inclusion" type="tns:Inclusion" />
+              </xsd:sequence>
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="carrier" type="tns:Carrier" />
+          <xsd:element minOccurs="0" name="originatingDepot" type="tns:Depot" />
+          <xsd:element minOccurs="0" name="destinationDepot" type="tns:Depot" />
+        </xsd:all>
+        <xsd:attribute minOccurs="0" name="id" type="xsd:positiveInteger" />
+      </xsd:complexType>
+      <xsd:complexType name="Adjustment">
+        <xsd:all>
+          <xsd:element name="description" type="tns:AdjustmentDescription" />
+          <xsd:element name="amount" type="tns:CurrencyAmount" />
+          <xsd:element name="tax" type="tns:CurrencyAmount" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:complexType name="Carrier">
+        <xsd:all>
+          <xsd:element name="id" type="tns:CarrierId" />
+          <xsd:element name="companyName" type="tns:CompanyName" />
+          <xsd:element name="companyContact" type="tns:ContactName" />
+          <xsd:element minOccurs="0" name="streetAddress" type="tns:Address" />
+          <xsd:element minOccurs="0" name="streetSuburb" type="tns:Suburb" />
+          <xsd:element minOccurs="0" name="streetCity" type="tns:City" />
+          <xsd:element minOccurs="0" name="streetState" type="tns:State" />
+          <xsd:element minOccurs="0" name="streetCode" type="tns:PostalCode" />
+          <xsd:element minOccurs="0" name="streetCountry" type="tns:CountryCode" />
+          <xsd:element minOccurs="0" name="postalAddress" type="tns:Address" />
+          <xsd:element minOccurs="0" name="postalSuburb" type="tns:Suburb" />
+          <xsd:element minOccurs="0" name="postalCity" type="tns:City" />
+          <xsd:element minOccurs="0" name="postalState" type="tns:State" />
+          <xsd:element minOccurs="0" name="postalCode" type="tns:PostalCode" />
+          <xsd:element minOccurs="0" name="postalCountry" type="tns:CountryCode" />
+          <xsd:element minOccurs="0" name="phone1" type="tns:Phone" />
+          <xsd:element minOccurs="0" name="phone2" type="tns:Phone" />
+          <xsd:element minOccurs="0" name="email" type="tns:Email" />
+          <xsd:element minOccurs="0" name="website" type="tns:Website" />
+          <xsd:element minOccurs="0" name="conditions" type="tns:CarrierConditions" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:complexType name="Depot">
+        <xsd:all>
+          <xsd:element name="name" type="tns:DepotName" />
+          <xsd:element minOccurs="0" name="street" type="tns:Address" />
+          <xsd:element minOccurs="0" name="suburb" type="tns:Suburb" />
+          <xsd:element minOccurs="0" name="city" type="tns:City" />
+          <xsd:element minOccurs="0" name="state" type="tns:State" />
+          <xsd:element minOccurs="0" name="code" type="tns:PostalCode" />
+          <xsd:element minOccurs="0" name="country" type="tns:CountryCode" />
+          <xsd:element minOccurs="0" name="phone1" type="tns:Phone" />
+          <xsd:element minOccurs="0" name="phone2" type="tns:Phone" />
+          <xsd:element minOccurs="0" name="fax" type="tns:Fax" />
+          <xsd:element minOccurs="0" name="instructions" type="tns:DepotInstructions" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:complexType name="Inclusion">
+        <xsd:all>
+          <xsd:element name="summary" type="tns:InclusionSummary" />
+          <xsd:element name="details" type="tns:InclusionDetails" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:complexType name="Location">
+        <xsd:all>
+          <xsd:element name="contactName" type="tns:ContactName" />
+          <xsd:element minOccurs="0" name="companyName" type="tns:CompanyName" />
+          <xsd:element name="street" type="tns:Address" />
+          <xsd:element name="suburb" type="tns:Suburb" />
+          <xsd:element name="state" type="tns:State" />
+          <xsd:element name="code" type="tns:PostalCode" />
+          <xsd:element name="country" type="tns:CountryCode" />
+          <xsd:element name="phone1" type="tns:Phone" />
+          <xsd:element minOccurs="0" name="phone2" type="tns:Phone" />
+          <xsd:element minOccurs="0" name="fax" type="tns:Fax" />
+          <xsd:element name="email" type="tns:Email" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:complexType name="Payment">
+        <xsd:all>
+          <xsd:element name="paymentType" type="tns:PaymentType" />
+          <xsd:element minOccurs="0" name="cardType" type="tns:CreditCardType" />
+          <xsd:element minOccurs="0" name="cardExpiryDate" type="tns:CreditCardExpiryDate" />
+          <xsd:element minOccurs="0" name="cardNumber" type="tns:CreditCardNumber" />
+          <xsd:element minOccurs="0" name="cardName" type="tns:CreditCardName" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:complexType name="BookingQuote">
+        <xsd:all>
+          <xsd:element name="totalPrice" type="tns:CurrencyAmount" />
+          <xsd:element name="basePrice" type="tns:CurrencyAmount" />
+          <xsd:element name="tax" type="tns:CurrencyAmount" />
+          <xsd:element name="currency" type="tns:CurrencyType" />
+          <xsd:element name="deliveryMethod" type="tns:DeliveryMethod" />
+          <xsd:element name="etaFrom" type="tns:Eta" />
+          <xsd:element name="etaTo" type="tns:Eta" />
+          <xsd:element name="guaranteedEta" type="tns:YesNoOption" />
+          <xsd:element name="carrierId" type="tns:CarrierId" />
+        </xsd:all>
+      </xsd:complexType>
+      <xsd:simpleType name="YesNoOption">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Y" />
+          <xsd:enumeration value="N" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Sex">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="M" />
+          <xsd:enumeration value="F" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Class">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Freight" />
+          <xsd:enumeration value="General Goods" />
+          <xsd:enumeration value="Vehicle" />
+          <xsd:enumeration value="Boat" />
+          <xsd:enumeration value="Animal" />
+          <xsd:enumeration value="Refrigerated" />
+          <xsd:enumeration value="Other" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Subclass">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="20" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Mode">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Truckload" />
+          <xsd:enumeration value="Less than load" />
+          <xsd:enumeration value="Container" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="TlSubclass">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="not required" />
+          <xsd:enumeration value="1" />
+          <xsd:enumeration value="2" />
+          <xsd:enumeration value="3" />
+          <xsd:enumeration value="4" />
+          <xsd:enumeration value="5" />
+          <xsd:enumeration value="6" />
+          <xsd:enumeration value="7" />
+          <xsd:enumeration value="8" />
+          <xsd:enumeration value="9" />
+          <xsd:enumeration value="10" />
+          <xsd:enumeration value="11" />
+          <xsd:enumeration value="12" />
+          <xsd:enumeration value="13" />
+          <xsd:enumeration value="14" />
+          <xsd:enumeration value="15" />
+          <xsd:enumeration value="16" />
+          <xsd:enumeration value="17" />
+          <xsd:enumeration value="18" />
+          <xsd:enumeration value="19" />
+          <xsd:enumeration value="20" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Packaging">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Backpack" />
+          <xsd:enumeration value="Bale" />
+          <xsd:enumeration value="Box" />
+          <xsd:enumeration value="Bunch" />
+          <xsd:enumeration value="Bundle" />
+          <xsd:enumeration value="Carton" />
+          <xsd:enumeration value="Crate" />
+          <xsd:enumeration value="Cylinder" />
+          <xsd:enumeration value="Document Envelope" />
+          <xsd:enumeration value="Drum" />
+          <xsd:enumeration value="Flat Pack" />
+          <xsd:enumeration value="Letter" />
+          <xsd:enumeration value="Pail" />
+          <xsd:enumeration value="Pallet" />
+          <xsd:enumeration value="Parcel" />
+          <xsd:enumeration value="Pipe" />
+          <xsd:enumeration value="Roll" />
+          <xsd:enumeration value="Satchel/Bag" />
+          <xsd:enumeration value="Skid" />
+          <xsd:enumeration value="Suitcase" />
+          <xsd:enumeration value="Tube" />
+          <xsd:enumeration value="Unpackaged or N/A" />
+          <xsd:enumeration value="Wheel/Tyre" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="PalletType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Chep" />
+          <xsd:enumeration value="Loscam" />
+          <xsd:enumeration value="Plain" />
+          <xsd:enumeration value="Not Required" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="PalletNature">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Exchange" />
+          <xsd:enumeration value="Transfer" />
+          <xsd:enumeration value="Not Required" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="ContainerDimensions">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="20FT" />
+          <xsd:enumeration value="40FT" />
+          <xsd:enumeration value="48FT" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="ContainerNature">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Shipping Container" />
+          <xsd:enumeration value="Flat Rack" />
+          <xsd:enumeration value="Open Top Container" />
+          <xsd:enumeration value="High Cube" />
+          <xsd:enumeration value="Curtin Sider" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="VehicleMake">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="VehicleModel">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="VehicleDescription">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="100" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="VehicleYear">
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1920" />
+          <xsd:maxInclusive value="2050" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="VehicleRegistration">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="20" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="BoatMake">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="BoatModel">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="BoatHullType">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="LivestockType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Cattle" />
+          <xsd:enumeration value="Horse" />
+          <xsd:enumeration value="Sheep" />
+          <xsd:enumeration value="Pig" />
+          <xsd:enumeration value="Other" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="AnimalType">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="AnimalBreed">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="AnimalAge">
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1" />
+          <xsd:maxInclusive value="100" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="AnimalCrate">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Hire 1" />
+          <xsd:enumeration value="Hire 2" />
+          <xsd:enumeration value="Buy 1" />
+          <xsd:enumeration value="Buy 2" />
+          <xsd:enumeration value="I have a crate" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="DistanceMeasurementType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Centimetres" />
+          <xsd:enumeration value="Metres" />
+          <xsd:enumeration value="Inches" />
+          <xsd:enumeration value="Feet" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="WeightMeasurementType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Grams" />
+          <xsd:enumeration value="Kilograms" />
+          <xsd:enumeration value="Ounces" />
+          <xsd:enumeration value="Pounds" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Length">
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1" />
+          <xsd:maxInclusive value="99999" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Width">
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1" />
+          <xsd:maxInclusive value="99999" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Height">
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1" />
+          <xsd:maxInclusive value="99999" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Weight">
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1" />
+          <xsd:maxInclusive value="99999999" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Quantity">
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1" />
+          <xsd:maxInclusive value="99999" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="ItemDescription">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="1000" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Comments">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="5000" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="DeliveryNature">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Domestic" />
+          <xsd:enumeration value="International" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="DeliveryType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Door to Door" />
+          <xsd:enumeration value="Depot to Depot" />
+          <xsd:enumeration value="Port to Port" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CountryCode">
+        <xsd:restriction base="xsd:string">
+          <xsd:pattern value="[A-Z]{2}" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="PostalCode">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="10" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Suburb">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="State">
+        <xsd:restriction base="xsd:string">
+          <xsd:pattern value="[A-Z]{3}" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="City">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="PortName">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="PortType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Sea" />
+          <xsd:enumeration value="Air" />
+          <xsd:enumeration value="Any" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="LocationType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Residence" />
+          <xsd:enumeration value="Business" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Date">
+        <xsd:restriction base="xsd:string">
+          <xsd:pattern value="20[0-9]{2}-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Datetime">
+        <xsd:restriction base="xsd:string">
+          <xsd:pattern value="20[0-9]{2}-(0[1-9]|1[012])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="ReadyTime">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="AM" />
+          <xsd:enumeration value="PM" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CurrencyAmount">
+        <xsd:restriction base="xsd:decimal">
+          <xsd:totalDigits value="8" />
+          <xsd:fractionDigits value="2" />
+          <xsd:maxInclusive value="999999.99" />
+          <xsd:minInclusive value="-999999.99" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CurrencyType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="AUD" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="DeliveryMethod">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Eta">
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1" />
+          <xsd:maxInclusive value="999999999" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="AdjustmentDescription">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CarrierId">
+        <xsd:restriction base="xsd:int">
+          <xsd:minInclusive value="1" />
+          <xsd:maxInclusive value="999999999" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CompanyName">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="100" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="ContactName">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="100" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Address">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="100" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Phone">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Fax">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Email">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="500" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="Website">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="300" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CarrierConditions">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="20000" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="DepotName">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="DepotInstructions">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="5000" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="InclusionSummary">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="InclusionDetails">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="500" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="LocationName">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="PaymentType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Credit Card" />
+          <xsd:enumeration value="Account" />
+          <xsd:enumeration value="Credit" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CreditCardType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="MasterCard" />
+          <xsd:enumeration value="Visa" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CreditCardExpiryDate">
+        <xsd:restriction base="xsd:string">
+          <xsd:pattern value="(0[1-9]|1[012])-20[0-9]{2}" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CreditCardNumber">
+        <xsd:restriction base="xsd:string">
+          <xsd:pattern value="[0-9]{16}" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="CreditCardName">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="ClientReference">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="PromotionCode">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="10" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="BookingNumber">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="ConsignmentNumber">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="50" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="ConsignmentDocument">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="1000000" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="ConsignmentDocumentType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="application/pdf" />
+          <xsd:enumeration value="application/msword" />
+          <xsd:enumeration value="application/excel" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="TrackingStatus">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Unavailable" />
+          <xsd:enumeration value="Issue" />
+          <xsd:enumeration value="Awaiting Pickup" />
+          <xsd:enumeration value="In Transit" />
+          <xsd:enumeration value="Delivered" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="TrackingFurtherDetails">
+        <xsd:restriction base="xsd:string">
+          <xsd:maxLength value="300" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="RequestStatus">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Awaiting Acceptance" />
+          <xsd:enumeration value="Awaiting Booking" />
+          <xsd:enumeration value="Completed" />
+          <xsd:enumeration value="Cancelled" />
+        </xsd:restriction>
+      </xsd:simpleType>
+      <xsd:simpleType name="GeneratedType">
+        <xsd:restriction base="xsd:string">
+          <xsd:enumeration value="Manually" />
+          <xsd:enumeration value="Automatically" />
+        </xsd:restriction>
+      </xsd:simpleType>
+    </xsd:schema>
+  </types>
+  <message name="getQuotesByRequest">
+    <part name="getQuotesByRequest" element="server:getQuotesByRequest" />
+  </message>
+  <message name="getQuotesByRequestResponse">
+    <part name="getQuotesByRequestResponse" element="server:getQuotesByRequestResponse" />
+  </message>
+  <message name="makeBookingByRequest">
+    <part name="makeBookingByRequest" element="server:makeBookingByRequest" />
+  </message>
+  <message name="makeBookingByRequestResponse">
+    <part name="makeBookingByRequestResponse" element="server:makeBookingByRequestResponse" />
+  </message>
+  <message name="getRequestIdByReference">
+    <part name="getRequestIdByReference" element="server:getRequestIdByReference" />
+  </message>
+  <message name="getRequestIdByReferenceResponse">
+    <part name="getRequestIdByReferenceResponse" element="server:getRequestIdByReferenceResponse" />
+  </message>
+  <message name="lodgeRequest">
+    <part name="lodgeRequest" element="server:lodgeRequest" />
+  </message>
+  <message name="lodgeRequestResponse">
+    <part name="lodgeRequestResponse" element="server:lodgeRequestResponse" />
+  </message>
+  <message name="makeBookingById">
+    <part name="makeBookingById" element="server:makeBookingById" />
+  </message>
+  <message name="makeBookingByIdResponse">
+    <part name="makeBookingByIdResponse" element="server:makeBookingByIdResponse" />
+  </message>
+  <message name="getRequest">
+    <part name="getRequest" element="server:getRequest" />
+  </message>
+  <message name="getRequestResponse">
+    <part name="getRequestResponse" element="server:getRequestResponse" />
+  </message>
+  <message name="getRequestsRequiringBooking">
+    <part name="getRequestsRequiringBooking" element="server:getRequestsRequiringBooking" />
+  </message>
+  <message name="getRequestsRequiringBookingResponse">
+    <part name="getRequestsRequiringBookingResponse" element="server:getRequestsRequiringBookingResponse" />
+  </message>
+  <message name="addBookingDetails">
+    <part name="addBookingDetails" element="server:addBookingDetails" />
+  </message>
+  <message name="addBookingDetailsResponse">
+    <part name="addBookingDetailsResponse" element="server:addBookingDetailsResponse" />
+  </message>
+  <portType name="quoting_portType">
+    <operation name="getQuotesByRequest">
+      <documentation>Returns quotes</documentation>
+      <input message="tns:getQuotesByRequest" />
+      <output message="tns:getQuotesByRequestResponse" />
+    </operation>
+    <operation name="makeBookingByRequest">
+      <documentation>Makes a Booking</documentation>
+      <input message="tns:makeBookingByRequest" />
+      <output message="tns:makeBookingByRequestResponse" />
+    </operation>
+    <operation name="getRequestIdByReference">
+      <documentation>Returns quotes</documentation>
+      <input message="tns:getRequestIdByReference" />
+      <output message="tns:getRequestIdByReferenceResponse" />
+    </operation>
+    <operation name="lodgeRequest">
+      <documentation>Returns quotes</documentation>
+      <input message="tns:lodgeRequest" />
+      <output message="tns:lodgeRequestResponse" />
+    </operation>
+    <operation name="makeBookingById">
+      <documentation>Returns quotes</documentation>
+      <input message="tns:makeBookingById" />
+      <output message="tns:makeBookingByIdResponse" />
+    </operation>
+    <operation name="getRequest">
+      <documentation>Returns request</documentation>
+      <input message="tns:getRequest" />
+      <output message="tns:getRequestResponse" />
+    </operation>
+    <operation name="getRequestsRequiringBooking">
+      <documentation>Returns requests</documentation>
+      <input message="tns:getRequestsRequiringBooking" />
+      <output message="tns:getRequestsRequiringBookingResponse" />
+    </operation>
+    <operation name="addBookingDetails">
+      <documentation>Makes a Booking</documentation>
+      <input message="tns:addBookingDetails" />
+      <output message="tns:addBookingDetailsResponse" />
+    </operation>
+  </portType>
+  <binding name="quoting_binding" type="tns:quoting_portType">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" />
+    <operation name="getQuotesByRequest">
+      <soap:operation soapAction="" />
+      <input>
+        <soap:body use="literal" />
+      </input>
+      <output>
+        <soap:body use="literal" />
+      </output>
+    </operation>
+    <operation name="makeBookingByRequest">
+      <soap:operation soapAction="" />
+      <input>
+        <soap:body use="literal" />
+      </input>
+      <output>
+        <soap:body use="literal" />
+      </output>
+    </operation>
+    <operation name="getRequestIdByReference">
+      <soap:operation soapAction="" />
+      <input>
+        <soap:body use="literal" />
+      </input>
+      <output>
+        <soap:body use="literal" />
+      </output>
+    </operation>
+    <operation name="lodgeRequest">
+      <soap:operation soapAction="" />
+      <input>
+        <soap:body use="literal" />
+      </input>
+      <output>
+        <soap:body use="literal" />
+      </output>
+    </operation>
+    <operation name="makeBookingById">
+      <soap:operation soapAction="" />
+      <input>
+        <soap:body use="literal" />
+      </input>
+      <output>
+        <soap:body use="literal" />
+      </output>
+    </operation>
+    <operation name="getRequest">
+      <soap:operation soapAction="" />
+      <input>
+        <soap:body use="literal" />
+      </input>
+      <output>
+        <soap:body use="literal" />
+      </output>
+    </operation>
+    <operation name="getRequestsRequiringBooking">
+      <soap:operation soapAction="" />
+      <input>
+        <soap:body use="literal" />
+      </input>
+      <output>
+        <soap:body use="literal" />
+      </output>
+    </operation>
+    <operation name="addBookingDetails">
+      <soap:operation soapAction="" />
+      <input>
+        <soap:body use="literal" />
+      </input>
+      <output>
+        <soap:body use="literal" />
+      </output>
+    </operation>
+  </binding>
+  <service name="quoting_Service">
+    <port name="quoting_port" binding="tns:quoting_binding">
+      <soap:address location="https://api.temando.com/soapServer.html" />
+    </port>
+  </service>
+</definitions>
