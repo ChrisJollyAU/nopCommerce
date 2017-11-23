@@ -1,0 +1,72 @@
+﻿@using System.Threading.Tasks
+@model Nop.Plugin.Payments.ZipMoney.Models.ConfigurationModel
+@inject Nop.Core.IWebHelper webHelper
+@{
+    Layout = "_ConfigurePlugin";
+}
+
+@await Component.InvokeAsync("StoreScopeConfiguration")
+
+<form asp-controller="PaymentZipMoney" asp-action="Configure" method="post">
+    <div class="panel-group">
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="UseSandbox_OverrideForStore" asp-input="UseSandbox" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="UseSandbox" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="UseSandbox" />
+                        <span asp-validation-for="UseSandbox"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="SandboxAPIKey_OverrideForStore" asp-input="SandboxAPIKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="SandboxAPIKey" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="SandboxAPIKey" />
+                        <span asp-validation-for="SandboxAPIKey"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="SandboxPublicKey_OverrideForStore" asp-input="SandboxPublicKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="SandboxPublicKey" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="SandboxPublicKey" />
+                        <span asp-validation-for="SandboxPublicKey"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="ProductionAPIKey_OverrideForStore" asp-input="ProductionAPIKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="ProductionAPIKey" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="ProductionAPIKey" />
+                        <span asp-validation-for="ProductionAPIKey"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        <nop-override-store-checkbox asp-for="ProductionPublicKey_OverrideForStore" asp-input="ProductionPublicKey" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />
+                        <nop-label asp-for="ProductionPublicKey" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="ProductionPublicKey" />
+                        <span asp-validation-for="ProductionPublicKey"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-9 col-md-offset-3">
+                        <input type="submit" name="save" class="btn bg-primary" value="@T("Admin.Common.Save")" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>

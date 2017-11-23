@@ -1,0 +1,17 @@
+﻿@{
+    Layout = "";
+}
+<script src="https://static.zipmoney.com.au/checkout/checkout-v1.min.js"></script>
+<table width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+        <td>
+            <button id="zip">Pay with zip</button>
+        </td>
+    </tr>
+</table>
+<script>
+    Zip.Checkout.attachButton('#zip', { 
+        checkoutUri: '/zip/checkout',
+        redirectUri: '/zip/return'
+    });
+</script>
