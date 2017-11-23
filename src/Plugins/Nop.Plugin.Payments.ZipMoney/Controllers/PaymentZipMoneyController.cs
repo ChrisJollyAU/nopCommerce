@@ -16,7 +16,7 @@ using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
-using Nop.Plugin.Payments.ZipMoney.ZipModel;
+using Nop.Plugin.Payments.ZipMoney.ZipMoneySDK.Models;
 using Nop.Web.Framework;
 using Nop.Services.Security;
 using Nop.Services.Stores;
@@ -154,16 +154,12 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             HttpClient client = new HttpClient();
             Shopper shopper = new Shopper();
             string shopser = JsonConvert.SerializeObject(shopper);
-
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer",zipMoneyPaymentSettings.UseSandbox ? zipMoneyPaymentSettings.SandboxAPIKey : zipMoneyPaymentSettings.ProductionAPIKey);
-            client.DefaultRequestHeaders.Add("Content-Type", "application/json");
-            client.DefaultRequestHeaders.Add("Zip-Version", "2017-03-01");
-            client.DefaultRequestHeaders.Add("Idempotency-Key", "");
-            var result = await client.PostAsync("https://api.sandbox.zipmoney.com.au/merchant/v1/checkouts",
-                new StringContent(shopser, Encoding.UTF8, "application/json"));
-            var r = await result.Content.ReadAsStringAsync();
-            //ZipCheckoutResponse zcr = JsonConvert.DeserializeObject<ZipCheckoutResponse>(r);
-            return r;
+            string apikey = zipMoneyPaymentSettings.UseSandbox
+                ? zipMoneyPaymentSettings.SandboxAPIKey
+                : zipMoneyPaymentSettings.ProductionAPIKey;
+            ZipMoney.ZipMoneySDK.ZipMoney zm = new ZipMoneySDK.ZipMoney(true,apikey);
+            ZipCheckoutResponse zcr = await zm.CreateCheckout(shopper);
+            return JsonConvert.SerializeObject(zcr);
         }
 
         public IActionResult ZipRedirect()

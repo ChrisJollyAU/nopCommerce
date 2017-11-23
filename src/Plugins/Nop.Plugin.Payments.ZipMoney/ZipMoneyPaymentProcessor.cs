@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Net.Http;
 using Microsoft.AspNetCore.Http;
 using Nop.Core;
 using Nop.Core.Domain.Directory;
@@ -50,8 +51,8 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            processPaymentRequest.
-            throw new System.NotImplementedException();
+            HttpClient client = new HttpClient();
+            client.PostAsync("https://api.sandbox.zipmoney.com.au/merchant/v1/charges/{chargeId}/capture")
         }
 
         public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
