@@ -11,6 +11,8 @@ namespace ZipMoneySDK.Models
         public ZipOrder()
         {
             items = new List<ZipOrderItem>();
+            shipping = new ZipShipping();
+            items = new List<ZipOrderItem>();
         }
         public string reference { get; set; }
         public decimal order_amount { get; set; }

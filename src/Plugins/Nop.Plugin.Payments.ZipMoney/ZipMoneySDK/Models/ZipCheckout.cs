@@ -7,6 +7,10 @@ namespace ZipMoneySDK.Models
         public ZipCheckout()
         {
             metadata = new Dictionary<string, string>();
+            shopper = new ZipShopper();
+            order = new ZipOrder();
+            features = new ZipFeatures();
+            config = new ZipConfig();
         }
         public ZipShopper shopper { get; set; }
         public ZipOrder order { get; set; }

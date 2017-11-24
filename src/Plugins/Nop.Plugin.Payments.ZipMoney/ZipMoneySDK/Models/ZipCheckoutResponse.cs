@@ -8,6 +8,14 @@ namespace ZipMoneySDK.Models
 {
     public class ZipCheckoutResponse
     {
+        public ZipCheckoutResponse()
+        {
+            shopper = new ZipShopper();
+            order = new ZipOrder();
+            features = new ZipFeatures();
+            metadata = new Dictionary<string, string>();
+            config = new ZipConfig();
+        }
         public string id { get; set; }
         public string uri { get; set; }
         public string type { get; set; }

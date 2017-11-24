@@ -8,6 +8,11 @@ namespace ZipMoneySDK.Models
 {
     public class ZipCharge
     {
+        public ZipCharge()
+        {
+            authority = new ZipAuthority();
+            order = new ZipOrder();
+        }
         public ZipAuthority authority { get; set; }
         public string reference { get; set; }
         public decimal amount { get; set; }

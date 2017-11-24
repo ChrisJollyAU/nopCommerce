@@ -8,6 +8,11 @@ namespace ZipMoneySDK.Models
 {
     public class ZipShopper
     {
+        public ZipShopper()
+        {
+            statistics = new ZipStatistics();
+            billing_address = new ZipAddress();
+        }
         public string title { get; set; }
         public string first_name { get; set; }
         public string last_name { get; set; }

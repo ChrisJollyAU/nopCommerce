@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Nop.Core;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
+using Nop.Core.Domain.Payments;
 using Nop.Core.Plugins;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
@@ -48,20 +49,20 @@ namespace Nop.Plugin.Payments.ZipMoney
             this._webHelper = webHelper;
             this._checkoutAttributeParser = checkoutAttributeParser;
             this._taxService = taxService;
-            zipMoney = new ZipMoneyProcessor(false, "apikey");
+            zipMoney = new ZipMoneyProcessor("apikey", false);
         }
 
         #endregion
 
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            ZipCharge zipcharge = new ZipCharge();
-            int chargeid = zipMoney.CreateCharge(zipcharge);
-            processPaymentRequest.CustomValues["ZipMoneyChargeId"] = chargeid;
-            ProcessPaymentResult result = new ProcessPaymentResult();
-            result.AllowStoringCreditCardNumber = false;
-            result.CaptureTransactionId = chargeid;
-            result.NewPaymentStatus = Core.Domain.Payments.PaymentStatus.Authorized;
+            var response = zipMoney.CaptureCharge(processPaymentRequest.CustomValues["ZipMoneyChargeId"].ToString(),processPaymentRequest.OrderTotal).Result;
+            ProcessPaymentResult result = new ProcessPaymentResult
+            {
+                AllowStoringCreditCardNumber = false,
+                CaptureTransactionId = response.id,
+                NewPaymentStatus = PaymentStatus.Paid
+            };
             return result;
         }
 
@@ -77,21 +78,29 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
         {
-            throw new System.NotImplementedException();
+            return 0;
         }
 
         public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
         {
             string chargeId = capturePaymentRequest.Order.AuthorizationTransactionId;
-            zipMoney.CaptureCharge(chargeId, capturePaymentRequest.Order.OrderTotal);
-            CapturePaymentResult result = new CapturePaymentResult();
-            result.NewPaymentStatus = Core.Domain.Payments.PaymentStatus.Paid;
+            var response = zipMoney.CaptureCharge(chargeId, capturePaymentRequest.Order.OrderTotal).Result;
+            CapturePaymentResult result = new CapturePaymentResult
+            {
+                NewPaymentStatus = PaymentStatus.Paid
+            };
             return result;
         }
 
         public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
         {
-            throw new System.NotImplementedException();
+            RefundPaymentResult result = new RefundPaymentResult();
+            var response = zipMoney.CreateRefund(refundPaymentRequest.Order.CaptureTransactionId, "",
+                refundPaymentRequest.AmountToRefund).Result;
+            result.NewPaymentStatus = refundPaymentRequest.IsPartialRefund
+                ? PaymentStatus.PartiallyRefunded
+                : PaymentStatus.Refunded;
+            return result;
         }
 
         public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
