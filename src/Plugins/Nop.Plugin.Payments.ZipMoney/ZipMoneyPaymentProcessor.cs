@@ -11,6 +11,8 @@ using Nop.Services.Directory;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Tax;
+using ZipMoneySDK;
+using ZipMoneySDK.Models;
 
 namespace Nop.Plugin.Payments.ZipMoney
 {
@@ -28,6 +30,7 @@ namespace Nop.Plugin.Payments.ZipMoney
         private readonly IWebHelper _webHelper;
         private readonly ICheckoutAttributeParser _checkoutAttributeParser;
         private readonly ITaxService _taxService;
+        private ZipMoneyProcessor zipMoney;
         #endregion
 
         #region Ctor
@@ -45,14 +48,21 @@ namespace Nop.Plugin.Payments.ZipMoney
             this._webHelper = webHelper;
             this._checkoutAttributeParser = checkoutAttributeParser;
             this._taxService = taxService;
+            zipMoney = new ZipMoneyProcessor(false, "apikey");
         }
 
         #endregion
 
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            HttpClient client = new HttpClient();
-            client.PostAsync("https://api.sandbox.zipmoney.com.au/merchant/v1/charges/{chargeId}/capture")
+            ZipCharge zipcharge = new ZipCharge();
+            int chargeid = zipMoney.CreateCharge(zipcharge);
+            processPaymentRequest.CustomValues["ZipMoneyChargeId"] = chargeid;
+            ProcessPaymentResult result = new ProcessPaymentResult();
+            result.AllowStoringCreditCardNumber = false;
+            result.CaptureTransactionId = chargeid;
+            result.NewPaymentStatus = Core.Domain.Payments.PaymentStatus.Authorized;
+            return result;
         }
 
         public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
@@ -72,7 +82,11 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
         {
-            throw new System.NotImplementedException();
+            string chargeId = capturePaymentRequest.Order.AuthorizationTransactionId;
+            zipMoney.CaptureCharge(chargeId, capturePaymentRequest.Order.OrderTotal);
+            CapturePaymentResult result = new CapturePaymentResult();
+            result.NewPaymentStatus = Core.Domain.Payments.PaymentStatus.Paid;
+            return result;
         }
 
         public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)

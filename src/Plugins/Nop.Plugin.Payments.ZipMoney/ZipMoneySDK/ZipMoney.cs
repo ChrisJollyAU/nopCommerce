@@ -6,16 +6,16 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Nop.Plugin.Payments.ZipMoney.ZipMoneySDK.Models;
+using ZipMoneySDK.Models;
 
-namespace Nop.Plugin.Payments.ZipMoney.ZipMoneySDK
+namespace ZipMoneySDK
 {
-    public class ZipMoney
+    public class ZipMoneyProcessor
     {
         private readonly bool _useSandbox;
         private HttpClient client;
         private readonly string _apiKey;
-        public ZipMoney(bool useSandbox = false,string ApiKey)
+        public ZipMoneyProcessor(bool useSandbox = false,string ApiKey)
         {
             _useSandbox = useSandbox;
             _apiKey = ApiKey;
@@ -26,18 +26,18 @@ namespace Nop.Plugin.Payments.ZipMoney.ZipMoneySDK
             client.DefaultRequestHeaders.Add("Idempotency-Key", "");
         }
 
-        public async Task<ZipCheckoutResponse> CreateCheckout(Shopper shopper)
+        public async Task<ZipCheckoutResponse> CreateCheckout(ZipCheckout checkout)
         {
-            string shopser = JsonConvert.SerializeObject(shopper);
+            string checkoutser = JsonConvert.SerializeObject(checkout);
             string uri;
             if (_useSandbox) uri = "https://api.sandbox.zipmoney.com.au/merchant/v1/checkouts";
             else uri = "";
             var result = await client.PostAsync(uri,
-                new StringContent(shopser, Encoding.UTF8, "application/json"));
+                new StringContent(checkoutser, Encoding.UTF8, "application/json"));
             return JsonConvert.DeserializeObject<ZipCheckoutResponse>(await result.Content.ReadAsStringAsync());
         }
 
-        public void CreateCharge()
+        public int CreateCharge(ZipCharge zipCharge)
         {
             
         }

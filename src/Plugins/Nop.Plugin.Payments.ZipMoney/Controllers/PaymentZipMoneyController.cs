@@ -16,10 +16,11 @@ using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
-using Nop.Plugin.Payments.ZipMoney.ZipMoneySDK.Models;
+using ZipMoneySDK.Models;
 using Nop.Web.Framework;
 using Nop.Services.Security;
 using Nop.Services.Stores;
+using ZipMoneySDK;
 
 namespace Nop.Plugin.Payments.ZipMoney.Controllers
 {
@@ -152,19 +153,27 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
             var zipMoneyPaymentSettings = _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
             HttpClient client = new HttpClient();
-            Shopper shopper = new Shopper();
-            string shopser = JsonConvert.SerializeObject(shopper);
+            ZipCheckout zipCheckout = new ZipCheckout();
             string apikey = zipMoneyPaymentSettings.UseSandbox
                 ? zipMoneyPaymentSettings.SandboxAPIKey
                 : zipMoneyPaymentSettings.ProductionAPIKey;
-            ZipMoney.ZipMoneySDK.ZipMoney zm = new ZipMoneySDK.ZipMoney(true,apikey);
-            ZipCheckoutResponse zcr = await zm.CreateCheckout(shopper);
+            ZipMoneyProcessor zm = new ZipMoneyProcessor(true,apikey);
+            ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
             return JsonConvert.SerializeObject(zcr);
         }
 
-        public IActionResult ZipRedirect()
+        public IActionResult ZipRedirect(string result,string checkoutid)
         {
-            
+            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var zipMoneyPaymentSettings = _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
+            HttpClient client = new HttpClient();
+            ZipCharge zipCharge = new ZipCharge();
+            string apikey = zipMoneyPaymentSettings.UseSandbox
+                ? zipMoneyPaymentSettings.SandboxAPIKey
+                : zipMoneyPaymentSettings.ProductionAPIKey;
+            ZipMoneyProcessor zm = new ZipMoneyProcessor(true, apikey);
+            int chargeid = zm.CreateCharge(zipCharge);
+
         }
     }
 }
