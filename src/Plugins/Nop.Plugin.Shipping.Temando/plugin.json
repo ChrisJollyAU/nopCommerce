@@ -1,11 +1,11 @@
 ﻿{
   "Group": "Shipping rate computation",
-  "FriendlyName": "Manual (Fixed or By Weight)",
-  "SystemName": "Shipping.FixedOrByWeight",
+  "FriendlyName": "Temando Shipping",
+  "SystemName": "Shipping.Temando",
   "Version": "1.18",
   "SupportedVersions": [ "4.00" ],
-  "Author": "nopCommerce team",
+  "Author": "Chris",
   "DisplayOrder": 1,
-  "FileName": "Nop.Plugin.Shipping.FixedOrByWeight.dll",
-  "Description": "This plugin offers shipping rates with fixed fee or calculated by weight"
+  "FileName": "Nop.Plugin.Shipping.Temando.dll",
+  "Description": "This plugin offers shipping rates from Temando"
 }

@@ -17,6 +17,7 @@ using ZipMoneySDK.Models;
 
 namespace Nop.Plugin.Payments.ZipMoney
 {
+    /// <inheritdoc />
     /// <summary>
     /// PayPalStandard payment processor
     /// </summary>
@@ -152,5 +153,16 @@ namespace Nop.Plugin.Payments.ZipMoney
         public PaymentMethodType PaymentMethodType => PaymentMethodType.Standard;
         public bool SkipPaymentInfo { get; }
         public string PaymentMethodDescription { get; }
+
+
+        public override void Install()
+        {
+            base.Install();
+        }
+
+        public override void Uninstall()
+        {
+            base.Uninstall();
+        }
     }
 }

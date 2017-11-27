@@ -14,5 +14,6 @@ namespace ZipMoneySDK.Models
         public string type { get; set; }
         public string reference { get; set; }
         public string image_uri {get; set;}
+        public string item_uri { get; set; }
     }
 }
