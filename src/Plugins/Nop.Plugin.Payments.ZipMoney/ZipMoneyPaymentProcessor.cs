@@ -126,12 +126,13 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public IList<string> ValidatePaymentForm(IFormCollection form)
         {
-            throw new System.NotImplementedException();
+            return new List<string>();
         }
 
         public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
         {
-            throw new System.NotImplementedException();
+            ProcessPaymentRequest processPaymentRequest = new ProcessPaymentRequest();
+            return processPaymentRequest;
         }
 
         public override string GetConfigurationPageUrl()

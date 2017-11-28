@@ -26,5 +26,6 @@ namespace ZipMoneySDK.Models
         public DateTime created { get; set; }
         public string state { get; set; }
         public ZipConfig config { get; set; }
+        public string redirect_uri { get; set; }
     }
 }

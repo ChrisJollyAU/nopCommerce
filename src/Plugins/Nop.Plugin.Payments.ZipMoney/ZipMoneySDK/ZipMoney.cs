@@ -22,7 +22,7 @@ namespace ZipMoneySDK
             _apiKey = ApiKey;
             client = new HttpClient();
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-            client.DefaultRequestHeaders.Add("Content-Type", "application/json");
+            //client.DefaultRequestHeaders.Add("Content-Type", "application/json");
             client.DefaultRequestHeaders.Add("Zip-Version", "2017-03-01");
             client.DefaultRequestHeaders.Add("Idempotency-Key", "");
         }
@@ -33,7 +33,10 @@ namespace ZipMoneySDK
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/checkouts" : "";
             var result = await client.PostAsync(uri,
                 new StringContent(checkoutser, Encoding.UTF8, "application/json"));
-            return JsonConvert.DeserializeObject<ZipCheckoutResponse>(await result.Content.ReadAsStringAsync());
+
+            var result2 = JsonConvert.DeserializeObject<ZipCheckoutResponse>(await result.Content.ReadAsStringAsync());
+            result2.redirect_uri = result2.uri;
+            return result2;
         }
 
         public async Task<ZipCheckout> RetreiveCheckout(string checkoutId)

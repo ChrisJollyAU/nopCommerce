@@ -41,8 +41,7 @@ using Nop.Services.Tax;
 
 namespace Nop.Plugin.Payments.ZipMoney.Controllers
 {
-    [AuthorizeAdmin]
-    [Area(AreaNames.Admin)]
+    
     public class PaymentZipMoneyController : BasePaymentController
     {
         private readonly ISettingService _settingService;
@@ -85,10 +84,25 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             ZipMoneyPaymentSettings zipMoneyPaymentSettings,
             IStoreContext storeContext,
             PaymentSettings paymentSettings,
-            ShoppingCartService shoppingCartService,
+            IShoppingCartService shoppingCartService,
             IPermissionService permissionService,
             ICustomerService customerService,
             ICurrencyService currencyService,
+            CurrencySettings currencySettings,
+            ILanguageService languageService,
+            IAffiliateService affiliateService,
+            OrderSettings orderSettings,
+            TaxSettings taxSettings,
+            IPriceFormatter priceFormatter,
+            IOrderTotalCalculationService orderTotalCalculationService,
+            IProductAttributeFormatter productAttributeFormatter,
+            IProductService productService,
+            ICheckoutAttributeFormatter checkoutAttributeFormatter,
+            IProductAttributeParser productAttributeParser,
+            ShippingSettings shippingSettings,
+            ICountryService countryService,
+            IStateProvinceService stateProvinceService,
+            ITaxService taxService,
             ILocalizationService localizationService)
         {
             this._workContext = workContext;
@@ -105,7 +119,23 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             this._permissionService = permissionService;
             this._customerService = customerService;
             this._storeContext = storeContext;
-            _currencyService = currencyService;
+            this._currencySettings = currencySettings;
+            this._affiliateService = affiliateService;
+            this._languageService = languageService;
+            this._currencyService = currencyService;
+            _orderSettings = orderSettings;
+            _taxSettings = taxSettings;
+            _priceFormatter = priceFormatter;
+            _orderTotalCalculationService = orderTotalCalculationService;
+            _productAttributeFormatter = productAttributeFormatter;
+            _productService = productService;
+            _checkoutAttributeFormatter = checkoutAttributeFormatter;
+            _productAttributeParser = productAttributeParser;
+            _shippingSettings = shippingSettings;
+            _countryService = countryService;
+            _stateProvinceService = stateProvinceService;
+            _taxService = taxService;
+
         }
 
         [AuthorizeAdmin]
@@ -149,6 +179,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         [AuthorizeAdmin]
         [AdminAntiForgery]
         [Area(AreaNames.Admin)]
+        [HttpPost]
         public IActionResult Configure(ConfigurationModel model)
         {
             //whether user has the authority
@@ -226,7 +257,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             zipCheckout.shopper.statistics.currency = "AUD";
             if (details.Customer.LastLoginDateUtc != null)
                 zipCheckout.shopper.statistics.last_login = details.Customer.LastLoginDateUtc.Value;
-            zipCheckout.order.order_amount = details.OrderTotal;
+            zipCheckout.order.amount = details.OrderTotal;
             zipCheckout.order.shipping.pickup = details.PickUpInStore;
             zipCheckout.order.shipping.address.line1 = details.ShippingAddress.Address1;
             zipCheckout.order.shipping.address.line2 = details.ShippingAddress.Address2;
@@ -240,13 +271,14 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             {
                 ZipOrderItem zipOrderItem = new ZipOrderItem
                 {
-                    amount = item.Product.Price * item.Quantity,
+                    amount = item.Product.Price,
                     name = item.Product.Name,
                     quantity = item.Quantity,
                     type = "sku",
                     reference = item.Product.Sku
                 };
-                var url = "https://www.freerangesupplies.com.au/content/images/";
+                
+                var url = _storeContext.CurrentStore.Url + "/content/images/";
                 string fname = "" + item.Product.ProductPictures.First().Picture.Id;
                 switch (item.Product.ProductPictures.First().Picture.MimeType)
                 {
@@ -287,7 +319,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             discountItem.reference = "discount";
             zipCheckout.order.items.Add(discountItem);
 
-            zipCheckout.config.redirect_uri = "~/Payment.ZipMoney/ZipRedirect";
+            zipCheckout.config.redirect_uri = _storeContext.CurrentStore.Url  + "/PaymentZipMoney/ZipRedirect";
 
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
@@ -296,6 +328,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
 
         public IActionResult ZipRedirect(string result, string checkoutid)
         {
+            if (result == null) return null;
             if (result.ToLowerInvariant().Equals("approved"))
             {
                 var details = GetOrderDetails();
