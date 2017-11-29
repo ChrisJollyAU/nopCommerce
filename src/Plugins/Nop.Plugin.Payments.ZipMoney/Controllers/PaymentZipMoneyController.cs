@@ -258,6 +258,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             if (details.Customer.LastLoginDateUtc != null)
                 zipCheckout.shopper.statistics.last_login = details.Customer.LastLoginDateUtc.Value;
             zipCheckout.order.amount = details.OrderTotal;
+            zipCheckout.order.currency = "AUD";
             zipCheckout.order.shipping.pickup = details.PickUpInStore;
             zipCheckout.order.shipping.address.line1 = details.ShippingAddress.Address1;
             zipCheckout.order.shipping.address.line2 = details.ShippingAddress.Address2;
@@ -326,7 +327,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             return JsonConvert.SerializeObject(zcr);
         }
 
-        public IActionResult ZipRedirect(string result, string checkoutid)
+        public async Task<IActionResult> ZipRedirect(string result, string checkoutid)
         {
             if (result == null) return null;
             if (result.ToLowerInvariant().Equals("approved"))
@@ -345,10 +346,28 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 zipCharge.amount = amount;
                 zipCharge.currency = "AUD";
                 ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
-                var response = zm.CreateCharge(zipCharge).Result;
-                return RedirectToPage("~/confirmorder");
+                ZipBaseResponse response;
+                //response = zm.CreateCharge(zipCharge).Result;
+                using (HttpClient client = new HttpClient())
+                {
+                    client.BaseAddress = new Uri(_storeContext.CurrentStore.Url);
+                    if (_storeContext.CurrentStore.SslEnabled &&
+                        !string.IsNullOrEmpty(_storeContext.CurrentStore.SecureUrl))
+                    {
+                        client.BaseAddress = new Uri(_storeContext.CurrentStore.SecureUrl);
+                    }
+                    var content = new FormUrlEncodedContent(new[]
+                    {
+                        new KeyValuePair<string, string>("nextstep", "nextstep"),
+                        new KeyValuePair<string, string>("ZipCheckoutId", checkoutid),
+                        new KeyValuePair<string, string>("ZipChargeId", /*response.id*/ "responseid"),
+                        new KeyValuePair<string, string>("ZipCheckoutResult", result)
+                    });
+                    await client.PostAsync("/checkout/PaymentInfo", content);
+                    return RedirectToPage("/checkout/CheckoutConfirm");
+                }
             }
-            return RedirectToPage("~/cart");
+            return RedirectToPage("/cart");
         }
 
         PlaceOrderContainer GetOrderDetails()

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Net.Http;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Primitives;
 using Nop.Core;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
@@ -57,13 +58,18 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            var response = zipMoney.CaptureCharge(processPaymentRequest.CustomValues["ZipMoneyChargeId"].ToString(),processPaymentRequest.OrderTotal).Result;
-            ProcessPaymentResult result = new ProcessPaymentResult
-            {
-                AllowStoringCreditCardNumber = false,
-                CaptureTransactionId = response.id,
-                NewPaymentStatus = PaymentStatus.Paid
-            };
+            ZipBaseResponse response;
+            //response = zipMoney.CaptureCharge(processPaymentRequest.CustomValues["ZipMoneyChargeId"].ToString(),processPaymentRequest.OrderTotal).Result;
+            ProcessPaymentResult result = new ProcessPaymentResult();
+            return result;
+            if (response.state.ToLowerInvariant().Equals("captured")) {
+                result = new ProcessPaymentResult
+                {
+                    AllowStoringCreditCardNumber = false,
+                    CaptureTransactionId = response.id,
+                    NewPaymentStatus = PaymentStatus.Paid
+                };
+            }
             return result;
         }
 
@@ -126,12 +132,21 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public IList<string> ValidatePaymentForm(IFormCollection form)
         {
-            return new List<string>();
+            var result =  new List<string>();
+            if (!form.ContainsKey("ZipCheckoutId"))
+                result.Add("No ZipMoney checkout was provided");
+            if (!form.ContainsKey("ZipChargeId"))
+                result.Add("No ZipMoney charge was provided");
+            return result;
         }
 
         public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
         {
             ProcessPaymentRequest processPaymentRequest = new ProcessPaymentRequest();
+            form.TryGetValue("ZipChargeId", out StringValues chargeid);
+            form.TryGetValue("ZipChargeId", out StringValues checkoutid);
+            processPaymentRequest.CustomValues["ZipChargeId"] = chargeid[0];
+            processPaymentRequest.CustomValues["ZipCheckoutId"] = checkoutid[0];
             return processPaymentRequest;
         }
 

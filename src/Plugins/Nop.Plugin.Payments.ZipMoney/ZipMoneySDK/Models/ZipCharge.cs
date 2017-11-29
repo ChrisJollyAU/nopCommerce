@@ -11,7 +11,6 @@ namespace ZipMoneySDK.Models
         public ZipCharge()
         {
             authority = new ZipAuthority();
-            order = new ZipOrder();
         }
         public ZipAuthority authority { get; set; }
         public string reference { get; set; }
@@ -19,5 +18,10 @@ namespace ZipMoneySDK.Models
         public string currency { get; set; }
         public bool capture { get; set; }
         public ZipOrder order { get; set; }
+
+        public bool ShouldSerializeorder()
+        {
+            return order != null;
+        }
     }
 }

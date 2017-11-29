@@ -16,6 +16,7 @@ namespace ZipMoneySDK.Models
         }
         public string reference { get; set; }
         public decimal amount { get; set; }
+        public string currency { get; set; }
         public ZipShipping shipping { get; set; }
         public List<ZipOrderItem> items { get; set; }
     }
