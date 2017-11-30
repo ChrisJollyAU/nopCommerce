@@ -59,9 +59,8 @@ namespace Nop.Plugin.Payments.ZipMoney
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
             ZipBaseResponse response;
-            //response = zipMoney.CaptureCharge(processPaymentRequest.CustomValues["ZipMoneyChargeId"].ToString(),processPaymentRequest.OrderTotal).Result;
+            response = zipMoney.CaptureCharge(processPaymentRequest.CustomValues["ZipChargeId"].ToString(),processPaymentRequest.OrderTotal).Result;
             ProcessPaymentResult result = new ProcessPaymentResult();
-            return result;
             if (response.state.ToLowerInvariant().Equals("captured")) {
                 result = new ProcessPaymentResult
                 {
@@ -75,7 +74,7 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
         {
-            throw new System.NotImplementedException();
+            return;
         }
 
         public bool HidePaymentMethod(IList<ShoppingCartItem> cart)
@@ -112,22 +111,22 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
         {
-            throw new System.NotImplementedException();
+            return new VoidPaymentResult();
         }
 
         public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            throw new System.NotImplementedException();
+            return new ProcessPaymentResult();
         }
 
         public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
-            throw new System.NotImplementedException();
+            return new CancelRecurringPaymentResult();
         }
 
         public bool CanRePostProcessPayment(Order order)
         {
-            throw new System.NotImplementedException();
+            return false;
         }
 
         public IList<string> ValidatePaymentForm(IFormCollection form)
@@ -167,8 +166,8 @@ namespace Nop.Plugin.Payments.ZipMoney
         public bool SupportVoid => true;
         public RecurringPaymentType RecurringPaymentType => RecurringPaymentType.NotSupported;
         public PaymentMethodType PaymentMethodType => PaymentMethodType.Standard;
-        public bool SkipPaymentInfo { get; }
-        public string PaymentMethodDescription { get; }
+        public bool SkipPaymentInfo => false;
+        public string PaymentMethodDescription => "ZipMoney";
 
 
         public override void Install()

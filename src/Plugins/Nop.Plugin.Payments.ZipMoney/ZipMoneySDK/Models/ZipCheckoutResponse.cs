@@ -27,5 +27,11 @@ namespace ZipMoneySDK.Models
         public string state { get; set; }
         public ZipConfig config { get; set; }
         public string redirect_uri { get; set; }
+        public ZipError error { get; set; }
+
+        public bool ShouldSerializeerror()
+        {
+            return error != null;
+        }
     }
 }

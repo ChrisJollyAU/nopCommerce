@@ -2,10 +2,8 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Text;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Nop.Plugin.Payments.ZipMoney.Models;
 using Nop.Services.Configuration;
 using Nop.Services.Payments;
@@ -16,6 +14,7 @@ using Nop.Services.Localization;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Primitives;
 using Newtonsoft.Json;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Common;
@@ -34,10 +33,12 @@ using Nop.Services.Directory;
 using Nop.Services.Discounts;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Localization;
+using Nop.Core.Http.Extensions;
 using Nop.Services.Affiliates;
 using Nop.Services.Catalog;
-using Nop.Services.Media;
 using Nop.Services.Tax;
+using Nop.Web.Factories;
+using Nop.Services.Logging;
 
 namespace Nop.Plugin.Payments.ZipMoney.Controllers
 {
@@ -74,6 +75,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         private readonly ICountryService _countryService;
         private readonly IStateProvinceService _stateProvinceService;
         private readonly ITaxService _taxService;
+        private readonly IGenericAttributeService _genericAttributeService;
+        private readonly ICheckoutModelFactory _checkoutModelFactory;
+        private readonly ILogger _logger;
 
         public PaymentZipMoneyController(ISettingService settingService,
             IWorkContext workContext,
@@ -103,6 +107,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             ICountryService countryService,
             IStateProvinceService stateProvinceService,
             ITaxService taxService,
+            IGenericAttributeService genericAttributeService,
+            ICheckoutModelFactory checkoutModelFactory,
+            ILogger logger,
             ILocalizationService localizationService)
         {
             this._workContext = workContext;
@@ -134,6 +141,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             _shippingSettings = shippingSettings;
             _countryService = countryService;
             _stateProvinceService = stateProvinceService;
+            _genericAttributeService = genericAttributeService;
+            _checkoutModelFactory = checkoutModelFactory;
+            _logger = logger;
             _taxService = taxService;
 
         }
@@ -323,7 +333,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             zipCheckout.config.redirect_uri = _storeContext.CurrentStore.Url  + "/PaymentZipMoney/ZipRedirect";
 
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
+            _logger.Information(JsonConvert.SerializeObject(zipCheckout));
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
+            _logger.Information(JsonConvert.SerializeObject(zcr));
             return JsonConvert.SerializeObject(zcr);
         }
 
@@ -346,28 +358,69 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 zipCharge.amount = amount;
                 zipCharge.currency = "AUD";
                 ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
-                ZipBaseResponse response;
-                //response = zm.CreateCharge(zipCharge).Result;
-                using (HttpClient client = new HttpClient())
+                ZipBaseResponse response = zm.CreateCharge(zipCharge).Result;
+                var content = new Dictionary<string, StringValues>
                 {
-                    client.BaseAddress = new Uri(_storeContext.CurrentStore.Url);
-                    if (_storeContext.CurrentStore.SslEnabled &&
-                        !string.IsNullOrEmpty(_storeContext.CurrentStore.SecureUrl))
-                    {
-                        client.BaseAddress = new Uri(_storeContext.CurrentStore.SecureUrl);
-                    }
-                    var content = new FormUrlEncodedContent(new[]
-                    {
-                        new KeyValuePair<string, string>("nextstep", "nextstep"),
-                        new KeyValuePair<string, string>("ZipCheckoutId", checkoutid),
-                        new KeyValuePair<string, string>("ZipChargeId", /*response.id*/ "responseid"),
-                        new KeyValuePair<string, string>("ZipCheckoutResult", result)
-                    });
-                    await client.PostAsync("/checkout/PaymentInfo", content);
-                    return RedirectToPage("/checkout/CheckoutConfirm");
-                }
+                    { "nextstep", "Next"},
+                    { "ZipCheckoutId", checkoutid },
+                    { "ZipChargeId", response.id },
+                    { "ZipChargeState", response.state },
+                    { "ZipCheckoutResult", result }
+                };
+                FormCollection collection = new FormCollection(content);
+                return EnterPaymentInfo(collection);
             }
-            return RedirectToPage("/cart");
+            _log
+            return RedirectToRoute("ShoppingCart");
+        }
+
+        public virtual IActionResult EnterPaymentInfo(IFormCollection form)
+        {
+            //validation
+            var cart = _workContext.CurrentCustomer.ShoppingCartItems
+                .Where(sci => sci.ShoppingCartType == ShoppingCartType.ShoppingCart)
+                .LimitPerStore(_storeContext.CurrentStore.Id)
+                .ToList();
+            if (!cart.Any())
+                return RedirectToRoute("ShoppingCart");
+
+            if (_orderSettings.OnePageCheckoutEnabled)
+                return RedirectToRoute("CheckoutOnePage");
+
+            if (_workContext.CurrentCustomer.IsGuest() && !_orderSettings.AnonymousCheckoutAllowed)
+                return Challenge();
+
+            //Check whether payment workflow is required
+            var isPaymentWorkflowRequired = _orderProcessingService.IsPaymentWorkflowRequired(cart);
+            if (!isPaymentWorkflowRequired)
+            {
+                return RedirectToRoute("CheckoutConfirm");
+            }
+
+            //load payment method
+            var paymentMethodSystemName = _workContext.CurrentCustomer
+                .GetAttribute<string>(SystemCustomerAttributeNames.SelectedPaymentMethod, _genericAttributeService, _storeContext.CurrentStore.Id);
+            var paymentMethod = _paymentService.LoadPaymentMethodBySystemName(paymentMethodSystemName);
+            if (paymentMethod == null)
+                return RedirectToRoute("CheckoutPaymentMethod");
+
+            var warnings = paymentMethod.ValidatePaymentForm(form);
+            foreach (var warning in warnings)
+                ModelState.AddModelError("", warning);
+            if (ModelState.IsValid)
+            {
+                //get payment info
+                var paymentInfo = paymentMethod.GetPaymentInfo(form);
+
+                //session save
+                HttpContext.Session.Set("OrderPaymentInfo", paymentInfo);
+                return RedirectToRoute("CheckoutConfirm");
+            }
+
+            //If we got this far, something failed, redisplay form
+            //model
+            var model = _checkoutModelFactory.PreparePaymentInfoModel(paymentMethod);
+            return View(model);
         }
 
         PlaceOrderContainer GetOrderDetails()
