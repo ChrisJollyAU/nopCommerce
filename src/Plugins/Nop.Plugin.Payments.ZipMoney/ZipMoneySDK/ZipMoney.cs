@@ -16,6 +16,7 @@ namespace ZipMoneySDK
         private readonly bool _useSandbox;
         private HttpClient client;
         private readonly string _apiKey;
+        private ZipError error;
         public ZipMoneyProcessor(string ApiKey, bool useSandbox = false)
         {
             _useSandbox = useSandbox;
@@ -29,14 +30,23 @@ namespace ZipMoneySDK
 
         public async Task<ZipCheckoutResponse> CreateCheckout(ZipCheckout checkout)
         {
+            error = null;
             string checkoutser = JsonConvert.SerializeObject(checkout);
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/checkouts" : "";
             var result = await client.PostAsync(uri,
                 new StringContent(checkoutser, Encoding.UTF8, "application/json"));
-
-            var result2 = JsonConvert.DeserializeObject<ZipCheckoutResponse>(await result.Content.ReadAsStringAsync());
-            result2.redirect_uri = result2.uri;
-            return result2;
+            if (result.IsSuccessStatusCode)
+            {
+                var result2 = 
+                    JsonConvert.DeserializeObject<ZipCheckoutResponse>(await result.Content.ReadAsStringAsync());
+                result2.redirect_uri = result2.uri;
+                return result2;
+            }
+            error = JsonConvert.DeserializeObject<ZipError>(await result.Content.ReadAsStringAsync());
+            //a blank/empty response
+            //allows the calling code to pass the object straight back to lightbox
+            //as the uri/redirect_uri is empty the lightbox will close automatically
+            return new ZipCheckoutResponse();
         }
 
         public async Task<ZipCheckout> RetreiveCheckout(string checkoutId)
@@ -88,10 +98,12 @@ namespace ZipMoneySDK
         public async Task<ZipRefundResponse> CreateRefund(string chargeId, string reason, decimal amount)
         {
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/refunds" : "";
-            Dictionary<string,string> vals = new Dictionary<string, string>();
-            vals["charged_id"] = chargeId;
-            vals["reason"] = reason;
-            vals["amount"] = amount.ToString(CultureInfo.InvariantCulture);
+            Dictionary<string, string> vals = new Dictionary<string, string>
+            {
+                ["charged_id"] = chargeId,
+                ["reason"] = reason,
+                ["amount"] = amount.ToString(CultureInfo.InvariantCulture)
+            };
             var response = await client.PostAsync(uri, new StringContent(JsonConvert.SerializeObject(vals),Encoding.UTF8,"application/json"));
             return JsonConvert.DeserializeObject<ZipRefundResponse>(await response.Content.ReadAsStringAsync());
         }

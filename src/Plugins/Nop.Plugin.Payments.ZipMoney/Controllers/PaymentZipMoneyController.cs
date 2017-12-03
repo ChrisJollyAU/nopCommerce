@@ -359,6 +359,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 zipCharge.currency = "AUD";
                 ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
                 ZipBaseResponse response = zm.CreateCharge(zipCharge).Result;
+                if (string.IsNullOrEmpty(response.state)) return RedirectToRoute("CheckoutPaymentMethod");
+                if (response.state != "authorised" && response.state != "captured") return RedirectToRoute("CheckoutPaymentMethod");
                 var content = new Dictionary<string, StringValues>
                 {
                     { "nextstep", "Next"},
@@ -370,7 +372,19 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 FormCollection collection = new FormCollection(content);
                 return EnterPaymentInfo(collection);
             }
-            _log
+            else if (result.ToLowerInvariant().Equals("cancelled"))
+            {
+                return RedirectToRoute("CheckoutPaymentMethod");
+            }
+            else if (result.ToLowerInvariant().Equals("referred"))
+            {
+                
+            }
+            else if (result.ToLowerInvariant().Equals("declined"))
+            {
+                return RedirectToRoute("CheckoutPaymentMethod");
+            }
+            //if all else fails go back to the shopping cart
             return RedirectToRoute("ShoppingCart");
         }
 
