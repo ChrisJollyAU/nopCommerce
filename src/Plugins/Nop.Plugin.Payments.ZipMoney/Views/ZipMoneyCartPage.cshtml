@@ -1,0 +1,10 @@
+﻿@model Nop.Plugin.Payments.ZipMoney.Models.ZipMoneyWidget
+@{
+    Layout = "";
+}
+<script type="text/javascript" src="http://code.jquery.com/jquery-latest.min.js"></script>
+<script type="text/javascript" src="https://d3k1w8lx8mqizo.cloudfront.net/lib/js/zm-widget-js/dist/zipmoney-widgets-v1.min.js"></script>
+<div data-zm-merchant="@Model.PublicKey" data-env="@Model.environment"></div>
+
+<span style="cursor:pointer" id="zip-cart-widg" data-zm-asset="cartwidget" data-zm-widget="popup" data-zm-popup-asset="termsdialog"></span>
+

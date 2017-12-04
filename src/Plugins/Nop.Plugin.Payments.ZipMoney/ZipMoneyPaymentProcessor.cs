@@ -7,6 +7,7 @@ using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
 using Nop.Core.Plugins;
+using Nop.Services.Cms;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
 using Nop.Services.Directory;
@@ -22,7 +23,7 @@ namespace Nop.Plugin.Payments.ZipMoney
     /// <summary>
     /// PayPalStandard payment processor
     /// </summary>
-    public class ZipMoneyPaymentProcessor : BasePlugin, IPaymentMethod
+    public class ZipMoneyPaymentProcessor : BasePlugin, IPaymentMethod, IWidgetPlugin
     {
         #region Fields
         private readonly ZipMoneyPaymentSettings _zipMoneyPaymentSettings;
@@ -178,6 +179,33 @@ namespace Nop.Plugin.Payments.ZipMoney
         public override void Uninstall()
         {
             base.Uninstall();
+        }
+
+        public IList<string> GetWidgetZones()
+        {
+            return new List<string>()
+            {
+                "checkout_payment_method_top",
+                "order_summary_cart_footer",
+                "productdetails_inside_overview_buttons_before"
+            };
+        }
+
+        public void GetPublicViewComponent(string widgetZone, out string viewComponentName)
+        {
+            viewComponentName = "";
+            if (widgetZone == "checkout_payment_method_top")
+            {
+                viewComponentName = "ZipMoneyInfo";
+            }
+            else if (widgetZone == "order_summary_cart_footer")
+            {
+                viewComponentName = "ZipMoneyCartPage";
+            }
+            else if (widgetZone == "productdetails_inside_overview_buttons_before")
+            {
+                viewComponentName = "ZipMoneyProductPage";
+            }
         }
     }
 }

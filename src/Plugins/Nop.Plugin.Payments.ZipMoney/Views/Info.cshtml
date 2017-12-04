@@ -1,0 +1,14 @@
+﻿@model Nop.Plugin.Payments.ZipMoney.Models.ZipInfoModel
+@{
+    Layout = "";
+}
+@if (Model.ShowInfo)
+{
+    <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td>
+                @Model.Info
+            </td>
+        </tr>
+    </table>
+}

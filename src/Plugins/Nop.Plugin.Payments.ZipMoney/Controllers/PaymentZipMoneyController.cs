@@ -33,6 +33,7 @@ using Nop.Services.Directory;
 using Nop.Services.Discounts;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Localization;
+using Nop.Core.Domain.Logging;
 using Nop.Core.Http.Extensions;
 using Nop.Services.Affiliates;
 using Nop.Services.Catalog;
@@ -341,6 +342,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
 
         public async Task<IActionResult> ZipRedirect(string result, string checkoutid)
         {
+            _logger.InsertLog(LogLevel.Debug, "ZipRedirect called. " + result + ". " + checkoutid, "",
+                _workContext.CurrentCustomer);
             if (result == null) return null;
             if (result.ToLowerInvariant().Equals("approved"))
             {

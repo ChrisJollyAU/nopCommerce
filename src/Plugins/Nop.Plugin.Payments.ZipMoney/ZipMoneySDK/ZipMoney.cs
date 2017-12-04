@@ -17,7 +17,8 @@ namespace ZipMoneySDK
         private HttpClient client;
         private readonly string _apiKey;
         private ZipError error;
-        public ZipMoneyProcessor(string ApiKey, bool useSandbox = false)
+        private string _partnerTag;
+        public ZipMoneyProcessor(string ApiKey, bool useSandbox = false,string partnerTag= "GeneralPartner")
         {
             _useSandbox = useSandbox;
             _apiKey = ApiKey;
@@ -26,6 +27,7 @@ namespace ZipMoneySDK
             //client.DefaultRequestHeaders.Add("Content-Type", "application/json");
             client.DefaultRequestHeaders.Add("Zip-Version", "2017-03-01");
             client.DefaultRequestHeaders.Add("Idempotency-Key", "");
+            _partnerTag = partnerTag;
         }
 
         public async Task<ZipCheckoutResponse> CreateCheckout(ZipCheckout checkout)
@@ -33,6 +35,8 @@ namespace ZipMoneySDK
             error = null;
             string checkoutser = JsonConvert.SerializeObject(checkout);
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/checkouts" : "";
+            if (!checkout.metadata.ContainsKey("partner"))
+                checkout.metadata["partner"] = _partnerTag;
             var result = await client.PostAsync(uri,
                 new StringContent(checkoutser, Encoding.UTF8, "application/json"));
             if (result.IsSuccessStatusCode)
