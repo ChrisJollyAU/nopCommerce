@@ -1,11 +1,11 @@
 ﻿{
   "Group": "Payment methods",
-  "FriendlyName": "PayPal Standard",
-  "SystemName": "Payments.PayPalStandard",
-  "Version": "1.42",
+  "FriendlyName": "SecurePay / Credit Card",
+  "SystemName": "Payments.SecurePay",
+  "Version": "1.0",
   "SupportedVersions": [ "4.00" ],
-  "Author": "nopCommerce team",
+  "Author": "Chris",
   "DisplayOrder": 1,
-  "FileName": "Nop.Plugin.Payments.PayPalStandard.dll",
-  "Description": "This plugin allows paying with PayPal Standard"
+  "FileName": "Nop.Plugin.Payments.SecurePay.dll",
+  "Description": "This plugin allows paying with SecurePay"
 }

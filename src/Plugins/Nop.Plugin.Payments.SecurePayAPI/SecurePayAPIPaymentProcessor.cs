@@ -5,7 +5,6 @@ using System.IO;
 using System.Net;
 using System.Text;
 using System.Web;
-using System.Web.Routing;
 using System.Xml;
 using Nop.Core;
 using Nop.Core.Domain.Directory;
@@ -23,6 +22,8 @@ using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Tax;
 using System.Xml.Serialization;
+using Microsoft.AspNetCore.Http;
+using Nop.Plugin.Payments.SecurePayAPI.Validators;
 
 namespace Nop.Plugin.Payments.SecurePayAPI
 {
@@ -40,7 +41,7 @@ namespace Nop.Plugin.Payments.SecurePayAPI
         private readonly IWebHelper _webHelper;
         private readonly ICheckoutAttributeParser _checkoutAttributeParser;
         private readonly ITaxService _taxService;
-        private readonly HttpContextBase _httpContext;
+        private readonly ILocalizationService _localizationService;
 
         private const string SecurePay_Url_Test = "https://test.securepay.com.au/xmlapi/payment";
         private const string SecurePay_Url_Live = "https://www.securepay.com.au/xmlapi/payment";
@@ -66,9 +67,8 @@ namespace Nop.Plugin.Payments.SecurePayAPI
 
         public SecurePayAPIPaymentProcessor(SecurePayAPIPaymentSettings paypalStandardPaymentSettings,
             ISettingService settingService, ICurrencyService currencyService,ICustomerService customerService,
-            CurrencySettings currencySettings, IWebHelper webHelper,
-            ICheckoutAttributeParser checkoutAttributeParser, ITaxService taxService,
-            HttpContextBase httpContext)
+            CurrencySettings currencySettings, IWebHelper webHelper, ILocalizationService localizationService,
+            ICheckoutAttributeParser checkoutAttributeParser, ITaxService taxService)
         {
             this._paypalStandardPaymentSettings = paypalStandardPaymentSettings;
             this._settingService = settingService;
@@ -78,7 +78,7 @@ namespace Nop.Plugin.Payments.SecurePayAPI
             this._webHelper = webHelper;
             this._checkoutAttributeParser = checkoutAttributeParser;
             this._taxService = taxService;
-            this._httpContext = httpContext;
+            _localizationService = localizationService;
         }
 
         #endregion
@@ -95,25 +95,6 @@ namespace Nop.Plugin.Payments.SecurePayAPI
             return 0;
         }
 
-        private string CreateSHA1Signature(string RawData)
-        {
-            /*
-             <summary>Creates a MD5 Signature</summary>
-             <param name="RawData">The string used to create the MD5 signautre.</param>
-             <returns>A string containing the MD5 signature.</returns>
-             */
-
-            System.Security.Cryptography.SHA1 hasher = System.Security.Cryptography.SHA1CryptoServiceProvider.Create();
-            byte[] HashValue = hasher.ComputeHash(Encoding.ASCII.GetBytes(RawData));
-
-            string strHex = "";
-            foreach (byte b in HashValue)
-            {
-                strHex += b.ToString("x2");
-            }
-            return strHex.ToUpper();
-        }
-
         #endregion
 
         #region Methods
@@ -125,39 +106,53 @@ namespace Nop.Plugin.Payments.SecurePayAPI
         /// <returns>Process payment result</returns>
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            var result = new ProcessPaymentResult();
-            result.AllowStoringCreditCardNumber = false;
-            result.NewPaymentStatus = PaymentStatus.Pending;
+            var result = new ProcessPaymentResult
+            {
+                AllowStoringCreditCardNumber = false,
+                NewPaymentStatus = PaymentStatus.Pending
+            };
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
-            var sp = new SPMessage.SecurePayMessage();
-            sp.MerchantInfo = new SPMessage.MerchantInfo();
-            sp.MerchantInfo.merchantID = _paypalStandardPaymentSettings.MerchantId;
-            sp.MerchantInfo.password = _paypalStandardPaymentSettings.Password;
-            sp.RequestType = "Payment";
-            sp.MessageInfo = new SPMessage.MessageInfo();
-            sp.MessageInfo.apiVersion = "xml-4.2";
-            sp.MessageInfo.timeoutValue = "60";
-            sp.MessageInfo.messageTimestamp = GetTimestamp();
-            sp.MessageInfo.messageID = processPaymentRequest.OrderGuid+DateTime.UtcNow.Hour.ToString()+DateTime.UtcNow.Minute.ToString()+DateTime.UtcNow.Second.ToString()+DateTime.UtcNow.Millisecond.ToString();
-            sp.Payment = new SPMessage.Payment();
-            sp.Payment.TxnList = new SPMessage.TxnList();
-            sp.Payment.TxnList.count = "1";
-            sp.Payment.TxnList.Txn = new SPMessage.Txn();
-            sp.Payment.TxnList.Txn.amount = ((int)(processPaymentRequest.OrderTotal * 100)).ToString();
-            sp.Payment.TxnList.Txn.CreditCardInfo = new SPMessage.CreditCardInfo();
-            sp.Payment.TxnList.Txn.ID = "1";
-            sp.Payment.TxnList.Txn.currency = "AUD";
-            sp.Payment.TxnList.Txn.purchaseOrderNo = processPaymentRequest.OrderGuid.ToString();
-            sp.Payment.TxnList.Txn.txnSource = "23";
+            var sp = new SPMessage.SecurePayMessage
+            {
+                MerchantInfo = new SPMessage.MerchantInfo
+                {
+                    merchantID = _paypalStandardPaymentSettings.MerchantId,
+                    password = _paypalStandardPaymentSettings.Password
+                },
+                RequestType = "Payment",
+                MessageInfo = new SPMessage.MessageInfo
+                {
+                    apiVersion = "xml-4.2",
+                    timeoutValue = "60",
+                    messageTimestamp = GetTimestamp(),
+                    messageID = processPaymentRequest.OrderGuid + DateTime.UtcNow.Hour.ToString() + DateTime.UtcNow.Minute.ToString() + DateTime.UtcNow.Second.ToString() + DateTime.UtcNow.Millisecond.ToString()
+                },
+                Payment = new SPMessage.Payment()
+            };
+            sp.Payment.TxnList = new SPMessage.TxnList
+            {
+                count = "1",
+                Txn = new SPMessage.Txn
+                {
+                    amount = ((int) (processPaymentRequest.OrderTotal * 100)).ToString(),
+                    CreditCardInfo = new SPMessage.CreditCardInfo(),
+                    ID = "1",
+                    currency = "AUD",
+                    purchaseOrderNo = processPaymentRequest.OrderGuid.ToString(),
+                    txnSource = "23"
+                }
+            };
             if (_paypalStandardPaymentSettings.FraudGuard) {
                 sp.Payment.TxnList.Txn.txnType = "21";
                 string name = customer.GetFullName();
                 string firstname = name.Substring(0,name.IndexOf(" "));
                 string lastname = name.Substring(name.IndexOf(" ")+1);
-                sp.Payment.TxnList.Txn.BuyerInfo = new SPMessage.BuyerInfo();
-                sp.Payment.TxnList.Txn.BuyerInfo.firstName = firstname;
-                sp.Payment.TxnList.Txn.BuyerInfo.lastName = lastname;
-                sp.Payment.TxnList.Txn.BuyerInfo.ip = customer.LastIpAddress;
+                sp.Payment.TxnList.Txn.BuyerInfo = new SPMessage.BuyerInfo
+                {
+                    firstName = firstname,
+                    lastName = lastname,
+                    ip = customer.LastIpAddress
+                };
             }
             else {
                 if (_paypalStandardPaymentSettings.UsePreauth)
@@ -298,26 +293,36 @@ namespace Nop.Plugin.Payments.SecurePayAPI
         public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
         {
             var result = new CapturePaymentResult();
-            var sp = new SPMessage.SecurePayMessage();
-            sp.MerchantInfo = new SPMessage.MerchantInfo();
+            var sp = new SPMessage.SecurePayMessage
+            {
+                MerchantInfo = new SPMessage.MerchantInfo()
+            };
             sp.MerchantInfo.merchantID = _paypalStandardPaymentSettings.MerchantId;
             sp.MerchantInfo.password = _paypalStandardPaymentSettings.Password;
             sp.RequestType = "Payment";
-            sp.MessageInfo = new SPMessage.MessageInfo();
-            sp.MessageInfo.apiVersion = "xml-4.2";
-            sp.MessageInfo.timeoutValue = "60";
-            sp.MessageInfo.messageID = capturePaymentRequest.Order.OrderGuid + DateTime.UtcNow.Hour.ToString() + DateTime.UtcNow.Minute.ToString() + DateTime.UtcNow.Second.ToString() + DateTime.UtcNow.Millisecond.ToString();
-            sp.Payment = new SPMessage.Payment();
-            sp.Payment.TxnList = new SPMessage.TxnList();
-            sp.Payment.TxnList.count = "1";
-            sp.Payment.TxnList.Txn = new SPMessage.Txn();
-            sp.Payment.TxnList.Txn.amount = ((int)(capturePaymentRequest.Order.OrderTotal * 100)).ToString();
-            sp.Payment.TxnList.Txn.ID = "1";
-            sp.Payment.TxnList.Txn.currency = "AUD";
-            sp.Payment.TxnList.Txn.purchaseOrderNo = capturePaymentRequest.Order.OrderGuid.ToString();
-            sp.Payment.TxnList.Txn.txnSource = "23";
-            sp.Payment.TxnList.Txn.txnType = "11";
-            sp.Payment.TxnList.Txn.preauthID = capturePaymentRequest.Order.AuthorizationTransactionId;
+            sp.MessageInfo = new SPMessage.MessageInfo
+            {
+                apiVersion = "xml-4.2",
+                timeoutValue = "60",
+                messageID = capturePaymentRequest.Order.OrderGuid + DateTime.UtcNow.Hour.ToString() + DateTime.UtcNow.Minute.ToString() + DateTime.UtcNow.Second.ToString() + DateTime.UtcNow.Millisecond.ToString()
+            };
+            sp.Payment = new SPMessage.Payment
+            {
+                TxnList = new SPMessage.TxnList
+                {
+                    count = "1",
+                    Txn = new SPMessage.Txn
+                    {
+                        amount = ((int)(capturePaymentRequest.Order.OrderTotal * 100)).ToString(),
+                        ID = "1",
+                        currency = "AUD",
+                        purchaseOrderNo = capturePaymentRequest.Order.OrderGuid.ToString(),
+                        txnSource = "23",
+                        txnType = "11",
+                        preauthID = capturePaymentRequest.Order.AuthorizationTransactionId
+                    }
+                }
+            };
 
             XmlSerializer serializer = new XmlSerializer(typeof(SPMessage.SecurePayMessage));
             StringWriter stringWriter = new StringWriter();
@@ -362,26 +367,38 @@ namespace Nop.Plugin.Payments.SecurePayAPI
         public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
         {
             var result = new RefundPaymentResult();
-            var sp = new SPMessage.SecurePayMessage();
-            sp.MerchantInfo = new SPMessage.MerchantInfo();
-            sp.MerchantInfo.merchantID = _paypalStandardPaymentSettings.MerchantId;
-            sp.MerchantInfo.password = _paypalStandardPaymentSettings.Password;
-            sp.RequestType = "Payment";
-            sp.MessageInfo = new SPMessage.MessageInfo();
-            sp.MessageInfo.apiVersion = "xml-4.2";
-            sp.MessageInfo.timeoutValue = "60";
-            sp.MessageInfo.messageID = refundPaymentRequest.Order.OrderGuid + DateTime.UtcNow.Hour.ToString() + DateTime.UtcNow.Minute.ToString() + DateTime.UtcNow.Second.ToString() + DateTime.UtcNow.Millisecond.ToString();
-            sp.Payment = new SPMessage.Payment();
-            sp.Payment.TxnList = new SPMessage.TxnList();
-            sp.Payment.TxnList.count = "1";
-            sp.Payment.TxnList.Txn = new SPMessage.Txn();
-            sp.Payment.TxnList.Txn.amount = ((int)(refundPaymentRequest.AmountToRefund * 100)).ToString();
-            sp.Payment.TxnList.Txn.ID = "1";
-            sp.Payment.TxnList.Txn.currency = "AUD";
-            sp.Payment.TxnList.Txn.purchaseOrderNo = refundPaymentRequest.Order.OrderGuid.ToString();
-            sp.Payment.TxnList.Txn.txnSource = "23";
-            sp.Payment.TxnList.Txn.txnType = "4";
-            sp.Payment.TxnList.Txn.txnID = refundPaymentRequest.Order.CaptureTransactionId;
+            var sp = new SPMessage.SecurePayMessage
+            {
+                MerchantInfo = new SPMessage.MerchantInfo
+                {
+                    merchantID = _paypalStandardPaymentSettings.MerchantId,
+                    password = _paypalStandardPaymentSettings.Password
+                },
+                RequestType = "Payment",
+                MessageInfo = new SPMessage.MessageInfo
+                {
+                    apiVersion = "xml-4.2",
+                    timeoutValue = "60",
+                    messageID = refundPaymentRequest.Order.OrderGuid + DateTime.UtcNow.Hour.ToString() + DateTime.UtcNow.Minute.ToString() + DateTime.UtcNow.Second.ToString() + DateTime.UtcNow.Millisecond.ToString()
+                },
+                Payment = new SPMessage.Payment
+                {
+                    TxnList = new SPMessage.TxnList
+                    {
+                        count = "1",
+                        Txn = new SPMessage.Txn
+                        {
+                            amount = ((int)(refundPaymentRequest.AmountToRefund * 100)).ToString(),
+                            ID = "1",
+                            currency = "AUD",
+                            purchaseOrderNo = refundPaymentRequest.Order.OrderGuid.ToString(),
+                            txnSource = "23",
+                            txnType = "4",
+                            txnID = refundPaymentRequest.Order.CaptureTransactionId
+                        }
+                    }
+                }
+            };
 
             XmlSerializer serializer = new XmlSerializer(typeof(SPMessage.SecurePayMessage));
             StringWriter stringWriter = new StringWriter();
@@ -424,26 +441,38 @@ namespace Nop.Plugin.Payments.SecurePayAPI
         public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
         {
             var result = new VoidPaymentResult();
-            var sp = new SPMessage.SecurePayMessage();
-            sp.MerchantInfo = new SPMessage.MerchantInfo();
-            sp.MerchantInfo.merchantID = _paypalStandardPaymentSettings.MerchantId;
-            sp.MerchantInfo.password = _paypalStandardPaymentSettings.Password;
-            sp.RequestType = "Payment";
-            sp.MessageInfo = new SPMessage.MessageInfo();
-            sp.MessageInfo.apiVersion = "xml-4.2";
-            sp.MessageInfo.timeoutValue = "60";
-            sp.MessageInfo.messageID = voidPaymentRequest.Order.OrderGuid + DateTime.UtcNow.Hour.ToString() + DateTime.UtcNow.Minute.ToString() + DateTime.UtcNow.Second.ToString() + DateTime.UtcNow.Millisecond.ToString();
-            sp.Payment = new SPMessage.Payment();
-            sp.Payment.TxnList = new SPMessage.TxnList();
-            sp.Payment.TxnList.count = "1";
-            sp.Payment.TxnList.Txn = new SPMessage.Txn();
-            sp.Payment.TxnList.Txn.amount = ((int)(voidPaymentRequest.Order.OrderTotal * 100)).ToString();
-            sp.Payment.TxnList.Txn.ID = "1";
-            sp.Payment.TxnList.Txn.currency = "AUD";
-            sp.Payment.TxnList.Txn.purchaseOrderNo = voidPaymentRequest.Order.OrderGuid.ToString();
-            sp.Payment.TxnList.Txn.txnSource = "23";
-            sp.Payment.TxnList.Txn.txnType = "6";
-            sp.Payment.TxnList.Txn.txnID = voidPaymentRequest.Order.CaptureTransactionId;
+            var sp = new SPMessage.SecurePayMessage
+            {
+                MerchantInfo = new SPMessage.MerchantInfo
+                {
+                    merchantID = _paypalStandardPaymentSettings.MerchantId,
+                    password = _paypalStandardPaymentSettings.Password
+                },
+                RequestType = "Payment",
+                MessageInfo = new SPMessage.MessageInfo
+                {
+                    apiVersion = "xml-4.2",
+                    timeoutValue = "60",
+                    messageID = voidPaymentRequest.Order.OrderGuid + DateTime.UtcNow.Hour.ToString() + DateTime.UtcNow.Minute.ToString() + DateTime.UtcNow.Second.ToString() + DateTime.UtcNow.Millisecond.ToString()
+                },
+                Payment = new SPMessage.Payment
+                {
+                    TxnList = new SPMessage.TxnList
+                    {
+                        count = "1",
+                        Txn = new SPMessage.Txn
+                        {
+                            amount = ((int)(voidPaymentRequest.Order.OrderTotal * 100)).ToString(),
+                            ID = "1",
+                            currency = "AUD",
+                            purchaseOrderNo = voidPaymentRequest.Order.OrderGuid.ToString(),
+                            txnSource = "23",
+                            txnType = "6",
+                            txnID = voidPaymentRequest.Order.CaptureTransactionId
+                        }
+                    }
+                }
+            };
 
             XmlSerializer serializer = new XmlSerializer(typeof(SPMessage.SecurePayMessage));
             StringWriter stringWriter = new StringWriter();
@@ -457,23 +486,19 @@ namespace Nop.Plugin.Payments.SecurePayAPI
             sw.Write(message);
             sw.Close();
             WebResponse response = request.GetResponse();
-            string responsefromserver = String.Empty;
-            if (response != null)
+            StreamReader sr = new StreamReader(response.GetResponseStream());
+            string responsefromserver = sr.ReadToEnd();
+            //responsefromserver = HttpUtility.UrlDecode(responsefromserver);
+            XmlSerializer ser = new XmlSerializer(typeof(SecurePayResponse.SecurePayMessage));
+            StringReader str = new StringReader(responsefromserver);
+            SecurePayResponse.SecurePayMessage msg = (SecurePayResponse.SecurePayMessage)ser.Deserialize(str);
+            if (msg.Status.statusCode == "000")
             {
-                StreamReader sr = new StreamReader(response.GetResponseStream());
-                responsefromserver = sr.ReadToEnd();
-                //responsefromserver = HttpUtility.UrlDecode(responsefromserver);
-                XmlSerializer ser = new XmlSerializer(typeof(SecurePayResponse.SecurePayMessage));
-                StringReader str = new StringReader(responsefromserver);
-                SecurePayResponse.SecurePayMessage msg = (SecurePayResponse.SecurePayMessage)ser.Deserialize(str);
-                if (msg.Status.statusCode == "000")
-                {
-                    result.NewPaymentStatus = PaymentStatus.Voided;
-                }
-                else
-                {
-                    result.AddError(msg.Status.statusCode + " " + msg.Status.statusDescription);
-                }
+                result.NewPaymentStatus = PaymentStatus.Voided;
+            }
+            else
+            {
+                result.AddError(msg.Status.statusCode + " " + msg.Status.statusDescription);
             }
             return result;
         }
@@ -515,40 +540,9 @@ namespace Nop.Plugin.Payments.SecurePayAPI
             return false;
         }
 
-        /// <summary>
-        /// Gets a route for provider configuration
-        /// </summary>
-        /// <param name="actionName">Action name</param>
-        /// <param name="controllerName">Controller name</param>
-        /// <param name="routeValues">Route values</param>
-        public void GetConfigurationRoute(out string actionName, out string controllerName, out RouteValueDictionary routeValues)
-        {
-            actionName = "Configure";
-            controllerName = "PaymentSecurePayAPI";
-            routeValues = new RouteValueDictionary() { { "Namespaces", "Nop.Plugin.Payments.SecurePayAPI.Controllers" }, { "area", null } };
-        }
-
-        /// <summary>
-        /// Gets a route for payment info
-        /// </summary>
-        /// <param name="actionName">Action name</param>
-        /// <param name="controllerName">Controller name</param>
-        /// <param name="routeValues">Route values</param>
-        public void GetPaymentInfoRoute(out string actionName, out string controllerName, out RouteValueDictionary routeValues)
-        {
-            actionName = "PaymentInfo";
-            controllerName = "PaymentSecurePayAPI";
-            routeValues = new RouteValueDictionary() { { "Namespaces", "Nop.Plugin.Payments.SecurePayAPI.Controllers" }, { "area", null } };
-        }
-
         public bool HidePaymentMethod(IList<ShoppingCartItem> cart)
         {
             return false;
-        }
-
-        public Type GetControllerType()
-        {
-            return typeof(PaymentSecurePayAPIController);
         }
 
         public override void Install()
@@ -585,6 +579,43 @@ namespace Nop.Plugin.Payments.SecurePayAPI
             this.DeletePluginLocaleResource("Plugins.Payments.SecurePayAPI.Fields.CardsAllowed");
             this.DeletePluginLocaleResource("Plugins.Payments.SecurePayAPI.Fields.CVV");
             base.Uninstall();
+        }
+
+        public IList<string> ValidatePaymentForm(IFormCollection form)
+        {
+            var warnings = new List<string>();
+
+            //validate
+            var validator = new PaymentInfoValidator(_localizationService);
+            var model = new PaymentInfoModel()
+            {
+                CardNumber = form["CardNumber"],
+                CardCode = form["CardCode"],
+                ExpireMonth = form["ExpireMonth"],
+                ExpireYear = form["ExpireYear"]
+            };
+            var validationResult = validator.Validate(model);
+            if (!validationResult.IsValid)
+                foreach (var error in validationResult.Errors)
+                    warnings.Add(error.ErrorMessage);
+            return warnings;
+        }
+
+        public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
+        {
+            var paymentInfo = new ProcessPaymentRequest
+            {
+                CreditCardNumber = form["CardNumber"],
+                CreditCardExpireMonth = int.Parse(form["ExpireMonth"]),
+                CreditCardExpireYear = int.Parse(form["ExpireYear"]),
+                CreditCardCvv2 = form["CardCode"]
+            };
+            return paymentInfo;
+        }
+
+        public void GetPublicViewComponent(out string viewComponentName)
+        {
+            viewComponentName = "PaymentSecurePay";
         }
 
         #endregion
@@ -664,6 +695,8 @@ namespace Nop.Plugin.Payments.SecurePayAPI
                 return false;
             }
         }
+
+        public string PaymentMethodDescription => "SecurePay / Credit Card";
         #endregion
 
 

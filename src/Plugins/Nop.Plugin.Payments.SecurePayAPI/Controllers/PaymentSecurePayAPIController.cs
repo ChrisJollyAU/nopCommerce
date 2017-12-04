@@ -28,12 +28,16 @@ namespace Nop.Plugin.Payments.SecurePayAPI.Controllers
         private readonly SecurePayAPIPaymentSettings _paypalStandardPaymentSettings;
         private readonly PaymentSettings _paymentSettings;
         private readonly ILocalizationService _localizationService;
+        private readonly IPermissionService _permissionService;
+        private readonly IStoreContext _storeContext;
+        private readonly IWorkContext _workContext;
 
         public PaymentSecurePayAPIController(ISettingService settingService, 
             IPaymentService paymentService, IOrderService orderService, 
             IOrderProcessingService orderProcessingService, 
-            IWebHelper webHelper,
+            IWebHelper webHelper, IPermissionService permissionService,
             SecurePayAPIPaymentSettings paypalStandardPaymentSettings,
+            IWorkContext workContext, IStoreContext storeContext,
             PaymentSettings paymentSettings, ILocalizationService localizationService)
         {
             this._settingService = settingService;
@@ -44,6 +48,9 @@ namespace Nop.Plugin.Payments.SecurePayAPI.Controllers
             this._paypalStandardPaymentSettings = paypalStandardPaymentSettings;
             this._paymentSettings = paymentSettings;
             this._localizationService = localizationService;
+            _permissionService = permissionService;
+            _workContext = workContext;
+            _storeContext = storeContext;
         }
 
         private string CreateSHA1Signature(string RawData)
@@ -73,12 +80,14 @@ namespace Nop.Plugin.Payments.SecurePayAPI.Controllers
             if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
-            var model = new ConfigurationModel();
-            model.Password = _paypalStandardPaymentSettings.Password;
-            model.TestAccount = _paypalStandardPaymentSettings.TestAccount;
-            model.MerchantId = _paypalStandardPaymentSettings.MerchantId;
-            model.FraudGuard = _paypalStandardPaymentSettings.FraudGuard;
-            return View("~/Plugins/Payments.SecurePayAPI/Views/PaymentSecurePayAPI/Configure.cshtml", model);
+            var model = new ConfigurationModel
+            {
+                Password = _paypalStandardPaymentSettings.Password,
+                TestAccount = _paypalStandardPaymentSettings.TestAccount,
+                MerchantId = _paypalStandardPaymentSettings.MerchantId,
+                FraudGuard = _paypalStandardPaymentSettings.FraudGuard
+            };
+            return View("~/Plugins/Payments.SecurePayAPI/Views/Configure.cshtml", model);
         }
 
         [AuthorizeAdmin]
@@ -103,93 +112,14 @@ namespace Nop.Plugin.Payments.SecurePayAPI.Controllers
             return Configure();
         }
 
-        [ChildActionOnly]
-        public ActionResult PaymentInfo()
+        public IActionResult CancelOrder()
         {
-            var model = new PaymentInfoModel();
+            var order = _orderService.SearchOrders(storeId: _storeContext.CurrentStore.Id,
+                customerId: _workContext.CurrentCustomer.Id, pageSize: 1).FirstOrDefault();
+            if (order != null)
+                return RedirectToRoute("OrderDetails", new { orderId = order.Id });
 
-            //years
-            for (int i = 0; i < 15; i++)
-            {
-                string year = Convert.ToString(DateTime.Now.Year + i);
-                model.ExpireYears.Add(new SelectListItem()
-                {
-                    Text = year,
-                    Value = year,
-                });
-            }
-
-            //months
-            for (int i = 1; i <= 12; i++)
-            {
-                string text = (i < 10) ? "0" + i.ToString() : i.ToString();
-                model.ExpireMonths.Add(new SelectListItem()
-                {
-                    Text = text,
-                    Value = i.ToString(),
-                });
-            }
-
-            //set postback values
-            var form = this.Request.Form;
-            model.CardNumber = form["CardNumber"];
-            model.CardCode = form["CardCode"];
-            var selectedMonth = model.ExpireMonths.Where(x => x.Value.Equals(form["ExpireMonth"], StringComparison.InvariantCultureIgnoreCase)).FirstOrDefault();
-            if (selectedMonth != null)
-                selectedMonth.Selected = true;
-            var selectedYear = model.ExpireYears.Where(x => x.Value.Equals(form["ExpireYear"], StringComparison.InvariantCultureIgnoreCase)).FirstOrDefault();
-            if (selectedYear != null)
-                selectedYear.Selected = true;
-
-            return View("~/Plugins/Payments.SecurePayAPI/Views/PaymentSecurePayAPI/PaymentInfo.cshtml", model);
-        }
-
-        [ValidateInput(false)]
-        public ActionResult AcceptPayment()
-        {
-            var processor = _paymentService.LoadPaymentMethodBySystemName("Payments.SecurePay") as SecurePayAPIPaymentProcessor;
-            if (processor == null ||
-                !processor.IsPaymentMethodActive(_paymentSettings) || !processor.PluginDescriptor.Installed)
-                throw new NopException("SecurePay module cannot be loaded");
-
-            return null;
-        }
-
-        [NonAction]
-        public override IList<string> ValidatePaymentForm(FormCollection form)
-        {
-            var warnings = new List<string>();
-
-            //validate
-            var validator = new PaymentInfoValidator(_localizationService);
-            var model = new PaymentInfoModel()
-            {
-                CardNumber = form["CardNumber"],
-                CardCode = form["CardCode"],
-                ExpireMonth = form["ExpireMonth"],
-                ExpireYear = form["ExpireYear"]
-            };
-            var validationResult = validator.Validate(model);
-            if (!validationResult.IsValid)
-                foreach (var error in validationResult.Errors)
-                    warnings.Add(error.ErrorMessage);
-            return warnings;
-        }
-
-        [NonAction]
-        public override ProcessPaymentRequest GetPaymentInfo(FormCollection form)
-        {
-            var paymentInfo = new ProcessPaymentRequest();
-            paymentInfo.CreditCardNumber = form["CardNumber"];
-            paymentInfo.CreditCardExpireMonth = int.Parse(form["ExpireMonth"]);
-            paymentInfo.CreditCardExpireYear = int.Parse(form["ExpireYear"]);
-            paymentInfo.CreditCardCvv2 = form["CardCode"];
-            return paymentInfo;
-        }
-
-        public ActionResult CancelOrder(FormCollection form)
-        {
-            return RedirectToAction("Index", "Home", new { area = "" });
+            return RedirectToRoute("HomePage");
         }
     }
 }
