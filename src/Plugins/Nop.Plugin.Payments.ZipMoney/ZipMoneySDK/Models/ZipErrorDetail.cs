@@ -6,10 +6,9 @@ using System.Threading.Tasks;
 
 namespace ZipMoneySDK.Models
 {
-    public class ZipError
+    public class ZipErrorDetail
     {
-        public string code { get; set; }
+        public string name { get; set; }
         public string message { get; set; }
-        public List<ZipErrorDetail> details { get; set; }
     }
 }

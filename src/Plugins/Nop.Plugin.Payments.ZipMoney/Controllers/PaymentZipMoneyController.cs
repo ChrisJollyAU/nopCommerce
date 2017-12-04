@@ -51,7 +51,6 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         private readonly IOrderService _orderService;
         private readonly IOrderProcessingService _orderProcessingService;
         private readonly IWebHelper _webHelper;
-        private readonly ZipMoneyPaymentSettings _zipMoneyPaymentSettings;
         private readonly PaymentSettings _paymentSettings;
         private readonly ILocalizationService _localizationService;
         private readonly IPermissionService _permissionService;
@@ -86,7 +85,6 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             IPaymentService paymentService, IOrderService orderService,
             IOrderProcessingService orderProcessingService,
             IWebHelper webHelper,
-            ZipMoneyPaymentSettings zipMoneyPaymentSettings,
             IStoreContext storeContext,
             PaymentSettings paymentSettings,
             IShoppingCartService shoppingCartService,
@@ -120,7 +118,6 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             this._orderService = orderService;
             this._orderProcessingService = orderProcessingService;
             this._webHelper = webHelper;
-            this._zipMoneyPaymentSettings = zipMoneyPaymentSettings;
             this._paymentSettings = paymentSettings;
             this._localizationService = localizationService;
             this._shoppingCartService = shoppingCartService;
@@ -314,29 +311,31 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 zipOrderItem.image_uri = url + fname;
                 zipCheckout.order.items.Add(zipOrderItem);
             }
-            ZipOrderItem shipItem = new ZipOrderItem();
             ZipOrderItem taxItem = new ZipOrderItem();
-            ZipOrderItem discountItem = new ZipOrderItem();
-            shipItem.amount = details.OrderShippingTotalInclTax;
-            shipItem.name = "Shipping";
-            shipItem.quantity = 1;
-            shipItem.type = "shipping";
-            shipItem.reference = "shipping";
+            ZipOrderItem shipItem = new ZipOrderItem
+            {
+                amount = details.OrderShippingTotalInclTax,
+                name = "Shipping",
+                quantity = 1,
+                type = "shipping",
+                reference = "shipping"
+            };
             zipCheckout.order.items.Add(shipItem);
-
-            discountItem.amount = details.OrderDiscountAmount;
-            discountItem.name = "discount";
-            discountItem.quantity = 1;
-            discountItem.type = "discount";
-            discountItem.reference = "discount";
+            ZipOrderItem discountItem = new ZipOrderItem
+            {
+                amount = details.OrderDiscountAmount,
+                name = "discount",
+                quantity = 1,
+                type = "discount",
+                reference = "discount"
+            };
             zipCheckout.order.items.Add(discountItem);
 
             zipCheckout.config.redirect_uri = _storeContext.CurrentStore.Url  + "/PaymentZipMoney/ZipRedirect";
-
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
-            _logger.Information(JsonConvert.SerializeObject(zipCheckout));
+            _logger.Debug(JsonConvert.SerializeObject(zipCheckout));
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
-            _logger.Information(JsonConvert.SerializeObject(zcr));
+            _logger.Debug(JsonConvert.SerializeObject(zcr));
             return JsonConvert.SerializeObject(zcr);
         }
 
@@ -360,10 +359,31 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 zipCharge.capture = false;
                 zipCharge.amount = amount;
                 zipCharge.currency = "AUD";
+                _logger.InsertLog(LogLevel.Debug, "ZipCharge JSON", JsonConvert.SerializeObject(zipCharge),
+                    _workContext.CurrentCustomer);
                 ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
                 ZipBaseResponse response = zm.CreateCharge(zipCharge).Result;
-                if (string.IsNullOrEmpty(response.state)) return RedirectToRoute("CheckoutPaymentMethod");
-                if (response.state != "authorised" && response.state != "captured") return RedirectToRoute("CheckoutPaymentMethod");
+                _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", JsonConvert.SerializeObject(response),
+                    _workContext.CurrentCustomer);
+                if (zm.GetLastError() != null)
+                {
+                    _logger.InsertLog(LogLevel.Debug, "ZipMoney Error", JsonConvert.SerializeObject(zm.GetLastError()),
+                        _workContext.CurrentCustomer);
+                }
+                if (string.IsNullOrEmpty(response.state))
+                {
+                    HttpContext.Session.SetString("ZipFriendlyError",
+                        "There was an error authorising your payment. Please ensure you have enough funds or choose a different payment method");
+                    HttpContext.Session.SetInt32("ZipShowError", 1);
+                    return RedirectToRoute("CheckoutPaymentMethod");
+                }
+                if (response.state != "authorised" && response.state != "captured")
+                {
+                    HttpContext.Session.SetString("ZipFriendlyError",
+                        "There was an error authorising your payment. Please ensure you have enough funds or choose a different payment method");
+                    HttpContext.Session.SetInt32("ZipShowError", 1);
+                    return RedirectToRoute("CheckoutPaymentMethod");
+                }
                 var content = new Dictionary<string, StringValues>
                 {
                     { "nextstep", "Next"},
@@ -377,6 +397,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             }
             else if (result.ToLowerInvariant().Equals("cancelled"))
             {
+                HttpContext.Session.SetString("ZipFriendlyError", "You have chosen not to proceed with ZipMoney. Please choose a different payment method to continue");
+                HttpContext.Session.SetInt32("ZipShowError", 1);
                 return RedirectToRoute("CheckoutPaymentMethod");
             }
             else if (result.ToLowerInvariant().Equals("referred"))
@@ -385,6 +407,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             }
             else if (result.ToLowerInvariant().Equals("declined"))
             {
+                HttpContext.Session.SetString("ZipFriendlyError","Unfortunately your ZipMoney application was declined. Please choose a different payment method to continue");
+                HttpContext.Session.SetInt32("ZipShowError", 1);
                 return RedirectToRoute("CheckoutPaymentMethod");
             }
             //if all else fails go back to the shopping cart
