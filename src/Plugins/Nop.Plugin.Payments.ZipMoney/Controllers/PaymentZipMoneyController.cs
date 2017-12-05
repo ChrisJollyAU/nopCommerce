@@ -303,8 +303,6 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             };
             zipCheckout.order = new ZipOrder
             {
-                amount = details.OrderTotal,
-                currency = "AUD",
                 shipping = new ZipShipping
                 {
                     pickup = details.PickUpInStore,

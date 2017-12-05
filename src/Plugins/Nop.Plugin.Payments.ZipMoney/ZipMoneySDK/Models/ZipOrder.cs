@@ -17,12 +17,6 @@ namespace ZipMoneySDK.Models
         }
 
         [JsonProperty(Required = Required.Always)]
-        public decimal amount { get; set; }
-
-        [JsonProperty(Required = Required.Always)]
-        public string currency { get; set; }
-
-        [JsonProperty(Required = Required.Always)]
         public ZipShipping shipping { get; set; }
 
         public List<ZipOrderItem> items { get; set; }
@@ -32,6 +26,13 @@ namespace ZipMoneySDK.Models
             if (items == null) return false;
             if (items.Count == 0) return false;
             return true;
+        }
+
+        public string cart_reference { get; set; }
+
+        public bool ShouldSerializecart_reference()
+        {
+            return !string.IsNullOrEmpty(cart_reference);
         }
     }
 }
