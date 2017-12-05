@@ -39,7 +39,7 @@ namespace ZipMoneySDK.Models
             return shopper != null;
         }
 
-        public ZipOrder order { get; set; }
+        public ZipCheckoutOrder order { get; set; }
 
         public bool ShouldSerializeorder()
         {

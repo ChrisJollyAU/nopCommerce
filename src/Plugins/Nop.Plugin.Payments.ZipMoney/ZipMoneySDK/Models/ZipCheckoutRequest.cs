@@ -28,7 +28,7 @@ namespace ZipMoneySDK.Models
         }
 
         [JsonProperty(Required = Required.Always)]
-        public ZipOrder order { get; set; }
+        public ZipCheckoutOrder order { get; set; }
 
         public ZipFeatures features { get; set; }
         public bool ShouldSerializefeatures()

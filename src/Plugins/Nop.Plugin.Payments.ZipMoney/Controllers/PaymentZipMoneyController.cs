@@ -301,8 +301,10 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     refunds_total_amount = refundstotalamount
                 }
             };
-            zipCheckout.order = new ZipOrder
+            zipCheckout.order = new ZipCheckoutOrder
             {
+                amount = details.OrderTotal,
+                currency = "AUD",
                 shipping = new ZipShipping
                 {
                     pickup = details.PickUpInStore,
