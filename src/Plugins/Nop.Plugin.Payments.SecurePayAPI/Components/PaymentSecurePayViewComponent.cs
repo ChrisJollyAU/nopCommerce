@@ -35,18 +35,6 @@ namespace Nop.Plugin.Payments.SecurePay.Components
                     Value = i.ToString(),
                 });
             }
-
-            //set postback values
-            var form = this.Request.Form;
-            model.CardNumber = form["CardNumber"];
-            model.CardCode = form["CardCode"];
-            var selectedMonth = model.ExpireMonths.FirstOrDefault(x => x.Value.Equals(form["ExpireMonth"], StringComparison.InvariantCultureIgnoreCase));
-            if (selectedMonth != null)
-                selectedMonth.Selected = true;
-            var selectedYear = model.ExpireYears.FirstOrDefault(x => x.Value.Equals(form["ExpireYear"], StringComparison.InvariantCultureIgnoreCase));
-            if (selectedYear != null)
-                selectedYear.Selected = true;
-
             return View("~/Plugins/Payments.SecurePayAPI/Views/PaymentInfo.cshtml", model);
         }
     }

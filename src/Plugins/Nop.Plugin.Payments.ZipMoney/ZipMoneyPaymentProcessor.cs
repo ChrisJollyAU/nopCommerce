@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
@@ -18,6 +19,7 @@ using ZipMoneySDK;
 using ZipMoneySDK.Models;
 using Nop.Services.Logging;
 using Newtonsoft.Json;
+using Nop.Core.Domain.Logging;
 
 namespace Nop.Plugin.Payments.ZipMoney
 {
@@ -66,31 +68,46 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            ZipBaseResponse response = zipMoney.CaptureCharge(processPaymentRequest.CustomValues["ZipChargeId"].ToString(),processPaymentRequest.OrderTotal).Result;
-            if (response.state == "captured")
+            if (processPaymentRequest.CustomValues["ZipCheckoutResult"].ToString().Equals("approved"))
             {
-                ProcessPaymentResult result = new ProcessPaymentResult();
-                if (response.state.ToLowerInvariant().Equals("captured"))
+                ZipBaseResponse response = zipMoney
+                    .CaptureCharge(processPaymentRequest.CustomValues["ZipChargeId"].ToString(),
+                        processPaymentRequest.OrderTotal).Result;
+                if (response.state == "captured")
                 {
-                    result = new ProcessPaymentResult
+                    ProcessPaymentResult result = new ProcessPaymentResult();
+                    if (response.state.ToLowerInvariant().Equals("captured"))
                     {
-                        AllowStoringCreditCardNumber = false,
-                        AuthorizationTransactionId = processPaymentRequest.CustomValues["ZipChargeId"].ToString(),
-                        CaptureTransactionId = response.id,
-                        NewPaymentStatus = PaymentStatus.Paid
-                    };
+                        result = new ProcessPaymentResult
+                        {
+                            AllowStoringCreditCardNumber = false,
+                            CaptureTransactionId = response.id,
+                            CaptureTransactionResult = response.state,
+                            NewPaymentStatus = PaymentStatus.Paid
+                        };
+                    }
+                    return result;
                 }
-                return result;
+                _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "ZipMoney Capture Error",
+                    JsonConvert.SerializeObject(zipMoney.GetLastError()));
+                _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "ZipMoney Capture Error Response",
+                    JsonConvert.SerializeObject(response));
+                return new ProcessPaymentResult
+                {
+                    AllowStoringCreditCardNumber = false,
+                    AuthorizationTransactionId = processPaymentRequest.CustomValues["ZipCheckoutId"].ToString(),
+                    AuthorizationTransactionResult = "authorised",
+                    AuthorizationTransactionCode = processPaymentRequest.CustomValues["ZipChargeId"].ToString(),
+                    NewPaymentStatus = PaymentStatus.Authorized
+                };
             }
-            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "ZipMoney Capture Error",
-                JsonConvert.SerializeObject(zipMoney.GetLastError()));
-            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "ZipMoney Capture Error Response",
-                JsonConvert.SerializeObject(response));
             return new ProcessPaymentResult
             {
                 AllowStoringCreditCardNumber = false,
-                AuthorizationTransactionId = processPaymentRequest.CustomValues["ZipChargeId"].ToString(),
-                NewPaymentStatus = PaymentStatus.Authorized
+                AuthorizationTransactionId = processPaymentRequest.CustomValues["ZipCheckoutId"].ToString(),
+                AuthorizationTransactionResult = processPaymentRequest.CustomValues["ZipCheckoutResult"].ToString(),
+                AuthorizationTransactionCode = processPaymentRequest.CustomValues["ZipChargeId"].ToString(),
+                NewPaymentStatus = PaymentStatus.Pending
             };
         }
 
@@ -111,18 +128,51 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
         {
-            string chargeId = capturePaymentRequest.Order.AuthorizationTransactionId;
-            var response = zipMoney.CaptureCharge(chargeId, capturePaymentRequest.Order.OrderTotal).Result;
-            CapturePaymentResult result = new CapturePaymentResult {NewPaymentStatus = PaymentStatus.Authorized};
+            string chargeId = capturePaymentRequest.Order.AuthorizationTransactionCode;
+            string chargeresult = capturePaymentRequest.Order.AuthorizationTransactionResult;
+            CapturePaymentResult result;
+            ZipBaseResponse response;
+            if (chargeresult.Equals("authorised"))
+            {
+                response = zipMoney.CaptureCharge(chargeId, capturePaymentRequest.Order.OrderTotal).Result;
+                result = new CapturePaymentResult {NewPaymentStatus = PaymentStatus.Authorized};
+                if (response.state == "captured")
+                {
+                    result.NewPaymentStatus = PaymentStatus.Paid;
+                    result.CaptureTransactionId = response.id;
+                    return result;
+                }
+                _logger.InsertLog(LogLevel.Error, "ZipMoney Capture Fail",
+                    JsonConvert.SerializeObject(zipMoney.GetLastError()));
+                result.AddError("ZipMoney Capture Failed. Check log for more info");
+                return result;
+            }
+            //create and capture
+            ZipCharge zipCharge = new ZipCharge
+            {
+                authority =
+                {
+                    type = "checkout_id",
+                    value = capturePaymentRequest.Order.AuthorizationTransactionId
+                },
+                capture = true,
+                amount = capturePaymentRequest.Order.OrderTotal,
+                currency = "AUD"
+            };
+            _logger.InsertLog(LogLevel.Debug, "zip capture",
+                JsonConvert.SerializeObject(zipCharge));
+            response = zipMoney.CreateCharge(zipCharge).Result;
+            result = new CapturePaymentResult();
             if (response.state == "captured")
             {
                 result.NewPaymentStatus = PaymentStatus.Paid;
                 result.CaptureTransactionId = response.id;
+                result.CaptureTransactionResult = response.state;
                 return result;
             }
-            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "ZipMoney Capture Fail",
+            _logger.InsertLog(LogLevel.Error, "Zip capture/charge error",
                 JsonConvert.SerializeObject(zipMoney.GetLastError()));
-            result.AddError("ZipMoney Capture Failed. Check log for more info");
+            result.Errors.Add("Unknown error");
             return result;
         }
 
@@ -164,6 +214,20 @@ namespace Nop.Plugin.Payments.ZipMoney
                 result.Add("No ZipMoney checkout was provided");
             if (!form.ContainsKey("ZipChargeId"))
                 result.Add("No ZipMoney charge was provided");
+            if (!form.ContainsKey("ZipCheckoutResult"))
+                result.Add("Unknown ZipMoney decision");
+            if (form["ZipCheckoutResult"] != StringValues.Empty)
+            {
+                var vals = form["ZipCheckoutResult"];
+                if (vals.Contains("approved") || vals.Contains("referred"))
+                {
+                    
+                }
+                else
+                {
+                    result.Add("Does not contain valid ZipMoney result");
+                }
+            }
             return result;
         }
 
@@ -171,9 +235,11 @@ namespace Nop.Plugin.Payments.ZipMoney
         {
             ProcessPaymentRequest processPaymentRequest = new ProcessPaymentRequest();
             form.TryGetValue("ZipChargeId", out StringValues chargeid);
-            form.TryGetValue("ZipChargeId", out StringValues checkoutid);
+            form.TryGetValue("ZipCheckoutId", out StringValues checkoutid);
+            form.TryGetValue("ZipCheckoutResult", out StringValues checkoutresult);
             processPaymentRequest.CustomValues["ZipChargeId"] = chargeid[0];
             processPaymentRequest.CustomValues["ZipCheckoutId"] = checkoutid[0];
+            processPaymentRequest.CustomValues["ZipCheckoutResult"] = checkoutresult[0];
             return processPaymentRequest;
         }
 
@@ -195,7 +261,7 @@ namespace Nop.Plugin.Payments.ZipMoney
         public RecurringPaymentType RecurringPaymentType => RecurringPaymentType.NotSupported;
         public PaymentMethodType PaymentMethodType => PaymentMethodType.Standard;
         public bool SkipPaymentInfo => false;
-        public string PaymentMethodDescription => "ZipMoney";
+        public string PaymentMethodDescription => "Buy Now, Pay Later with ZipMoney";
 
 
         public override void Install()

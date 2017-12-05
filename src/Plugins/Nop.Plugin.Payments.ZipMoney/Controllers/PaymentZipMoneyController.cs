@@ -336,64 +336,86 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             _logger.Debug(JsonConvert.SerializeObject(zipCheckout));
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
             _logger.Debug(JsonConvert.SerializeObject(zcr));
+            _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer,"ZipCheckoutId",zcr.id,_storeContext.CurrentStore.Id);
             return JsonConvert.SerializeObject(zcr);
         }
 
-        public async Task<IActionResult> ZipRedirect(string result, string checkoutid)
+        public IActionResult ZipRedirect(string result, string checkoutid)
         {
             _logger.InsertLog(LogLevel.Debug, "ZipRedirect called. " + result + ". " + checkoutid, "",
                 _workContext.CurrentCustomer);
             if (result == null) return null;
             if (result.ToLowerInvariant().Equals("approved"))
             {
-                var details = GetOrderDetails();
-                decimal amount = details.OrderTotal;
-                var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
-                var zipMoneyPaymentSettings = _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
-                ZipCharge zipCharge = new ZipCharge();
-                string apikey = zipMoneyPaymentSettings.UseSandbox
-                    ? zipMoneyPaymentSettings.SandboxAPIKey
-                    : zipMoneyPaymentSettings.ProductionAPIKey;
-                zipCharge.authority.type = "checkout_id";
-                zipCharge.authority.value = checkoutid;
-                zipCharge.capture = false;
-                zipCharge.amount = amount;
-                zipCharge.currency = "AUD";
-                _logger.InsertLog(LogLevel.Debug, "ZipCharge JSON", JsonConvert.SerializeObject(zipCharge),
-                    _workContext.CurrentCustomer);
-                ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
-                ZipBaseResponse response = zm.CreateCharge(zipCharge).Result;
-                _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", JsonConvert.SerializeObject(response),
-                    _workContext.CurrentCustomer);
-                if (zm.GetLastError() != null)
-                {
-                    _logger.InsertLog(LogLevel.Debug, "ZipMoney Error", JsonConvert.SerializeObject(zm.GetLastError()),
+                var savedcheckoutId = _workContext.CurrentCustomer
+                    .GetAttribute<string>("ZipCheckoutId", _genericAttributeService, _storeContext.CurrentStore.Id);
+                if (savedcheckoutId.Equals(checkoutid))
+                {//same session
+                    var details = GetOrderDetails();
+                    decimal amount = details.OrderTotal;
+                    var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+                    var zipMoneyPaymentSettings = _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
+                    string apikey = zipMoneyPaymentSettings.UseSandbox
+                        ? zipMoneyPaymentSettings.SandboxAPIKey
+                        : zipMoneyPaymentSettings.ProductionAPIKey;
+                    ZipCharge zipCharge = new ZipCharge
+                    {
+                        authority =
+                        {
+                            type = "checkout_id",
+                            value = checkoutid
+                        },
+                        capture = false,
+                        amount = amount,
+                        currency = "AUD"
+                    };
+                    _logger.InsertLog(LogLevel.Debug, "ZipCharge JSON", JsonConvert.SerializeObject(zipCharge),
                         _workContext.CurrentCustomer);
+                    ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
+                    ZipBaseResponse response = zm.CreateCharge(zipCharge).Result;
+                    _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", JsonConvert.SerializeObject(response),
+                        _workContext.CurrentCustomer);
+                    if (zm.GetLastError() != null)
+                    {
+                        _logger.InsertLog(LogLevel.Debug, "ZipMoney Error",
+                            JsonConvert.SerializeObject(zm.GetLastError()),
+                            _workContext.CurrentCustomer);
+                    }
+                    if (string.IsNullOrEmpty(response.state))
+                    {
+                        HttpContext.Session.SetString("ZipFriendlyError",
+                            "There was an error authorising your payment. Please ensure you have enough funds or choose a different payment method");
+                        HttpContext.Session.SetInt32("ZipShowError", 1);
+                        return RedirectToRoute("CheckoutPaymentMethod");
+                    }
+                    if (response.state != "authorised" && response.state != "captured")
+                    {
+                        HttpContext.Session.SetString("ZipFriendlyError",
+                            "There was an error authorising your payment. Please ensure you have enough funds or choose a different payment method");
+                        HttpContext.Session.SetInt32("ZipShowError", 1);
+                        return RedirectToRoute("CheckoutPaymentMethod");
+                    }
+                    var content = new Dictionary<string, StringValues>
+                    {
+                        {"nextstep", "Next"},
+                        {"ZipCheckoutId", checkoutid},
+                        {"ZipChargeId", response.id},
+                        {"ZipChargeState", response.state},
+                        {"ZipCheckoutResult", result}
+                    };
+                    FormCollection collection = new FormCollection(content);
+                    return EnterPaymentInfo(collection);
                 }
-                if (string.IsNullOrEmpty(response.state))
+                else
                 {
-                    HttpContext.Session.SetString("ZipFriendlyError",
-                        "There was an error authorising your payment. Please ensure you have enough funds or choose a different payment method");
-                    HttpContext.Session.SetInt32("ZipShowError", 1);
-                    return RedirectToRoute("CheckoutPaymentMethod");
+                    //different session. most likely referral that is now approved
+                    Order order = _orderService.GetOrderByAuthorizationTransactionIdAndPaymentMethod(checkoutid, "ZipMoney");
+                    _orderProcessingService.Capture(order);
+                    if (order.PaymentStatus == PaymentStatus.Paid)
+                    {
+                        return RedirectToRoute("CheckoutCompleted", new {orderId = order.Id});
+                    }
                 }
-                if (response.state != "authorised" && response.state != "captured")
-                {
-                    HttpContext.Session.SetString("ZipFriendlyError",
-                        "There was an error authorising your payment. Please ensure you have enough funds or choose a different payment method");
-                    HttpContext.Session.SetInt32("ZipShowError", 1);
-                    return RedirectToRoute("CheckoutPaymentMethod");
-                }
-                var content = new Dictionary<string, StringValues>
-                {
-                    { "nextstep", "Next"},
-                    { "ZipCheckoutId", checkoutid },
-                    { "ZipChargeId", response.id },
-                    { "ZipChargeState", response.state },
-                    { "ZipCheckoutResult", result }
-                };
-                FormCollection collection = new FormCollection(content);
-                return EnterPaymentInfo(collection);
             }
             else if (result.ToLowerInvariant().Equals("cancelled"))
             {
@@ -403,7 +425,20 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             }
             else if (result.ToLowerInvariant().Equals("referred"))
             {
-                
+                var content = new Dictionary<string, StringValues>
+                {
+                    {"nextstep", "Next"},
+                    {"ZipCheckoutId", checkoutid},
+                    {"ZipChargeId", ""},
+                    {"ZipChargeState", ""},
+                    {"ZipCheckoutResult", result}
+                };
+                HttpContext.Session.SetString("ZipReferred", "Your payment is currently pending approval. You may choose to place the order now hang on until you receive an email with the decision");
+                HttpContext.Session.SetString("ZipReferred1", "If approved you will be able to complete the payment following the link in the email");
+                HttpContext.Session.SetString("ZipReferred2", "If declined we will cancel your purchase");
+                HttpContext.Session.SetInt32("ZipShowReferred", 1);
+                FormCollection collection = new FormCollection(content);
+                return EnterPaymentInfo(collection);
             }
             else if (result.ToLowerInvariant().Equals("declined"))
             {

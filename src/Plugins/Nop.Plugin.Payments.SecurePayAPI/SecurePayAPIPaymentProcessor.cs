@@ -625,78 +625,36 @@ namespace Nop.Plugin.Payments.SecurePayAPI
         /// <summary>
         /// Gets a value indicating whether capture is supported
         /// </summary>
-        public bool SupportCapture
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool SupportCapture => true;
 
         /// <summary>
         /// Gets a value indicating whether partial refund is supported
         /// </summary>
-        public bool SupportPartiallyRefund
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool SupportPartiallyRefund => true;
 
         /// <summary>
         /// Gets a value indicating whether refund is supported
         /// </summary>
-        public bool SupportRefund
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool SupportRefund => true;
 
         /// <summary>
         /// Gets a value indicating whether void is supported
         /// </summary>
-        public bool SupportVoid
-        {
-            get
-            {
-                return true;
-            }
-        }
+        public bool SupportVoid => true;
 
         /// <summary>
         /// Gets a recurring payment type of payment method
         /// </summary>
-        public RecurringPaymentType RecurringPaymentType
-        {
-            get
-            {
-                return RecurringPaymentType.NotSupported;
-            }
-        }
+        public RecurringPaymentType RecurringPaymentType => RecurringPaymentType.NotSupported;
 
         /// <summary>
         /// Gets a payment method type
         /// </summary>
-        public PaymentMethodType PaymentMethodType
-        {
-            get
-            {
-                return PaymentMethodType.Standard;
-            }
-        }
+        public PaymentMethodType PaymentMethodType => PaymentMethodType.Standard;
 
-        public bool SkipPaymentInfo
-        {
-            get
-            {
-                return false;
-            }
-        }
+        public bool SkipPaymentInfo => false;
 
-        public string PaymentMethodDescription => "SecurePay / Credit Card";
+        public string PaymentMethodDescription => "Credit/Debit Card";
         #endregion
 
 
