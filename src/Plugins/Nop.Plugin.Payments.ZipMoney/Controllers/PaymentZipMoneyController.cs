@@ -380,8 +380,10 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 reference = "discount"
             };
             zipCheckout.order.items.Add(discountItem);
-
-            zipCheckout.config.redirect_uri = _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect";
+            zipCheckout.config = new ZipConfig
+            {
+                redirect_uri = _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
+            };
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
             _logger.Debug(JsonConvert.SerializeObject(zipCheckout));
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
