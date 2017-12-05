@@ -272,7 +272,12 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 statistics = new ZipStatistics
                 {
                     account_created = details.Customer.CreatedOnUtc,
-                    currency = "AUD"
+                    currency = "AUD",
+                    sales_total_count = _orderService.SearchOrders(customerId:_workContext.CurrentCustomer.Id).Count,
+                    sales_total_amount = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id).Sum(x => x.OrderTotal),
+                    sales_avg_amount = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id).Average(x => x.OrderTotal),
+                    sales_max_amount = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id).Max(x => x.OrderTotal),
+                    refunds_total_amount = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id).Sum(x => x.RefundedAmount)
                 }
             };
             zipCheckout.order = new ZipOrder
@@ -308,7 +313,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     name = item.Product.Name,
                     quantity = item.Quantity,
                     type = OrderType.sku,
-                    reference = item.Product.Sku
+                    product_code = item.Product.Sku,
                 };
 
                 string url = _storeContext.CurrentStore.Url + "/content/images/";
