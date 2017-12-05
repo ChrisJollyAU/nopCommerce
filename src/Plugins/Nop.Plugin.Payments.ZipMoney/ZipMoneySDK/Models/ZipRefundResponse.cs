@@ -13,7 +13,11 @@ namespace ZipMoneySDK.Models
         public string id { get; set; }
 
         public string charge_id { get; set; }
-        public bool ShouldSerializecharge_id => !string.IsNullOrEmpty(charge_id);
+
+        public bool ShouldSerializecharge_id()
+        {
+            return !string.IsNullOrEmpty(charge_id);
+        }
 
         [JsonProperty(Required = Required.Always)]
         public string reason { get; set; }
@@ -26,14 +30,11 @@ namespace ZipMoneySDK.Models
 
         public Dictionary<string,string> metadata { get; set; }
 
-        public bool ShouldSerializemetadata
+        public bool ShouldSerializemetadata()
         {
-            get
-            {
-                if (metadata == null) return false;
-                if (metadata.Count == 0) return false;
-                return true;
-            }
+            if (metadata == null) return false;
+            if (metadata.Count == 0) return false;
+            return true;
         }
     }
 }

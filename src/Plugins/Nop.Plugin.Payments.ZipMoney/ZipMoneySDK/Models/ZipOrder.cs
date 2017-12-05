@@ -9,14 +9,12 @@ namespace ZipMoneySDK.Models
 {
     public class ZipOrder
     {
-        public ZipOrder()
-        {
-            items = new List<ZipOrderItem>();
-            shipping = new ZipShipping();
-            items = new List<ZipOrderItem>();
-        }
         public string reference { get; set; }
-        public bool ShouldSerializereference => !string.IsNullOrEmpty(reference);
+
+        public bool ShouldSerializereference()
+        {
+            return !string.IsNullOrEmpty(reference);
+        }
 
         [JsonProperty(Required = Required.Always)]
         public decimal amount { get; set; }
@@ -29,14 +27,11 @@ namespace ZipMoneySDK.Models
 
         public List<ZipOrderItem> items { get; set; }
 
-        public bool ShouldSerializeitems
+        public bool ShouldSerializeitems()
         {
-            get
-            {
-                if (items == null) return false;
-                if (items.Count == 0) return false;
-                return true;
-            }
+            if (items == null) return false;
+            if (items.Count == 0) return false;
+            return true;
         }
     }
 }

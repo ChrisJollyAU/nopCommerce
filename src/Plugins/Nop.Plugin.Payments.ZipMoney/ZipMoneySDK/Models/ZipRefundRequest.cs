@@ -20,14 +20,11 @@ namespace ZipMoneySDK.Models
 
         public Dictionary<string,string> metadata { get; set; }
 
-        public bool ShouldSerializemetadata
+        public bool ShouldSerializemetadata()
         {
-            get
-            {
-                if (metadata == null) return false;
-                if (metadata.Count == 0) return false;
-                return true;
-            }
+            if (metadata == null) return false;
+            if (metadata.Count == 0) return false;
+            return true;
         }
     }
 }

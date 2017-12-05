@@ -39,18 +39,19 @@ namespace ZipMoneySDK.Models
         public DateTime created_date { get; set; }
 
         public ZipOrder order { get; set; }
-        public bool ShouldSerializeorder => order != null;
+
+        public bool ShouldSerializeorder()
+        {
+            return order != null;
+        }
 
         public Dictionary<string,string> metadata { get; set; }
 
-        public bool ShouldSerializemetadata
+        public bool ShouldSerializemetadata()
         {
-            get
-            {
-                if (metadata == null) return false;
-                if (metadata.Count == 0) return false;
-                return true;
-            }
+            if (metadata == null) return false;
+            if (metadata.Count == 0) return false;
+            return true;
         }
     }
 }

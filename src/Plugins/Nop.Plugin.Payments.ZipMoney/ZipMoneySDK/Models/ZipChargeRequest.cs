@@ -13,7 +13,11 @@ namespace ZipMoneySDK.Models
         public ZipAuthority authority { get; set; }
 
         public string reference { get; set; }
-        public bool ShouldSerializereference => !string.IsNullOrEmpty(reference);
+
+        public bool ShouldSerializereference()
+        {
+            return !string.IsNullOrEmpty(reference);
+        }
 
         [JsonProperty(Required = Required.Always)]
         public decimal amount { get; set; }
@@ -25,7 +29,6 @@ namespace ZipMoneySDK.Models
         public bool capture { get; set; }
 
         public ZipOrder order { get; set; }
-
         public bool ShouldSerializeorder()
         {
             return order != null;

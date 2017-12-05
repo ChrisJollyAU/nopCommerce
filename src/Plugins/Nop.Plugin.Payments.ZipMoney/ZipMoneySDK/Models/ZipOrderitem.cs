@@ -21,10 +21,18 @@ namespace ZipMoneySDK.Models
         public decimal amount { get; set; }
 
         public string reference { get; set; }
-        public bool ShouldSerializereference => !string.IsNullOrEmpty(reference);
+
+        public bool ShouldSerializereference()
+        {
+            return !string.IsNullOrEmpty(reference);
+        }
 
         public string description { get; set; }
-        public bool ShouldSerializedescription => !string.IsNullOrEmpty(description);
+
+        public bool ShouldSerializedescription()
+        {
+            return !string.IsNullOrEmpty(description);
+        }
 
         [JsonProperty(Required = Required.Always)]
         public int quantity { get; set; }
@@ -34,12 +42,24 @@ namespace ZipMoneySDK.Models
         public OrderType type { get; set; }
 
         public string image_uri {get; set;}
-        public bool ShouldSerializeimage_uri => !string.IsNullOrEmpty(image_uri);
+
+        public bool ShouldSerializeimage_uri()
+        {
+            return !string.IsNullOrEmpty(image_uri);
+        }
 
         public string item_uri { get; set; }
-        public bool ShouldSerializeitem_uri => !string.IsNullOrEmpty(item_uri);
+
+        public bool ShouldSerializeitem_uri()
+        {
+            return !string.IsNullOrEmpty(item_uri);
+        }
 
         public string product_code { get; set; }
-        public bool ShouldSerializeproduct_code => !string.IsNullOrEmpty(product_code);
+
+        public bool ShouldSerializeproduct_code()
+        {
+            return !string.IsNullOrEmpty(product_code);
+        }
     }
 }

@@ -14,13 +14,12 @@ namespace ZipMoneySDK.Models
     }
     public class ZipShopper
     {
-        public ZipShopper()
-        {
-            statistics = new ZipStatistics();
-            billing_address = new ZipAddress();
-        }
         public string title { get; set; }
-        public bool ShouldSerializetitle => !string.IsNullOrEmpty(title);
+
+        public bool ShouldSerializetitle()
+        {
+            return !string.IsNullOrEmpty(title);
+        }
 
         [JsonProperty(Required = Required.Always)]
         public string first_name { get; set; }
@@ -29,23 +28,43 @@ namespace ZipMoneySDK.Models
         public string last_name { get; set; }
 
         public string middle_name { get; set; }
-        public bool ShouldSerializemiddle_name => !string.IsNullOrEmpty(middle_name);
+
+        public bool ShouldSerializemiddle_name()
+        {
+            return !string.IsNullOrEmpty(middle_name);
+        }
 
         public string phone { get; set; }
-        public bool ShouldSerializephone => !string.IsNullOrEmpty(phone);
+
+        public bool ShouldSerializephone()
+        {
+            return !string.IsNullOrEmpty(phone);
+        }
 
         [JsonProperty(Required = Required.Always)]
         public string email { get; set; }
 
-        public string birth_date { get; set; }
-        public bool ShouldSerializebirth_date => !string.IsNullOrEmpty(birth_date);
+        public DateTime? birth_date { get; set; }
+
+        public bool ShouldSerializebirth_date()
+        {
+            return birth_date != null;
+        }
 
         [JsonConverter(typeof(StringEnumConverter))]
         public Gender? gender { get; set; }
-        public bool ShouldSerializegender => gender != null;
+
+        public bool ShouldSerializegender()
+        {
+            return gender != null;
+        }
 
         public ZipStatistics statistics { get; set; }
-        public bool ShouldSerializestatistics => statistics != null;
+
+        public bool ShouldSerializestatistics()
+        {
+            return statistics != null;
+        }
 
         [JsonProperty(Required = Required.Always)]
         public ZipAddress billing_address { get; set; }

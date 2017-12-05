@@ -16,14 +16,11 @@ namespace ZipMoneySDK.Models
         public string message { get; set; }
 
         public List<ZipErrorDetail> details { get; set; }
-        public bool ShouldSerializedetails
+        public bool ShouldSerializedetails()
         {
-            get
-            {
-                if (details == null) return false;
-                if (details.Count == 0) return false;
-                return true;
-            }
+            if (details == null) return false;
+            if (details.Count == 0) return false;
+            return true;
         }
     }
 }

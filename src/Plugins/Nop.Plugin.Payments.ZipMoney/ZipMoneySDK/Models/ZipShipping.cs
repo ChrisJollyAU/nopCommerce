@@ -12,13 +12,24 @@ namespace ZipMoneySDK.Models
         {
         }
         public bool pickup { get; set; }
-        public bool ShouldSerializepckup => pickup;
+
+        public bool ShouldSerializepckup()
+        {
+            return pickup;
+        }
 
         public ZipTracking tracking { get; set; }
-        public bool ShouldSerializetracking => tracking != null;
+
+        public bool ShouldSerializetracking()
+        {
+            return tracking != null;
+        }
 
         public ZipAddress address { get; set; }
-        public bool ShouldSerializeaddress => address != null;
 
+        public bool ShouldSerializeaddress()
+        {
+            return address != null;
+        }
     }
 }
