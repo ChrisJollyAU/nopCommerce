@@ -7,22 +7,16 @@ using Newtonsoft.Json;
 
 namespace ZipMoneySDK.Models
 {
-    public class ZipRefundResponse
+    public class ZipRefundRequest
     {
         [JsonProperty(Required = Required.Always)]
-        public string id { get; set; }
-
         public string charge_id { get; set; }
-        public bool ShouldSerializecharge_id => !string.IsNullOrEmpty(charge_id);
 
         [JsonProperty(Required = Required.Always)]
         public string reason { get; set; }
 
         [JsonProperty(Required = Required.Always)]
         public decimal amount { get; set; }
-
-        [JsonProperty(Required = Required.Always)]
-        public DateTime created { get; set; }
 
         public Dictionary<string,string> metadata { get; set; }
 

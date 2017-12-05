@@ -68,24 +68,20 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
-            if (processPaymentRequest.CustomValues["ZipCheckoutResult"].ToString().Equals("approved"))
+            if (processPaymentRequest.CustomValues["ZipCheckoutResult"].ToString().ToLowerInvariant().Equals("approved"))
             {
-                ZipBaseResponse response = zipMoney
+                ZipChargeResponse response = zipMoney
                     .CaptureCharge(processPaymentRequest.CustomValues["ZipChargeId"].ToString(),
                         processPaymentRequest.OrderTotal).Result;
-                if (response.state == "captured")
+                if (response.state == ChargeState.captured)
                 {
-                    ProcessPaymentResult result = new ProcessPaymentResult();
-                    if (response.state.ToLowerInvariant().Equals("captured"))
+                    ProcessPaymentResult result = new ProcessPaymentResult
                     {
-                        result = new ProcessPaymentResult
-                        {
-                            AllowStoringCreditCardNumber = false,
-                            CaptureTransactionId = response.id,
-                            CaptureTransactionResult = response.state,
-                            NewPaymentStatus = PaymentStatus.Paid
-                        };
-                    }
+                        AllowStoringCreditCardNumber = false,
+                        CaptureTransactionId = response.id,
+                        CaptureTransactionResult = response.state.ToString(),
+                        NewPaymentStatus = PaymentStatus.Paid
+                    };
                     return result;
                 }
                 _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "ZipMoney Capture Error",
@@ -131,12 +127,12 @@ namespace Nop.Plugin.Payments.ZipMoney
             string chargeId = capturePaymentRequest.Order.AuthorizationTransactionCode;
             string chargeresult = capturePaymentRequest.Order.AuthorizationTransactionResult;
             CapturePaymentResult result;
-            ZipBaseResponse response;
-            if (chargeresult.Equals("authorised"))
+            ZipChargeResponse response;
+            if (chargeresult.ToLowerInvariant().Equals("authorised"))
             {
                 response = zipMoney.CaptureCharge(chargeId, capturePaymentRequest.Order.OrderTotal).Result;
                 result = new CapturePaymentResult {NewPaymentStatus = PaymentStatus.Authorized};
-                if (response.state == "captured")
+                if (response.state == ChargeState.captured)
                 {
                     result.NewPaymentStatus = PaymentStatus.Paid;
                     result.CaptureTransactionId = response.id;
@@ -148,11 +144,11 @@ namespace Nop.Plugin.Payments.ZipMoney
                 return result;
             }
             //create and capture
-            ZipCharge zipCharge = new ZipCharge
+            ZipChargeRequest zipCharge = new ZipChargeRequest
             {
                 authority =
                 {
-                    type = "checkout_id",
+                    type =  AuthorityType.checkout_id,
                     value = capturePaymentRequest.Order.AuthorizationTransactionId
                 },
                 capture = true,
@@ -163,11 +159,11 @@ namespace Nop.Plugin.Payments.ZipMoney
                 JsonConvert.SerializeObject(zipCharge));
             response = zipMoney.CreateCharge(zipCharge).Result;
             result = new CapturePaymentResult();
-            if (response.state == "captured")
+            if (response.state == ChargeState.captured)
             {
                 result.NewPaymentStatus = PaymentStatus.Paid;
                 result.CaptureTransactionId = response.id;
-                result.CaptureTransactionResult = response.state;
+                result.CaptureTransactionResult = response.state.ToString();
                 return result;
             }
             _logger.InsertLog(LogLevel.Error, "Zip capture/charge error",
@@ -179,11 +175,18 @@ namespace Nop.Plugin.Payments.ZipMoney
         public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
         {
             RefundPaymentResult result = new RefundPaymentResult();
-            var response = zipMoney.CreateRefund(refundPaymentRequest.Order.CaptureTransactionId, "",
+            var response = zipMoney.CreateRefund(refundPaymentRequest.Order.CaptureTransactionId, "plugin called refund",
                 refundPaymentRequest.AmountToRefund).Result;
-            result.NewPaymentStatus = refundPaymentRequest.IsPartialRefund
-                ? PaymentStatus.PartiallyRefunded
-                : PaymentStatus.Refunded;
+            var error = zipMoney.GetLastError();
+            if (error == null)
+            {
+                result.NewPaymentStatus = refundPaymentRequest.IsPartialRefund
+                    ? PaymentStatus.PartiallyRefunded
+                    : PaymentStatus.Refunded;
+                return result;
+            }
+            result.AddError(error.error.message);
+            _logger.InsertLog(LogLevel.Error, error.error.message, JsonConvert.SerializeObject(error));
             return result;
         }
 
@@ -280,7 +283,8 @@ namespace Nop.Plugin.Payments.ZipMoney
             {
                 "checkout_payment_method_top",
                 "order_summary_cart_footer",
-                "productdetails_inside_overview_buttons_before"
+                "productdetails_inside_overview_buttons_before",
+                "checkout_confirm_top"
             };
         }
 
@@ -298,6 +302,10 @@ namespace Nop.Plugin.Payments.ZipMoney
             else if (widgetZone == "productdetails_inside_overview_buttons_before")
             {
                 viewComponentName = "ZipMoneyProductPage";
+            }
+            else if (widgetZone == "checkout_confirm_top")
+            {
+                viewComponentName = "ZipMoneyReferralConfirm";
             }
         }
     }

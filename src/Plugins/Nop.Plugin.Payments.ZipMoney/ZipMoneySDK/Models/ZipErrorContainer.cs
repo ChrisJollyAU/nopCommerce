@@ -7,9 +7,9 @@ using Newtonsoft.Json;
 
 namespace ZipMoneySDK.Models
 {
-    public class ZipConfig
+    public class ZipErrorContainer
     {
         [JsonProperty(Required = Required.Always)]
-        public string redirect_uri { get; set; }
+        public ZipError error { get; set; }
     }
 }

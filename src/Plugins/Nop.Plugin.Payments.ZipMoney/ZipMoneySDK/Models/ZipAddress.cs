@@ -11,16 +11,26 @@ namespace ZipMoneySDK.Models
     {
         [JsonProperty(Required = Required.Always)]
         public string line1 { get; set; }
+
         public string line2 { get; set; }
+        public bool ShouldSerializeline2 => !string.IsNullOrEmpty(line2);
+
         [JsonProperty(Required = Required.Always)]
         public string city { get; set; }
+
         [JsonProperty(Required = Required.Always)]
         public string state { get; set; }
+
         [JsonProperty(Required = Required.Always)]
         public string postal_code { get; set; }
+
         [JsonProperty(Required = Required.Always)]
         public string country { get; set; }
+
         public string first_name { get; set; }
+        public bool ShouldSerializefirst_name => !string.IsNullOrEmpty(first_name);
+
         public string last_name { get; set; }
+        public bool ShouldSerializelast_name => !string.IsNullOrEmpty(last_name);
     }
 }
