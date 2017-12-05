@@ -387,7 +387,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
             _logger.Debug(JsonConvert.SerializeObject(zipCheckout));
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
-            _logger.Debug(JsonConvert.SerializeObject(zcr));
+            _logger.Debug(zm.GetLastResponse());
             _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, "ZipCheckoutId", zcr.id,
                 _storeContext.CurrentStore.Id);
             return JsonConvert.SerializeObject(zcr);
@@ -428,16 +428,37 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                         _workContext.CurrentCustomer);
                     ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
                     ZipChargeResponse response = zm.CreateCharge(zipCharge).Result;
-                    _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", JsonConvert.SerializeObject(response),
+                    _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
                         _workContext.CurrentCustomer);
                     if (zm.GetLastError() != null)
+                    {
                         _logger.InsertLog(LogLevel.Error, "ZipMoney Error",
                             JsonConvert.SerializeObject(zm.GetLastError()),
                             _workContext.CurrentCustomer);
-                    if (response.state != ChargeState.authorised && response.state != ChargeState.captured)
-                    {
-                        HttpContext.Session.SetString("ZipFriendlyError",
-                            "There was an error authorising your payment. Please ensure you have enough funds or choose a different payment method");
+                        switch (zm.GetLastError().error.code)
+                        {
+                            case "account_insufficient_funds":
+                                HttpContext.Session.SetString("ZipFriendlyError",
+                                    "There was an error authorising your payment. Please ensure you have enough funds or choose a different payment method");
+                                break;
+                            case "account_inoperative":
+                                HttpContext.Session.SetString("ZipFriendlyError",
+                                    "There was an error authorising your payment. Your account appears to be in arrears or is closed");
+                                break;
+                            case "account_locked":
+                                HttpContext.Session.SetString("ZipFriendlyError",
+                                    "There was an error authorising your payment. Your account appears to be in arrears or is closed");
+                                break;
+                            case "amount_invalid":
+                                HttpContext.Session.SetString("ZipFriendlyError",
+                                    "There was an error authorising your payment. Your account appears to be in arrears or is closed");
+                                break;
+                            case "fraud_check":
+                                HttpContext.Session.SetString("ZipFriendlyError",
+                                    "There was an error authorising your payment. Your account appears to be in arrears or is closed");
+                                break;
+
+                        }
                         HttpContext.Session.SetInt32("ZipShowError", 1);
                         return RedirectToRoute("CheckoutPaymentMethod");
                     }

@@ -18,6 +18,7 @@ namespace ZipMoneySDK
         private readonly string _apiKey;
         private ZipErrorContainer error;
         private string _partnerTag;
+        private string lastresponse;
         public ZipMoneyProcessor(string ApiKey, bool useSandbox = false,string partnerTag= "GeneralPartner")
         {
             _useSandbox = useSandbox;
@@ -35,9 +36,15 @@ namespace ZipMoneySDK
             return error;
         }
 
+        public string GetLastResponse()
+        {
+            return lastresponse;
+        }
+
         public async Task<ZipCheckoutResponse> CreateCheckout(ZipCheckoutRequest checkout)
         {
             error = null;
+            lastresponse = "";
             string checkoutser = JsonConvert.SerializeObject(checkout);
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/checkouts" : "https://api.zipmoney.com.au/merchant/v1/checkouts/";
             if (checkout.metadata == null) checkout.metadata = new Dictionary<string, string>();
@@ -45,14 +52,15 @@ namespace ZipMoneySDK
                 checkout.metadata["partner"] = _partnerTag;
             var result = await client.PostAsync(uri,
                 new StringContent(checkoutser, Encoding.UTF8, "application/json"));
+            lastresponse = await result.Content.ReadAsStringAsync();
             if (result.IsSuccessStatusCode)
             {
                 var result2 = 
-                    JsonConvert.DeserializeObject<ZipCheckoutResponse>(await result.Content.ReadAsStringAsync());
+                    JsonConvert.DeserializeObject<ZipCheckoutResponse>(lastresponse);
                 result2.redirect_uri = result2.uri;
                 return result2;
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(await result.Content.ReadAsStringAsync());
+            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             //a blank/empty response
             //allows the calling code to pass the object straight back to lightbox
             //as the uri/redirect_uri is empty the lightbox will close automatically
@@ -62,70 +70,80 @@ namespace ZipMoneySDK
         public async Task<ZipCheckoutRequest> RetreiveCheckout(string checkoutId)
         {
             error = null;
+            lastresponse = "";
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/checkouts/" : "https://api.zipmoney.com.au/merchant/v1/checkouts/";
             uri += checkoutId;
             var response = await client.GetAsync(uri);
+            lastresponse = await response.Content.ReadAsStringAsync();
             if (response.IsSuccessStatusCode)
             {
-                return JsonConvert.DeserializeObject<ZipCheckoutRequest>(await response.Content.ReadAsStringAsync());
+                return JsonConvert.DeserializeObject<ZipCheckoutRequest>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(await response.Content.ReadAsStringAsync());
+            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             return new ZipCheckoutRequest();
         }
 
         public async Task<ZipChargeResponse> CreateCharge(ZipChargeRequest zipCharge)
         {
             error = null;
+            lastresponse = "";
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/charges/" : "https://api.zipmoney.com.au/merchant/v1/charges/";
             var result = await client.PostAsync(uri, new StringContent(JsonConvert.SerializeObject(zipCharge),Encoding.UTF8,"application/json"));
+            lastresponse = await result.Content.ReadAsStringAsync();
             if (result.IsSuccessStatusCode)
             {
-                return JsonConvert.DeserializeObject<ZipChargeResponse>(await result.Content.ReadAsStringAsync());
+                return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(await result.Content.ReadAsStringAsync());
+            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             return new ZipChargeResponse();
         }
 
         public async Task<ZipChargeResponse> CaptureCharge(string chargeId, decimal amount)
         {
             error = null;
+            lastresponse = "";
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/charges/" : "https://api.zipmoney.com.au/merchant/v1/charges/";
             uri += chargeId + "/capture";
             string content = "{\"amount\": " + amount + "}";
             var result = await client.PostAsync(uri, new StringContent(content,Encoding.UTF8,"application/json"));
+            lastresponse = await result.Content.ReadAsStringAsync();
             if (result.IsSuccessStatusCode)
             {
-                return JsonConvert.DeserializeObject<ZipChargeResponse>(await result.Content.ReadAsStringAsync());
+                return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(await result.Content.ReadAsStringAsync());
+            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             return new ZipChargeResponse();
         }
 
         public async Task<ZipChargeResponse> CancelCharge(string chargeId)
         {
             error = null;
+            lastresponse = "";
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/charges/" : "https://api.zipmoney.com.au/merchant/v1/charges/";
             uri += chargeId + "/cancel";
             var result = await client.PostAsync(uri, new StringContent("{}", Encoding.UTF8, "application/json"));
+            lastresponse = await result.Content.ReadAsStringAsync();
             if (result.IsSuccessStatusCode)
             {
-                return JsonConvert.DeserializeObject<ZipChargeResponse>(await result.Content.ReadAsStringAsync());
+                return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(await result.Content.ReadAsStringAsync());
+            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             return new ZipChargeResponse();
         }
 
         public async Task<ZipChargeResponse> RetrieveCharge(string chargeId)
         {
             error = null;
+            lastresponse = "";
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/charges/" : "https://api.zipmoney.com.au/merchant/v1/charges/";
             uri += chargeId;
             var result = await client.GetAsync(uri);
+            lastresponse = await result.Content.ReadAsStringAsync();
             if (result.IsSuccessStatusCode)
             {
-                return JsonConvert.DeserializeObject<ZipChargeResponse>(await result.Content.ReadAsStringAsync());
+                return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(await result.Content.ReadAsStringAsync());
+            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             return new ZipChargeResponse();
         }
 
@@ -138,6 +156,7 @@ namespace ZipMoneySDK
         public async Task<ZipRefundResponse> CreateRefund(string chargeId, string reason, decimal amount)
         {
             error = null;
+            lastresponse = "";
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/refunds/" : "https://api.zipmoney.com.au/merchant/v1/refunds/";
             Dictionary<string, string> vals = new Dictionary<string, string>
             {
@@ -146,25 +165,28 @@ namespace ZipMoneySDK
                 ["amount"] = amount.ToString(CultureInfo.InvariantCulture)
             };
             var response = await client.PostAsync(uri, new StringContent(JsonConvert.SerializeObject(vals),Encoding.UTF8,"application/json"));
+            lastresponse = await response.Content.ReadAsStringAsync();
             if (response.IsSuccessStatusCode)
             {
-                return JsonConvert.DeserializeObject<ZipRefundResponse>(await response.Content.ReadAsStringAsync());
+                return JsonConvert.DeserializeObject<ZipRefundResponse>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(await response.Content.ReadAsStringAsync());
+            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             return new ZipRefundResponse();
         }
 
         public async Task<ZipRefundResponse> RetreiveRefund(string refundId)
         {
             error = null;
+            lastresponse = "";
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/refunds/" : "https://api.zipmoney.com.au/merchant/v1/refunds/";
             uri += refundId;
             var result = await client.GetAsync(uri);
+            lastresponse = await result.Content.ReadAsStringAsync();
             if (result.IsSuccessStatusCode)
             {
-                return JsonConvert.DeserializeObject<ZipRefundResponse>(await result.Content.ReadAsStringAsync());
+                return JsonConvert.DeserializeObject<ZipRefundResponse>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(await result.Content.ReadAsStringAsync());
+            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             return new ZipRefundResponse();
         }
 
@@ -175,6 +197,8 @@ namespace ZipMoneySDK
 
         public async Task<ZipTokenResponse> CreateToken(string checkoutId)
         {
+            error = null;
+            lastresponse = "";
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/tokens/" : "https://api.zipmoney.com.au/merchant/v1/tokens/";
             ZipTokenRequest tokenRequest = new ZipTokenRequest
             {
@@ -185,7 +209,13 @@ namespace ZipMoneySDK
                 }
             };
             var response = await client.PostAsync(uri, new StringContent(JsonConvert.SerializeObject(tokenRequest),Encoding.UTF8,"application/json"));
-            return JsonConvert.DeserializeObject<ZipTokenResponse>(await response.Content.ReadAsStringAsync());
+            lastresponse = await response.Content.ReadAsStringAsync();
+            if (response.IsSuccessStatusCode)
+            {
+                return JsonConvert.DeserializeObject<ZipTokenResponse>(lastresponse);
+            }
+            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
+            return new ZipTokenResponse();
         }
     }
 }
