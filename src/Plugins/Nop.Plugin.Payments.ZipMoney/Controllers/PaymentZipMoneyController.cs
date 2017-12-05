@@ -252,6 +252,27 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 ? zipMoneyPaymentSettings.SandboxAPIKey
                 : zipMoneyPaymentSettings.ProductionAPIKey;
             PlaceOrderContainer details = GetOrderDetails();
+            var orders = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id);
+            var orderscount = orders.Count;
+            var salestotalamount = orders.Sum(x => x.OrderTotal);
+            decimal salesavgamount = 0;
+            try
+            {
+                salesavgamount = orders.Average(x => x.OrderTotal);
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            decimal salesmaxamount = 0;
+            try
+            {
+                salesmaxamount = orders.Max(x => x.OrderTotal);
+            }
+            catch (InvalidOperationException)
+            {
+                
+            }
+            var refundstotalamount = orders.Sum(x => x.RefundedAmount);
             zipCheckout.shopper = new ZipShopper
             {
                 billing_address = new ZipAddress
@@ -273,11 +294,11 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 {
                     account_created = details.Customer.CreatedOnUtc,
                     currency = "AUD",
-                    sales_total_count = _orderService.SearchOrders(customerId:_workContext.CurrentCustomer.Id).Count,
-                    sales_total_amount = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id).Sum(x => x.OrderTotal),
-                    sales_avg_amount = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id).Average(x => x.OrderTotal),
-                    sales_max_amount = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id).Max(x => x.OrderTotal),
-                    refunds_total_amount = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id).Sum(x => x.RefundedAmount)
+                    sales_total_count = orderscount,
+                    sales_total_amount = salestotalamount,
+                    sales_avg_amount = salesavgamount,
+                    sales_max_amount = salesmaxamount,
+                    refunds_total_amount = refundstotalamount
                 }
             };
             zipCheckout.order = new ZipOrder
