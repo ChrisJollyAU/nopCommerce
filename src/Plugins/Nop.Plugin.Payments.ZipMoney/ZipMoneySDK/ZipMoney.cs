@@ -40,6 +40,7 @@ namespace ZipMoneySDK
             error = null;
             string checkoutser = JsonConvert.SerializeObject(checkout);
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/checkouts" : "https://api.zipmoney.com.au/merchant/v1/checkouts/";
+            if (checkout.metadata == null) checkout.metadata = new Dictionary<string, string>();
             if (!checkout.metadata.ContainsKey("partner"))
                 checkout.metadata["partner"] = _partnerTag;
             var result = await client.PostAsync(uri,
