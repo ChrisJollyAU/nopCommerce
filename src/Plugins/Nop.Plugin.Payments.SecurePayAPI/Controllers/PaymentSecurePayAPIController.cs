@@ -18,6 +18,8 @@ using Nop.Services.Security;
 
 namespace Nop.Plugin.Payments.SecurePayAPI.Controllers
 {
+    [Area(AreaNames.Admin)]
+    [AuthorizeAdmin]
     public class PaymentSecurePayAPIController : BasePaymentController
     {
         private readonly ISettingService _settingService;
@@ -72,8 +74,6 @@ namespace Nop.Plugin.Payments.SecurePayAPI.Controllers
             return strHex.ToUpper();
         }
 
-        [AuthorizeAdmin]
-        [Area(AreaNames.Admin)]
         public IActionResult Configure()
         {
             //whether user has the authority
@@ -90,6 +90,7 @@ namespace Nop.Plugin.Payments.SecurePayAPI.Controllers
             return View("~/Plugins/Payments.SecurePayAPI/Views/Configure.cshtml", model);
         }
 
+        [HttpPost]
         [AuthorizeAdmin]
         [AdminAntiForgery]
         [Area(AreaNames.Admin)]

@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc.Rendering;
+﻿using System.Collections.Generic;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Nop.Web.Framework.Mvc.ModelBinding;
 using Nop.Web.Framework.Mvc.Models;
-using System.Collections.Generic;
 
 namespace Nop.Plugin.Payments.SecurePayAPI.Models
 {
@@ -9,22 +9,19 @@ namespace Nop.Plugin.Payments.SecurePayAPI.Models
     {
         public PaymentInfoModel()
         {
+            CreditCardTypes = new List<SelectListItem>();
             ExpireMonths = new List<SelectListItem>();
             ExpireYears = new List<SelectListItem>();
-            CardsAllowed = new List<SelectListItem>();
-            SelectListItem mc = new SelectListItem
-            {
-                Text = "MasterCard"
-            };
-            SelectListItem visa = new SelectListItem
-            {
-                Text = "Visa"
-            };
-            CardsAllowed.Add(mc);
-            CardsAllowed.Add(visa);
         }
 
-        public string CardType { get; set; }
+        [NopResourceDisplayName("Payment.SelectCreditCard")]
+        public string CreditCardType { get; set; }
+
+        [NopResourceDisplayName("Payment.SelectCreditCard")]
+        public IList<SelectListItem> CreditCardTypes { get; set; }
+
+        [NopResourceDisplayName("Payment.CardholderName")]
+        public string CardholderName { get; set; }
 
         [NopResourceDisplayName("Payment.CardNumber")]
         public string CardNumber { get; set; }
@@ -34,13 +31,12 @@ namespace Nop.Plugin.Payments.SecurePayAPI.Models
 
         [NopResourceDisplayName("Payment.ExpirationDate")]
         public string ExpireYear { get; set; }
+
         public IList<SelectListItem> ExpireMonths { get; set; }
+
         public IList<SelectListItem> ExpireYears { get; set; }
 
-        [NopResourceDisplayName("Plugins.Payments.SecurePayAPI.Fields.CardsAllowed")]
-        public IList<SelectListItem> CardsAllowed { get; set; }
-
-        [NopResourceDisplayName("Plugins.Payments.SecurePayAPI.Fields.CVV")]
+        [NopResourceDisplayName("Payment.CardCode")]
         public string CardCode { get; set; }
     }
 }

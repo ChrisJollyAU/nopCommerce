@@ -1,60 +1,60 @@
-﻿@{
-    Layout = "";
+﻿@model Nop.Plugin.Payments.SecurePayAPI.Models.ConfigurationModel
+@{
+    Layout = "_ConfigurePlugin";
 }
-@model ConfigurationModel
-@using Nop.Plugin.Payments.SecurePayAPI.Models;
-@using Nop.Web.Framework;
-@Html.Action("StoreScopeConfiguration", "Setting", new { area = "Admin" })
 
-@using (Html.BeginForm())
-{
-    <table class="adminContent">
-    <tr>
-        <td colspan="2" width="100%">
-            <hr />
-        </td>
-    </tr>
-        <tr>
-            <td class="adminTitle">
-                @Html.NopLabelFor(model => model.Password):
-            </td>
-            <td class="adminData">
-                @Html.EditorFor(model => model.Password)
-                @Html.ValidationMessageFor(model => model.Password)
-            </td>
-        </tr>
-        <tr>
-            <td class="adminTitle">
-                @Html.NopLabelFor(model => model.MerchantId):
-            </td>
-            <td class="adminData">
-                @Html.EditorFor(model => model.MerchantId)
-                @Html.ValidationMessageFor(model => model.MerchantId)
-            </td>
-        </tr>
-        <tr>
-            <td class="adminTitle">
-                @Html.NopLabelFor(model => model.TestAccount):
-            </td>
-            <td class="adminData">
-                @Html.EditorFor(model => model.TestAccount)
-                @Html.ValidationMessageFor(model => model.TestAccount)
-            </td>
-        </tr>
-        <tr>
-            <td class="adminTitle">
-                @Html.NopLabelFor(model => model.FraudGuard):
-            </td>
-            <td class="adminData">
-                @Html.EditorFor(model => model.FraudGuard)
-                @Html.ValidationMessageFor(model => model.FraudGuard)
-            </td>
-        </tr>
-        <tr>
-            <td colspan="2" width="100%">
-                <input type="submit" name="save" class="t-button" value="@T("Admin.Common.Save")" />
-            </td>
-        </tr>
-    </table>
-    
-}
+@await Component.InvokeAsync("StoreScopeConfiguration")
+
+<form asp-controller="PaymentSecurePayAPI" asp-action="Configure" method="post">
+    <div class="panel-group">
+        <div class="panel panel-default">
+            <div class="panel-body">
+                <div class="form-group">
+                    <div class="col-md-3">
+                        @*<nop-override-store-checkbox asp-for="AdditionalFee_OverrideForStore" asp-input="AdditionalFee" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />*@
+                        <nop-label asp-for="Password" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="Password" />
+                        <span asp-validation-for="Password"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        @*<nop-override-store-checkbox asp-for="AdditionalFeePercentage_OverrideForStore" asp-input="AdditionalFeePercentage" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />*@
+                        <nop-label asp-for="MerchantId" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="MerchantId" />
+                        <span asp-validation-for="MerchantId"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        @*<nop-override-store-checkbox asp-for="AdditionalFeePercentage_OverrideForStore" asp-input="AdditionalFeePercentage" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />*@
+                        <nop-label asp-for="TestAccount" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="TestAccount" />
+                        <span asp-validation-for="TestAccount"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-3">
+                        @*<nop-override-store-checkbox asp-for="AdditionalFeePercentage_OverrideForStore" asp-input="AdditionalFeePercentage" asp-store-scope="@Model.ActiveStoreScopeConfiguration" />*@
+                        <nop-label asp-for="FraudGuard" />
+                    </div>
+                    <div class="col-md-9">
+                        <nop-editor asp-for="FraudGuard" />
+                        <span asp-validation-for="FraudGuard"></span>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <div class="col-md-9 col-md-offset-3">
+                        <input type="submit" name="save" class="btn bg-primary" value="@T("Admin.Common.Save")" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
