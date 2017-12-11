@@ -385,9 +385,13 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 redirect_uri = _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
             };
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
-            _logger.Debug(JsonConvert.SerializeObject(zipCheckout));
+            _logger.InsertLog(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout));
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
-            _logger.Debug(zm.GetLastResponse());
+            _logger.InsertLog(LogLevel.Debug,"zip checkoutresponse",zm.GetLastResponse());
+            if (zm.GetLastError() != null)
+            {
+                _logger.InsertLog(LogLevel.Error, "zip error", zm.GetLastResponse());
+            }
             _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, "ZipCheckoutId", zcr.id,
                 _storeContext.CurrentStore.Id);
             return JsonConvert.SerializeObject(zcr);
