@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Web;
@@ -545,6 +546,14 @@ namespace Nop.Plugin.Payments.SecurePayAPI
             return false;
         }
 
+        /// <summary>
+        /// Gets a configuration page URL
+        /// </summary>
+        public override string GetConfigurationPageUrl()
+        {
+            return $"{_webHelper.GetStoreLocation()}Admin/PaymentSecurePayAPI/Configure";
+        }
+
         public override void Install()
         {
             //settings
@@ -587,8 +596,9 @@ namespace Nop.Plugin.Payments.SecurePayAPI
 
             //validate
             var validator = new PaymentInfoValidator(_localizationService);
-            var model = new PaymentInfoModel()
+            var model = new PaymentInfoModel
             {
+                CardholderName = form["CardholderName"],
                 CardNumber = form["CardNumber"],
                 CardCode = form["CardCode"],
                 ExpireMonth = form["ExpireMonth"],
@@ -596,21 +606,22 @@ namespace Nop.Plugin.Payments.SecurePayAPI
             };
             var validationResult = validator.Validate(model);
             if (!validationResult.IsValid)
-                foreach (var error in validationResult.Errors)
-                    warnings.Add(error.ErrorMessage);
+                warnings.AddRange(validationResult.Errors.Select(error => error.ErrorMessage));
+
             return warnings;
         }
 
         public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
         {
-            var paymentInfo = new ProcessPaymentRequest
+            return new ProcessPaymentRequest
             {
+                CreditCardType = form["CreditCardType"],
+                CreditCardName = form["CardholderName"],
                 CreditCardNumber = form["CardNumber"],
                 CreditCardExpireMonth = int.Parse(form["ExpireMonth"]),
                 CreditCardExpireYear = int.Parse(form["ExpireYear"]),
                 CreditCardCvv2 = form["CardCode"]
             };
-            return paymentInfo;
         }
 
         public void GetPublicViewComponent(out string viewComponentName)

@@ -3,7 +3,7 @@ using Nop.Web.Framework.Mvc.Models;
 
 namespace Nop.Plugin.Shipping.Temando.Models
 {
-    public class TemandoShippingModel
+    public class TemandoShippingModel : BaseNopModel
     {
         [NopResourceDisplayName("Username")]
         public string Username { get; set; }

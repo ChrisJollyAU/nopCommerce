@@ -1,12 +1,12 @@
-﻿@{
+﻿@model Nop.Plugin.Shipping.Temando.Models.TemandoShippingModel
+@inject Nop.Core.IWebHelper webHelper
+@{
     Layout = "_ConfigurePlugin";
 }
-
-@model Nop.Plugin.Shipping.Temando.Models.TemandoShippingModel
 @using Nop.Plugin.Shipping.Temando;
 
 <form asp-controller="ShippingTemando" asp-action="Configure" method="post">
-    
+
 
     <div class="panel-group">
         <div class="panel panel-default">

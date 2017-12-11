@@ -196,10 +196,12 @@ namespace Nop.Plugin.Shipping.Temando
                     var availquotes = quot.getQuotesByRequest(quote);
                     foreach (AvailableQuote q in availquotes)
                     {
-                        ShippingOption shipopt = new ShippingOption();
-                        shipopt.Name = q.carrier.companyName.Replace("(B2B)", "") + ", " + q.deliveryMethod;
-                        shipopt.Rate = q.totalPrice + 5;
-                        shipopt.Description = String.Format("{0} - {1} Days", q.etaFrom, q.etaTo);
+                        ShippingOption shipopt = new ShippingOption
+                        {
+                            Name = q.carrier.companyName.Replace("(B2B)", "") + ", " + q.deliveryMethod,
+                            Rate = q.totalPrice + 5,
+                            Description = $"{q.etaFrom} - {q.etaTo} Days"
+                        };
                         response.ShippingOptions.Add(shipopt);
                         if (shipopt.Name.Contains("TNT"))
                         {
@@ -214,10 +216,12 @@ namespace Nop.Plugin.Shipping.Temando
             }
             else
             {
-                ShippingOption shipopt = new ShippingOption();
-                shipopt.Name = "Free shipping - TNT Road Express";
-                shipopt.Rate = 0;
-                shipopt.Description = String.Format("{0} - {1} Days", 2, 5);
+                ShippingOption shipopt = new ShippingOption
+                {
+                    Name = "Free shipping - TNT Road Express",
+                    Rate = 0,
+                    Description = $"{2} - {5} Days"
+                };
                 response.ShippingOptions.Add(shipopt);
             }
             return response;
@@ -238,7 +242,7 @@ namespace Nop.Plugin.Shipping.Temando
         /// </summary>
         public override string GetConfigurationPageUrl()
         {
-            return $"{_webHelper.GetStoreLocation()}Admin/Temando/Configure";
+            return $"{_webHelper.GetStoreLocation()}Admin/ShippingTemando/Configure";
         }
 
         /// <summary>

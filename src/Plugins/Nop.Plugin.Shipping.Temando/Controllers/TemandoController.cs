@@ -69,7 +69,7 @@ namespace Nop.Plugin.Shipping.Temando.Controllers
             model.Password = _temandoSettings.Password;
             model.Threshold = _temandoSettings.Threshold;
 
-            return View("~/Plugins/Shipping.Temando/Views/ShippingTemando/Configure.cshtml", model);
+            return View("~/Plugins/Shipping.Temando/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
