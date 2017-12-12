@@ -437,7 +437,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     if (zm.GetLastError() != null)
                     {
                         _logger.InsertLog(LogLevel.Error, "ZipMoney Error",
-                            JsonConvert.SerializeObject(zm.GetLastError()),
+                            zm.GetLastResponse(),
                             _workContext.CurrentCustomer);
                         switch (zm.GetLastError().error.code)
                         {
