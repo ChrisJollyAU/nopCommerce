@@ -343,7 +343,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     product_code = item.Product.Sku,
                 };
 
-                string url = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl : _storeContext.CurrentStore.Url + "/content/images/";
+                string url = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl + "/content/images/" : _storeContext.CurrentStore.Url + "/content/images/";
                 string fname = "" + item.Product.ProductPictures.First().Picture.Id;
                 switch (item.Product.ProductPictures.First().Picture.MimeType)
                 {
@@ -390,7 +390,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             
             zipCheckout.config = new ZipConfig
             {
-                redirect_uri = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl : _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
+                redirect_uri = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl + "/PaymentZipMoney/ZipRedirect" : _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
             };
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
             _logger.InsertLog(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout));
