@@ -154,7 +154,7 @@ namespace Nop.Plugin.Payments.ZipMoney
             //create and capture
             ZipChargeRequest zipCharge = new ZipChargeRequest
             {
-                authority =
+                authority = new ZipAuthority
                 {
                     type =  AuthorityType.checkout_id,
                     value = capturePaymentRequest.Order.AuthorizationTransactionId

@@ -8,6 +8,7 @@ using Nop.Services.Shipping;
 using Nop.Services.Shipping.Tracking;
 using Nop.Services.Logging;
 using System.Collections.Generic;
+using System.IO;
 using System.ServiceModel;
 using Nop.Plugin.Shipping.Temando.ServiceReference1;
 //TODO temando login settings
@@ -53,7 +54,15 @@ namespace Nop.Plugin.Shipping.Temando
             this._logger = logger;
             this._webHelper = webHelper;
             postcodes = new List<string>();
-            postcodes.AddRange(System.IO.File.ReadAllLines(CommonHelper.MapPath("/Plugins/Shipping.Temando/postcodes.csv")));
+            try
+            {
+                postcodes.AddRange(
+                    System.IO.File.ReadAllLines(CommonHelper.MapPath("/Plugins/Shipping.Temando/postcodes.csv")));
+            }
+            catch (FileNotFoundException e)
+            {
+                
+            }
             threshold = _temandoSettings.Threshold;
         }
         #endregion

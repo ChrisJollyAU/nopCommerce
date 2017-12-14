@@ -284,7 +284,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     city = details.BillingAddress.City,
                     country = details.BillingAddress.Country.TwoLetterIsoCode,
                     postal_code = details.BillingAddress.ZipPostalCode,
-                    state = details.BillingAddress.StateProvince.Abbreviation
+                    state = details.BillingAddress.StateProvince.Name
                 },
                 email = details.BillingAddress.Email,
                 phone = details.BillingAddress.PhoneNumber.Replace(" ", ""),
@@ -308,21 +308,27 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 shipping = new ZipShipping
                 {
                     pickup = details.PickUpInStore,
-                    address = new ZipAddress
-                    {
-                        line1 = details.ShippingAddress.Address1,
-                        line2 = details.ShippingAddress.Address2,
-                        first_name = details.ShippingAddress.FirstName,
-                        last_name = details.ShippingAddress.LastName,
-                        city = details.ShippingAddress.City,
-                        country = details.ShippingAddress.Country.TwoLetterIsoCode,
-                        state = details.ShippingAddress.StateProvince.Name,
-                        postal_code = details.ShippingAddress.ZipPostalCode
-                    }
                 },
                 items = new List<ZipOrderItem>()
             };
-
+            if (details.ShippingAddress != null)
+            {
+                zipCheckout.order.shipping.address = new ZipAddress
+                {
+                    line1 = details.ShippingAddress.Address1,
+                    line2 = details.ShippingAddress.Address2,
+                    first_name = details.ShippingAddress.FirstName,
+                    last_name = details.ShippingAddress.LastName,
+                    city = details.ShippingAddress.City,
+                    country = details.ShippingAddress.Country.TwoLetterIsoCode,
+                    state = details.ShippingAddress.StateProvince.Name,
+                    postal_code = details.ShippingAddress.ZipPostalCode
+                };
+            }
+            else
+            {
+                zipCheckout.order.shipping.pickup = true;
+            }
             if (details.Customer.LastLoginDateUtc != null)
                 zipCheckout.shopper.statistics.last_login = details.Customer.LastLoginDateUtc.Value;
 
@@ -337,7 +343,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     product_code = item.Product.Sku,
                 };
 
-                string url = _storeContext.CurrentStore.Url + "/content/images/";
+                string url = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl : _storeContext.CurrentStore.Url + "/content/images/";
                 string fname = "" + item.Product.ProductPictures.First().Picture.Id;
                 switch (item.Product.ProductPictures.First().Picture.MimeType)
                 {
@@ -380,9 +386,11 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 reference = "discount"
             };
             zipCheckout.order.items.Add(discountItem);
+
+            
             zipCheckout.config = new ZipConfig
             {
-                redirect_uri = _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
+                redirect_uri = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl : _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
             };
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
             _logger.InsertLog(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout));
@@ -402,11 +410,12 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             _logger.InsertLog(LogLevel.Debug, "ZipRedirect called. " + result + ". " + checkoutid, "",
                 _workContext.CurrentCustomer);
             if (result == null) return null;
+            if (checkoutid == null) return null;
             if (result.ToLowerInvariant().Equals("approved"))
             {
                 string savedcheckoutId = _workContext.CurrentCustomer
                     .GetAttribute<string>("ZipCheckoutId", _genericAttributeService, _storeContext.CurrentStore.Id);
-                if (savedcheckoutId.Equals(checkoutid))
+                if (savedcheckoutId != null && savedcheckoutId.Equals(checkoutid))
                 {
 //same session
                     PlaceOrderContainer details = GetOrderDetails();
@@ -431,9 +440,23 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     _logger.InsertLog(LogLevel.Debug, "ZipCharge JSON", JsonConvert.SerializeObject(zipCharge),
                         _workContext.CurrentCustomer);
                     ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
-                    ZipChargeResponse response = zm.CreateCharge(zipCharge).Result;
-                    _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
-                        _workContext.CurrentCustomer);
+                    ZipChargeResponse response;
+                    try
+                    {
+                        response = zm.CreateCharge(zipCharge).Result;
+                        _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
+                            _workContext.CurrentCustomer);
+                    }
+                    catch (Newtonsoft.Json.JsonSerializationException e)
+                    {
+                        _logger.InsertLog(LogLevel.Error, "Newtonsoft.Json.JsonSerializationException", e.Message);
+                        _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
+                            _workContext.CurrentCustomer);
+                        HttpContext.Session.SetString("ZipFriendlyError","There was an error euahtorising your payment. We received an invalid response. Please try again");
+                        HttpContext.Session.SetInt32("ZipShowError", 1);
+                        return RedirectToRoute("CheckoutPaymentMethod");
+                    }
+                    
                     if (zm.GetLastError() != null)
                     {
                         _logger.InsertLog(LogLevel.Error, "ZipMoney Error",
@@ -477,14 +500,24 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     FormCollection collection = new FormCollection(content);
                     return EnterPaymentInfo(collection);
                 }
+                _logger.InsertLog(LogLevel.Debug, "Searching for checkoutid");
                 //different session. most likely referral that is now approved
                 Order order =
-                    _orderService.GetOrderByAuthorizationTransactionIdAndPaymentMethod(checkoutid, "ZipMoney");
-                var errors = _orderProcessingService.Capture(order);
-                if (order.PaymentStatus == PaymentStatus.Paid)
-                    return RedirectToRoute("CheckoutCompleted", new {orderId = order.Id});
-                _logger.InsertLog(LogLevel.Error, "Could not capture transaction. Checkout_id=" + checkoutid,
-                    errors.ToString());
+                    _orderService.GetOrderByAuthorizationTransactionIdAndPaymentMethod(checkoutid, "Payments.ZipMoney");
+                if (order != null)
+                {
+                    _logger.InsertLog(LogLevel.Debug, "Searching for checkoutid: found");
+                    _orderProcessingService.MarkAsAuthorized(order);
+                    var errors = _orderProcessingService.Capture(order);
+                    if (order.PaymentStatus == PaymentStatus.Paid)
+                        return RedirectToRoute("CheckoutCompleted", new {orderId = order.Id});
+                    _logger.InsertLog(LogLevel.Error, "Could not capture transaction. Checkout_id=" + checkoutid,
+                        errors.ToString());
+                }
+                else
+                {
+                    _logger.InsertLog(LogLevel.Error, "Order not found");
+                }
             }
             else if (result.ToLowerInvariant().Equals("cancelled"))
             {

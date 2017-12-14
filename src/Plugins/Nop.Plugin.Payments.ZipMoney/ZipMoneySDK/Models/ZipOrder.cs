@@ -16,8 +16,11 @@ namespace ZipMoneySDK.Models
             return !string.IsNullOrEmpty(reference);
         }
 
-        [JsonProperty(Required = Required.Always)]
         public ZipShipping shipping { get; set; }
+        public bool ShouldSerializeshipping()
+        {
+            return true;
+        }
 
         public List<ZipOrderItem> items { get; set; }
 
