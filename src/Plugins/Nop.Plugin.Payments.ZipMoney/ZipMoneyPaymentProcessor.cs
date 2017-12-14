@@ -74,16 +74,19 @@ namespace Nop.Plugin.Payments.ZipMoney
                 ZipChargeResponse response = zipMoney
                     .CaptureCharge(processPaymentRequest.CustomValues["ZipChargeId"].ToString(),
                         processPaymentRequest.OrderTotal).Result;
-                if (response.state == ChargeState.captured)
+                if (zipMoney.GetLastError() == null)
                 {
-                    result = new ProcessPaymentResult
+                    if (response.state == ChargeState.captured)
                     {
-                        AllowStoringCreditCardNumber = false,
-                        CaptureTransactionId = response.id,
-                        CaptureTransactionResult = response.state.ToString(),
-                        NewPaymentStatus = PaymentStatus.Paid
-                    };
-                    return result;
+                        result = new ProcessPaymentResult
+                        {
+                            AllowStoringCreditCardNumber = false,
+                            CaptureTransactionId = response.id,
+                            CaptureTransactionResult = response.state.ToString(),
+                            NewPaymentStatus = PaymentStatus.Paid
+                        };
+                        return result;
+                    }
                 }
                 _logger.InsertLog(LogLevel.Debug, "ZipMoney Capture Error",
                     JsonConvert.SerializeObject(zipMoney.GetLastError()));
@@ -140,7 +143,7 @@ namespace Nop.Plugin.Payments.ZipMoney
             {
                 response = zipMoney.CaptureCharge(chargeId, capturePaymentRequest.Order.OrderTotal).Result;
                 result = new CapturePaymentResult {NewPaymentStatus = PaymentStatus.Authorized};
-                if (response.state == ChargeState.captured)
+                if (response?.state == ChargeState.captured)
                 {
                     result.NewPaymentStatus = PaymentStatus.Paid;
                     result.CaptureTransactionId = response.id;
@@ -168,7 +171,7 @@ namespace Nop.Plugin.Payments.ZipMoney
             response = zipMoney.CreateCharge(zipCharge).Result;
             _logger.InsertLog(LogLevel.Debug, "zip capture response", zipMoney.GetLastResponse());
             result = new CapturePaymentResult();
-            if (response.state == ChargeState.captured)
+            if (response?.state == ChargeState.captured)
             {
                 result.NewPaymentStatus = PaymentStatus.Paid;
                 result.CaptureTransactionId = response.id;
@@ -177,7 +180,7 @@ namespace Nop.Plugin.Payments.ZipMoney
             }
             _logger.InsertLog(LogLevel.Error, "Zip capture/charge error",
                 JsonConvert.SerializeObject(zipMoney.GetLastError()));
-            result.Errors.Add("Unknown error");
+            result.Errors.Add(zipMoney.GetLastError().error.message);
             return result;
         }
 

@@ -440,23 +440,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     _logger.InsertLog(LogLevel.Debug, "ZipCharge JSON", JsonConvert.SerializeObject(zipCharge),
                         _workContext.CurrentCustomer);
                     ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
-                    ZipChargeResponse response;
-                    try
-                    {
-                        response = zm.CreateCharge(zipCharge).Result;
-                        _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
-                            _workContext.CurrentCustomer);
-                    }
-                    catch (Newtonsoft.Json.JsonSerializationException e)
-                    {
-                        _logger.InsertLog(LogLevel.Error, "Newtonsoft.Json.JsonSerializationException", e.Message);
-                        _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
-                            _workContext.CurrentCustomer);
-                        HttpContext.Session.SetString("ZipFriendlyError","There was an error euahtorising your payment. We received an invalid response. Please try again");
-                        HttpContext.Session.SetInt32("ZipShowError", 1);
-                        return RedirectToRoute("CheckoutPaymentMethod");
-                    }
-                    
+                    ZipChargeResponse response = zm.CreateCharge(zipCharge).Result;
+                    _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
+                        _workContext.CurrentCustomer);
                     if (zm.GetLastError() != null)
                     {
                         _logger.InsertLog(LogLevel.Error, "ZipMoney Error",
@@ -483,6 +469,11 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                             case "fraud_check":
                                 HttpContext.Session.SetString("ZipFriendlyError",
                                     "There was an error authorising your payment. Your account appears to be in arrears or is closed");
+                                break;
+                            case "serialization":
+                            default:
+                                HttpContext.Session.SetString("ZipFriendlyError",
+                                    "There was an error authorising your payment. Freerange Supplies did not receive a valid response from ZipMoney. Please try again or choose a different payment method");
                                 break;
 
                         }

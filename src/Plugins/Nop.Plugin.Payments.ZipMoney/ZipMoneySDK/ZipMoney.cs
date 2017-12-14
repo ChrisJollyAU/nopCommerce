@@ -75,12 +75,26 @@ namespace ZipMoneySDK
             uri += checkoutId;
             var response = await client.GetAsync(uri);
             lastresponse = await response.Content.ReadAsStringAsync();
-            if (response.IsSuccessStatusCode)
+            try
             {
-                return JsonConvert.DeserializeObject<ZipCheckoutRequest>(lastresponse);
+                if (response.IsSuccessStatusCode)
+                {
+                    return JsonConvert.DeserializeObject<ZipCheckoutRequest>(lastresponse);
+                }
+                error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
-            return new ZipCheckoutRequest();
+            catch (JsonSerializationException e)
+            {
+                error = new ZipErrorContainer
+                {
+                    error = new ZipError
+                    {
+                        code = "serialization",
+                        message = e.Message
+                    }
+                };
+            }
+            return null;
         }
 
         public async Task<ZipChargeResponse> CreateCharge(ZipChargeRequest zipCharge)
@@ -90,12 +104,26 @@ namespace ZipMoneySDK
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/charges/" : "https://api.zipmoney.com.au/merchant/v1/charges/";
             var result = await client.PostAsync(uri, new StringContent(JsonConvert.SerializeObject(zipCharge),Encoding.UTF8,"application/json"));
             lastresponse = await result.Content.ReadAsStringAsync();
-            if (result.IsSuccessStatusCode)
+            try
             {
-                return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
+                if (result.IsSuccessStatusCode)
+                {
+                    return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
+                }
+                error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
-            return new ZipChargeResponse();
+            catch (JsonSerializationException e)
+            {
+                error = new ZipErrorContainer
+                {
+                    error = new ZipError
+                    {
+                        code = "serialization",
+                        message = e.Message
+                    }
+                };
+            }
+            return null;
         }
 
         public async Task<ZipChargeResponse> CaptureCharge(string chargeId, decimal amount)
@@ -107,12 +135,26 @@ namespace ZipMoneySDK
             string content = "{\"amount\": " + amount + "}";
             var result = await client.PostAsync(uri, new StringContent(content,Encoding.UTF8,"application/json"));
             lastresponse = await result.Content.ReadAsStringAsync();
-            if (result.IsSuccessStatusCode)
+            try
             {
-                return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
+                if (result.IsSuccessStatusCode)
+                {
+                    return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
+                }
+                error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
-            return new ZipChargeResponse();
+            catch (JsonSerializationException e)
+            {
+                error = new ZipErrorContainer
+                {
+                    error = new ZipError
+                    {
+                        code = "serialization",
+                        message = e.Message
+                    }
+                };
+            }
+            return null;
         }
 
         public async Task<ZipChargeResponse> CancelCharge(string chargeId)
@@ -123,12 +165,26 @@ namespace ZipMoneySDK
             uri += chargeId + "/cancel";
             var result = await client.PostAsync(uri, new StringContent("{}", Encoding.UTF8, "application/json"));
             lastresponse = await result.Content.ReadAsStringAsync();
-            if (result.IsSuccessStatusCode)
+            try
             {
-                return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
+                if (result.IsSuccessStatusCode)
+                {
+                    return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
+                }
+                error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
-            return new ZipChargeResponse();
+            catch (JsonSerializationException e)
+            {
+                error = new ZipErrorContainer
+                {
+                    error = new ZipError
+                    {
+                        code = "serialization",
+                        message = e.Message
+                    }
+                };
+            }
+            return null;
         }
 
         public async Task<ZipChargeResponse> RetrieveCharge(string chargeId)
@@ -139,12 +195,26 @@ namespace ZipMoneySDK
             uri += chargeId;
             var result = await client.GetAsync(uri);
             lastresponse = await result.Content.ReadAsStringAsync();
-            if (result.IsSuccessStatusCode)
+            try
             {
-                return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
+                if (result.IsSuccessStatusCode)
+                {
+                    return JsonConvert.DeserializeObject<ZipChargeResponse>(lastresponse);
+                }
+                error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
-            return new ZipChargeResponse();
+            catch (JsonSerializationException e)
+            {
+                error = new ZipErrorContainer
+                {
+                    error = new ZipError
+                    {
+                        code = "serialization",
+                        message = e.Message
+                    }
+                };
+            }
+            return null;
         }
 
         public async Task<ZipChargeCollection> ListCharges(int skip = 0, int limit = 0, string state = "",
@@ -166,12 +236,26 @@ namespace ZipMoneySDK
             };
             var response = await client.PostAsync(uri, new StringContent(JsonConvert.SerializeObject(vals),Encoding.UTF8,"application/json"));
             lastresponse = await response.Content.ReadAsStringAsync();
-            if (response.IsSuccessStatusCode)
+            try
             {
-                return JsonConvert.DeserializeObject<ZipRefundResponse>(lastresponse);
+                if (response.IsSuccessStatusCode)
+                {
+                    return JsonConvert.DeserializeObject<ZipRefundResponse>(lastresponse);
+                }
+                error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
-            return new ZipRefundResponse();
+            catch (JsonSerializationException e)
+            {
+                error = new ZipErrorContainer
+                {
+                    error = new ZipError
+                    {
+                        code = "serialization",
+                        message = e.Message
+                    }
+                };
+            }
+            return null;
         }
 
         public async Task<ZipRefundResponse> RetreiveRefund(string refundId)
@@ -182,12 +266,26 @@ namespace ZipMoneySDK
             uri += refundId;
             var result = await client.GetAsync(uri);
             lastresponse = await result.Content.ReadAsStringAsync();
-            if (result.IsSuccessStatusCode)
+            try
             {
-                return JsonConvert.DeserializeObject<ZipRefundResponse>(lastresponse);
+                if (result.IsSuccessStatusCode)
+                {
+                    return JsonConvert.DeserializeObject<ZipRefundResponse>(lastresponse);
+                }
+                error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
-            return new ZipRefundResponse();
+            catch (JsonSerializationException e)
+            {
+                error = new ZipErrorContainer
+                {
+                    error = new ZipError
+                    {
+                        code = "serialization",
+                        message = e.Message
+                    }
+                };
+            }
+            return null;
         }
 
         public async Task<ZipRefundCollection> ListRefunds(string chargeId,int skip,int limit)
@@ -210,12 +308,26 @@ namespace ZipMoneySDK
             };
             var response = await client.PostAsync(uri, new StringContent(JsonConvert.SerializeObject(tokenRequest),Encoding.UTF8,"application/json"));
             lastresponse = await response.Content.ReadAsStringAsync();
-            if (response.IsSuccessStatusCode)
+            try
             {
-                return JsonConvert.DeserializeObject<ZipTokenResponse>(lastresponse);
+                if (response.IsSuccessStatusCode)
+                {
+                    return JsonConvert.DeserializeObject<ZipTokenResponse>(lastresponse);
+                }
+                error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
             }
-            error = JsonConvert.DeserializeObject<ZipErrorContainer>(lastresponse);
-            return new ZipTokenResponse();
+            catch (JsonSerializationException e)
+            {
+                error = new ZipErrorContainer
+                {
+                    error = new ZipError
+                    {
+                        code = "serialization",
+                        message = e.Message
+                    }
+                };
+            }
+            return null;
         }
     }
 }
