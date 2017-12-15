@@ -393,9 +393,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 redirect_uri = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl + "/PaymentZipMoney/ZipRedirect" : _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
             };
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
-            _logger.InsertLog(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout));
+            _logger.InsertLog(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout),_workContext.CurrentCustomer);
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
-            _logger.InsertLog(LogLevel.Debug,"zip checkoutresponse",zm.GetLastResponse());
+            _logger.InsertLog(LogLevel.Debug,"zip checkoutresponse",zm.GetLastResponse(),_workContext.CurrentCustomer);
             if (zm.GetLastError() != null)
             {
                 _logger.InsertLog(LogLevel.Error, "zip error", zm.GetLastResponse());
@@ -491,13 +491,13 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     FormCollection collection = new FormCollection(content);
                     return EnterPaymentInfo(collection);
                 }
-                _logger.InsertLog(LogLevel.Debug, "Searching for checkoutid");
+                _logger.InsertLog(LogLevel.Debug, "Searching for checkoutid","", _workContext.CurrentCustomer);
                 //different session. most likely referral that is now approved
                 Order order =
                     _orderService.GetOrderByAuthorizationTransactionIdAndPaymentMethod(checkoutid, "Payments.ZipMoney");
                 if (order != null)
                 {
-                    _logger.InsertLog(LogLevel.Debug, "Searching for checkoutid: found");
+                    _logger.InsertLog(LogLevel.Debug, "Searching for checkoutid: found","", _workContext.CurrentCustomer);
                     _orderProcessingService.MarkAsAuthorized(order);
                     var errors = _orderProcessingService.Capture(order);
                     if (order.PaymentStatus == PaymentStatus.Paid)
@@ -507,7 +507,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 }
                 else
                 {
-                    _logger.InsertLog(LogLevel.Error, "Order not found");
+                    _logger.InsertLog(LogLevel.Error, "Order not found","", _workContext.CurrentCustomer);
                 }
             }
             else if (result.ToLowerInvariant().Equals("cancelled"))

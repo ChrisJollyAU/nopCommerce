@@ -38,15 +38,16 @@ namespace Nop.Plugin.Payments.ZipMoney
         private readonly IWebHelper _webHelper;
         private readonly ICheckoutAttributeParser _checkoutAttributeParser;
         private readonly ITaxService _taxService;
-        private ZipMoneyProcessor zipMoney;
+        private readonly ZipMoneyProcessor zipMoney;
         private readonly ILogger _logger;
+        private readonly IWorkContext _workContext;
         #endregion
 
         #region Ctor
 
         public ZipMoneyPaymentProcessor(ZipMoneyPaymentSettings zipMoneyPaymentSettings,
             ISettingService settingService, ICurrencyService currencyService,ICustomerService customerService,
-            CurrencySettings currencySettings, IWebHelper webHelper, ILogger logger,
+            CurrencySettings currencySettings, IWebHelper webHelper, ILogger logger, IWorkContext workContext,
             ICheckoutAttributeParser checkoutAttributeParser, ITaxService taxService)
         {
             this._zipMoneyPaymentSettings = zipMoneyPaymentSettings;
@@ -58,6 +59,7 @@ namespace Nop.Plugin.Payments.ZipMoney
             this._checkoutAttributeParser = checkoutAttributeParser;
             this._taxService = taxService;
             _logger = logger;
+            _workContext = workContext;
             string apikey = _zipMoneyPaymentSettings.UseSandbox
                 ? _zipMoneyPaymentSettings.SandboxAPIKey
                 : _zipMoneyPaymentSettings.ProductionAPIKey;
@@ -89,9 +91,9 @@ namespace Nop.Plugin.Payments.ZipMoney
                     }
                 }
                 _logger.InsertLog(LogLevel.Debug, "ZipMoney Capture Error",
-                    JsonConvert.SerializeObject(zipMoney.GetLastError()));
+                    JsonConvert.SerializeObject(zipMoney.GetLastError()), _workContext.CurrentCustomer);
                 _logger.InsertLog(LogLevel.Debug, "ZipMoney Capture Error Response",
-                    zipMoney.GetLastResponse());
+                    zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
                 return new ProcessPaymentResult
                 {
                     AllowStoringCreditCardNumber = false,
@@ -150,7 +152,7 @@ namespace Nop.Plugin.Payments.ZipMoney
                     return result;
                 }
                 _logger.InsertLog(LogLevel.Error, "ZipMoney Capture Fail",
-                    zipMoney.GetLastResponse());
+                    zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
                 result.AddError("ZipMoney Capture Failed. Check log for more info");
                 return result;
             }
@@ -167,9 +169,9 @@ namespace Nop.Plugin.Payments.ZipMoney
                 currency = "AUD"
             };
             _logger.InsertLog(LogLevel.Debug, "zip capture",
-                JsonConvert.SerializeObject(zipCharge));
+                JsonConvert.SerializeObject(zipCharge), _workContext.CurrentCustomer);
             response = zipMoney.CreateCharge(zipCharge).Result;
-            _logger.InsertLog(LogLevel.Debug, "zip capture response", zipMoney.GetLastResponse());
+            _logger.InsertLog(LogLevel.Debug, "zip capture response", zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
             result = new CapturePaymentResult();
             if (response?.state == ChargeState.captured)
             {
