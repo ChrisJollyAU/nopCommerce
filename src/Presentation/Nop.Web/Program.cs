@@ -8,6 +8,7 @@ namespace Nop.Web
         public static void Main(string[] args)
         {
             var host = WebHost.CreateDefaultBuilder(args)
+                .UseApplicationInsights()
                 .UseKestrel(options => options.AddServerHeader = false)
                 .UseStartup<Startup>()
                 .Build();
