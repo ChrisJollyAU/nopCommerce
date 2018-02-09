@@ -3,8 +3,14 @@
 }
 <script src="https://static.zipmoney.com.au/checkout/checkout-v1.js"></script>
 <script>
-    Zip.Checkout.init({ 
+    $(document).ready(function () {
+        $("input[class='button-1 payment-info-next-step-button']").attr("disabled", "disabled");
+        $("input[class='button-1 payment-info-next-step-button']").css("background-color", "grey");
+    })
+</script>
+<script>
+    Zip.Checkout.init({
         checkoutUri: '/PaymentZipMoney/ZipCheckout',
         redirectUri: '/PaymentZipMoney/ZipRedirect'
-    });
+    })
 </script>

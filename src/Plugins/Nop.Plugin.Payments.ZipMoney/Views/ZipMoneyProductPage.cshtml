@@ -4,6 +4,16 @@
 }
 
 <script type="text/javascript" src="https://d3k1w8lx8mqizo.cloudfront.net/lib/js/zm-widget-js/dist/zipmoney-widgets-v1.min.js"></script>
+
+<style>
+    [zm-asset], [data-zm-asset] {
+        cursor: pointer;
+    }
+
+        [zm-asset] iframe, [data-zm-asset] iframe {
+            pointer-events: none !important;
+        }
+</style>
 <div data-zm-merchant="@Model.PublicKey" data-env="@Model.environment"></div>
 
 <span style="cursor:pointer" id="zip-product-widg" data-zm-asset="productwidget" data-zm-widget="popup" data-zm-popup-asset="termsdialog"></span>
