@@ -1,6 +1,6 @@
 ﻿{
   "Group": "Payment methods",
-  "FriendlyName": "ZipMoney",
+  "FriendlyName": "Zip",
   "SystemName": "Payments.ZipMoney",
   "Version": "1.00",
   "SupportedVersions": [ "4.00" ],
