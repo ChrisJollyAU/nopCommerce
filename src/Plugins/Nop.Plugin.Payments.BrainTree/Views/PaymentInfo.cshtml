@@ -1,0 +1,52 @@
+﻿@{
+    Layout = "";
+}
+@model Nop.Plugin.Payments.BrainTree.Models.PaymentInfoModel
+<script src="https://js.braintreegateway.com/web/dropin/1.11.0/js/dropin.min.js"></script>
+<div id="dropin-container"></div>
+<button id="submit-button" class="button-1" type="button">Submit Details</button>
+<script>
+    $(document).ready(function () {
+        $("input[class='button-1 payment-info-next-step-button']").attr("disabled", "disabled");
+        $("input[class='button-1 payment-info-next-step-button']").css("background-color", "grey");
+    })
+</script>
+<script>
+    window.onload = function () {
+        var button = document.querySelector('#submit-button');
+        var form = document.getElementsByTagName('form')[1];
+        var deviceDataInput = null;
+        var nonceInput = null;
+        if (deviceDataInput == null) {
+            deviceDataInput = document.createElement('input');
+            deviceDataInput.name = 'device_data';
+            deviceDataInput.type = 'hidden';
+            form.appendChild(deviceDataInput);
+        }
+        if (nonceInput == null) {
+            nonceInput = document.createElement('input');
+            nonceInput.name = 'nonce';
+            nonceInput.type = 'hidden';
+            form.appendChild(nonceInput);
+        }
+        braintree.dropin.create({
+            authorization: '@Model.Token',
+            container: '#dropin-container',
+            dataCollector: {
+                kount: true, // Required if Kount fraud data collection is enabled
+                paypal: false // Required if PayPal fraud data collection is enabled
+
+            }
+        }, function (createErr, instance) {
+            button.addEventListener('click', function () {
+                instance.requestPaymentMethod(function (requestPaymentMethodErr, payload) {
+                    // Submit payload.nonce to your server
+                    deviceDataInput.value = payload.deviceData;
+                    nonceInput.value = payload.nonce;
+                    $("input[class='button-1 payment-info-next-step-button']").removeAttr("disabled");
+                    $("input[class='button-1 payment-info-next-step-button']").css("background-color","#4ab2f1")
+                });
+            });
+        });
+    }
+</script>
