@@ -392,7 +392,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             {
                 redirect_uri = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl + "/PaymentZipMoney/ZipRedirect" : _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
             };
-            ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
+            ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, zipMoneyPaymentSettings.UseSandbox);
             _logger.InsertLog(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout),_workContext.CurrentCustomer);
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
             _logger.InsertLog(LogLevel.Debug,"zip checkoutresponse",zm.GetLastResponse(),_workContext.CurrentCustomer);
@@ -439,7 +439,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     };
                     _logger.InsertLog(LogLevel.Debug, "ZipCharge JSON", JsonConvert.SerializeObject(zipCharge),
                         _workContext.CurrentCustomer);
-                    ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, true);
+                    ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, zipMoneyPaymentSettings.UseSandbox);
                     ZipChargeResponse response = zm.CreateCharge(zipCharge).Result;
                     _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
                         _workContext.CurrentCustomer);
