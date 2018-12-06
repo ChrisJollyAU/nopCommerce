@@ -205,7 +205,42 @@ namespace Nop.Plugin.Payments.BrainTree
         public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
         {
             var result = new RefundPaymentResult();
-            result.AddError("Refund method not supported");
+            var gateway = new BraintreeGateway
+            {
+                Environment = _brainTreePaymentSettings.UseSandBox ? Environment.SANDBOX : Environment.PRODUCTION,
+                MerchantId = _brainTreePaymentSettings.MerchantId,
+                PublicKey = _brainTreePaymentSettings.PublicKey,
+                PrivateKey = _brainTreePaymentSettings.PrivateKey
+            };
+            var trans = gateway.Transaction.Find(refundPaymentRequest.Order.OrderGuid.ToString());
+            if (trans.Status == TransactionStatus.SETTLED || trans.Status == TransactionStatus.SETTLING)
+            {
+                Result<Transaction> refundtrans;
+                if (refundPaymentRequest.IsPartialRefund)
+                {
+                    refundtrans = gateway.Transaction.Refund(refundPaymentRequest.Order.OrderGuid.ToString(),
+                        refundPaymentRequest.AmountToRefund);
+                }
+                else
+                {
+                    refundtrans = gateway.Transaction.Refund(refundPaymentRequest.Order.OrderGuid.ToString());
+                }
+
+                if (!refundtrans.IsSuccess())
+                {
+                    result.AddError(refundtrans.Message);
+                }
+                else
+                {
+                    result.NewPaymentStatus = refundPaymentRequest.IsPartialRefund
+                        ? PaymentStatus.PartiallyRefunded
+                        : PaymentStatus.Refunded;
+                }
+            }
+            else
+            {
+                result.AddError("Transaction not available for refund. Try void");
+            }
             return result;
         }
 
@@ -365,7 +400,7 @@ namespace Nop.Plugin.Payments.BrainTree
         {
             get
             {
-                return false;
+                return true;
             }
         }
 
@@ -376,7 +411,7 @@ namespace Nop.Plugin.Payments.BrainTree
         {
             get
             {
-                return false;
+                return true;
             }
         }
 
