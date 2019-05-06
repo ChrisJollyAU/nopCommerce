@@ -142,6 +142,7 @@ namespace Nop.Plugin.Payments.BrainTree
                 processPaymentRequest.CustomValues["RiskData.Id"] = result.Target.RiskData.id;
                 processPaymentRequest.CustomValues["RiskData.DeviceData"] = result.Target.RiskData.deviceDataCaptured;
                 processPaymentRequest.CustomValues["RiskData.Decision"] = result.Target.RiskData.decision;
+                processPaymentRequest.CustomValues["Braintree.Id"] = result.Target.Id;
             }
             else
             {
@@ -212,7 +213,7 @@ namespace Nop.Plugin.Payments.BrainTree
                 PublicKey = _brainTreePaymentSettings.PublicKey,
                 PrivateKey = _brainTreePaymentSettings.PrivateKey
             };
-            var trans = gateway.Transaction.Find(refundPaymentRequest.Order.OrderGuid.ToString());
+            var trans = gateway.Transaction.Find((string)refundPaymentRequest.Order.DeserializeCustomValues()["Braintree.Id"]);
             if (trans.Status == TransactionStatus.SETTLED || trans.Status == TransactionStatus.SETTLING)
             {
                 Result<Transaction> refundtrans;
