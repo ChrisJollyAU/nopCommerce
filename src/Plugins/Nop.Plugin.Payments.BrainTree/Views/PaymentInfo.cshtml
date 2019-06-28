@@ -2,8 +2,10 @@
     Layout = "";
 }
 @model Nop.Plugin.Payments.BrainTree.Models.PaymentInfoModel
-<script src="https://js.braintreegateway.com/web/dropin/1.14.1/js/dropin.min.js"></script>
+<script src="https://js.braintreegateway.com/web/dropin/1.18.0/js/dropin.min.js"></script>
+
 <div id="dropin-container"></div>
+
 <button id="submit-button" class="button-1" type="button">Submit Details</button>
 <script>
     $(document).ready(function () {
@@ -32,6 +34,14 @@
         braintree.dropin.create({
             authorization: '@Model.Token',
             container: '#dropin-container',
+            threeDSecure: {
+                amount: @Model.Amount,
+            },
+            card: {
+                cardholderName: {
+                  required: true
+                }
+            },
             paypal: {
                 flow: "checkout",
                 currency: "AUD",
@@ -45,11 +55,17 @@
         }, function (createErr, instance) {
             button.addEventListener('click', function () {
                 instance.requestPaymentMethod(function (requestPaymentMethodErr, payload) {
-                    // Submit payload.nonce to your server
-                    deviceDataInput.value = payload.deviceData;
-                    nonceInput.value = payload.nonce;
-                    $("input[class='button-1 payment-info-next-step-button']").removeAttr("disabled");
-                    $("input[class='button-1 payment-info-next-step-button']").css("background-color","#4ab2f1")
+                    if (payload.liabilityShifted || payload.type !== 'CreditCard') {
+                        // Submit payload.nonce to your server
+                            deviceDataInput.value = payload.deviceData;
+                            nonceInput.value = payload.nonce;
+                            $("input[class='button-1 payment-info-next-step-button']").removeAttr("disabled");
+                            $("input[class='button-1 payment-info-next-step-button']").css("background-color","#4ab2f1")
+                    } else {
+                        // Decide if you will force the user to enter a different
+                        // payment method if liablity was not shifted
+                        instance.clearSelectedPaymentMethod();
+                    }
                 });
             });
         });

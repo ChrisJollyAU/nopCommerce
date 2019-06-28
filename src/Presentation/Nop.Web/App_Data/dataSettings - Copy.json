@@ -1,0 +1,5 @@
+{
+  "DataProvider": "sqlserver",
+  "DataConnectionString": "Data Source=eubu2xij6s.database.windows.net;Initial Catalog=freerang_store_36;Integrated Security=False;Persist Security Info=False;User ID=frstore;Password=nop31t2t1!;MultipleActiveResultSets=True",
+  "RawDataSettings": {}
+}

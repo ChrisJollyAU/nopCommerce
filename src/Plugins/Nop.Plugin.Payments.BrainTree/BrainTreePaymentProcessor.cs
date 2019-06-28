@@ -12,6 +12,7 @@ using Nop.Services.Configuration;
 using Nop.Services.Customers;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
+using Nop.Services.Logging;
 using Environment = Braintree.Environment;
 using Nop.Services.Localization;
 
@@ -36,7 +37,7 @@ namespace Nop.Plugin.Payments.BrainTree
         private readonly BrainTreePaymentSettings _brainTreePaymentSettings;
         private readonly ILocalizationService _localizationService;
         private readonly IWebHelper _webHelper;
-
+        private readonly ILogger _logger;
         #endregion
 
         #region Ctor
@@ -46,6 +47,7 @@ namespace Nop.Plugin.Payments.BrainTree
             IOrderTotalCalculationService orderTotalCalculationService,
             BrainTreePaymentSettings brainTreePaymentSettings,
             ILocalizationService localizationService,
+            ILogger logger,
             IWebHelper webHelper)
         {
             this._customerService = customerService;
@@ -54,6 +56,7 @@ namespace Nop.Plugin.Payments.BrainTree
             this._brainTreePaymentSettings = brainTreePaymentSettings;
             this._localizationService = localizationService;
             this._webHelper = webHelper;
+            this._logger = logger;
         }
 
         #endregion
@@ -86,6 +89,15 @@ namespace Nop.Plugin.Payments.BrainTree
                 PrivateKey = privateKey
             };
 
+            PaymentMethodNonce paymentMethodNonce = gateway.PaymentMethodNonce.Find((string)processPaymentRequest.CustomValues["nonce"]);
+            ThreeDSecureInfo info = paymentMethodNonce.ThreeDSecureInfo;
+
+            if (info == null || info.LiabilityShifted == false)
+            {
+                processPaymentResult.AddError("3D Secure not verified. Please go back to payment methods and try again");
+                _logger.Debug("Braintree error. 3DS not provided or not shifted ", null, customer);
+            }
+
             //new transaction request
             var transactionRequest = new TransactionRequest
             {
@@ -96,7 +108,11 @@ namespace Nop.Plugin.Payments.BrainTree
                 PaymentMethodNonce = (string)processPaymentRequest.CustomValues["nonce"],
                 Options = new TransactionOptionsRequest
                 {
-                    SubmitForSettlement = true
+                    SubmitForSettlement = true,
+                    ThreeDSecure = new TransactionOptionsThreeDSecureRequest
+                    {
+                        Required = true
+                    }
                 },
                 Customer = new CustomerRequest
                 {
@@ -143,10 +159,19 @@ namespace Nop.Plugin.Payments.BrainTree
                 processPaymentRequest.CustomValues["RiskData.DeviceData"] = result.Target.RiskData.deviceDataCaptured;
                 processPaymentRequest.CustomValues["RiskData.Decision"] = result.Target.RiskData.decision;
                 processPaymentRequest.CustomValues["Braintree.Id"] = result.Target.Id;
+                if (result.Target.ThreeDSecureInfo != null)
+                {
+                    processPaymentRequest.CustomValues["Braintree.3DS.Enrolled"] = result.Target.ThreeDSecureInfo.Enrolled;
+                    processPaymentRequest.CustomValues["Braintree.3DS.LiabilityShift"] = result.Target.ThreeDSecureInfo.LiabilityShifted;
+                    processPaymentRequest.CustomValues["Braintree.3DS.LiabilityShiftPoss"] = result.Target.ThreeDSecureInfo.LiabilityShiftPossible;
+                    processPaymentRequest.CustomValues["Braintree.3DS.Status"] = result.Target.ThreeDSecureInfo.Status;
+                }
             }
             else
             {
                 processPaymentResult.AddError("Error processing payment." + result.Message);
+                _logger.Debug("Braintree error " + result.Message, null, customer);
+                
             }
 
             return processPaymentResult;
@@ -219,12 +244,12 @@ namespace Nop.Plugin.Payments.BrainTree
                 Result<Transaction> refundtrans;
                 if (refundPaymentRequest.IsPartialRefund)
                 {
-                    refundtrans = gateway.Transaction.Refund(refundPaymentRequest.Order.OrderGuid.ToString(),
+                    refundtrans = gateway.Transaction.Refund(trans.Id,
                         refundPaymentRequest.AmountToRefund);
                 }
                 else
                 {
-                    refundtrans = gateway.Transaction.Refund(refundPaymentRequest.Order.OrderGuid.ToString());
+                    refundtrans = gateway.Transaction.Refund(trans.Id);
                 }
 
                 if (!refundtrans.IsSuccess())

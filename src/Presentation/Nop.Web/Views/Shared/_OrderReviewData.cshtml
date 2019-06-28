@@ -45,8 +45,8 @@
                         </li>
                     }
                     @if (Model.BillingAddress.CityEnabled ||
-                         Model.BillingAddress.StateProvinceEnabled ||
-                         Model.BillingAddress.ZipPostalCodeEnabled)
+                        Model.BillingAddress.StateProvinceEnabled ||
+                        Model.BillingAddress.ZipPostalCodeEnabled)
                     {
                         <li class="city-state-zip">
                             @if (Model.BillingAddress.CityEnabled)
@@ -79,20 +79,20 @@
                             @Html.Raw(Model.BillingAddress.FormattedCustomAddressAttributes)
                         </li>
                     }
-                    @if (Model.CustomValues != null)
-                    {
-                        foreach (var item in Model.CustomValues)
-                        {
-                            <li class="custom-value">
-                                <span class="label">
-                                    @item.Key:
-                                </span>
-                                <span class="value">
-                                    @(item.Value != null ? item.Value.ToString() : "")
-                                </span>
-                            </li>
-                        }
-                    }
+                    @* @if (Model.CustomValues != null)
+        {
+            foreach (var item in Model.CustomValues)
+            {
+                <li class="custom-value">
+                    <span class="label">
+                        @item.Key:
+                    </span>
+                    <span class="value">
+                        @(item.Value != null ? item.Value.ToString() : "")
+                    </span>
+                </li>
+            }
+        }*@
                 </ul>
             </div>
             @if (!string.IsNullOrEmpty(Model.PaymentMethod))

@@ -1,0 +1,17 @@
+[
+  "DiscountRequirement.MustBeAssignedToCustomerRole",
+  "CurrencyExchange.ECB",
+  "ExternalAuth.Facebook",
+  "Payments.CheckMoneyOrder",
+  "Payments.Square",
+  "Payments.WorldpayUS",
+  "Payments.SecurePay",
+  "Payments.ZipMoney",
+  "Payments.BrainTree",
+  "Pickup.PickupInStore",
+  "Shipping.FixedOrByWeight",
+  "Shipping.Temando",
+  "Tax.FixedOrByCountryStateZip",
+  "Tracking.AfterShip",
+  "Shipping.AustraliaPost"
+]
