@@ -55,17 +55,17 @@
         }, function (createErr, instance) {
             button.addEventListener('click', function () {
                 instance.requestPaymentMethod(function (requestPaymentMethodErr, payload) {
-                    if (payload.liabilityShifted || payload.type !== 'CreditCard') {
+                    //if (payload.liabilityShifted || payload.type !== 'CreditCard') {
                         // Submit payload.nonce to your server
                             deviceDataInput.value = payload.deviceData;
                             nonceInput.value = payload.nonce;
                             $("input[class='button-1 payment-info-next-step-button']").removeAttr("disabled");
                             $("input[class='button-1 payment-info-next-step-button']").css("background-color","#4ab2f1")
-                    } else {
+                    //} else {
                         // Decide if you will force the user to enter a different
                         // payment method if liablity was not shifted
-                        instance.clearSelectedPaymentMethod();
-                    }
+                        //instance.clearSelectedPaymentMethod();
+                    //}
                 });
             });
         });

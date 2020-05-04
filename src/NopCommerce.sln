@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.27004.2009
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29609.76
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libraries", "Libraries", "{E4ACA93B-D3DE-4557-B069-F1DB42925A4B}"
 EndProject
@@ -10,6 +10,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{A340B280-C12B-47E7-90B7-89C650F8AAFC}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Plugins", "Plugins", "{7881B112-7843-4542-B1F7-F99553FB9BB7}"
+	ProjectSection(SolutionItems) = preProject
+		Plugins\Nop.Plugin.DiscountRules.ShippingCountry\Nop.Plugin.DiscountRules.ShippingCountry.csproj = Plugins\Nop.Plugin.DiscountRules.ShippingCountry\Nop.Plugin.DiscountRules.ShippingCountry.csproj
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nop.Web", "Presentation\Nop.Web\Nop.Web.csproj", "{4F1F649C-1020-45BE-A487-F416D9297FF3}"
 EndProject
@@ -72,6 +75,10 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nop.Plugin.Tracking.AfterShip", "Plugins\Nop.Plugin.Tracking.AfterShip\Nop.Plugin.Tracking.AfterShip.csproj", "{7ACC0D0A-032A-438F-B080-DBFFF71C0878}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nop.Plugin.Payments.BrainTree", "Plugins\Nop.Plugin.Payments.BrainTree\Nop.Plugin.Payments.BrainTree.csproj", "{1EDF5A9B-962E-4E08-A18D-DDF6076F8AAD}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nop.Plugin.DiscountRules.ShippingCountry", "Plugins\Nop.Plugin.DiscountRules.ShippingCountry\Nop.Plugin.DiscountRules.ShippingCountry.csproj", "{4F3ADC43-F577-47AE-8D4D-B8CF71828589}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Nop.Plugin.Shipping.AustraliaPost", "Plugins\Nop.Plugin.Shipping.AustraliaPost\Nop.Plugin.Shipping.AustraliaPost.csproj", "{D265E230-0F30-4805-B743-E95AFD739331}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -417,6 +424,30 @@ Global
 		{1EDF5A9B-962E-4E08-A18D-DDF6076F8AAD}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{1EDF5A9B-962E-4E08-A18D-DDF6076F8AAD}.Release|x86.ActiveCfg = Release|Any CPU
 		{1EDF5A9B-962E-4E08-A18D-DDF6076F8AAD}.Release|x86.Build.0 = Release|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Debug|x86.Build.0 = Debug|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Release|x86.ActiveCfg = Release|Any CPU
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589}.Release|x86.Build.0 = Release|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Debug|x86.Build.0 = Debug|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Release|x86.ActiveCfg = Release|Any CPU
+		{D265E230-0F30-4805-B743-E95AFD739331}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -453,6 +484,8 @@ Global
 		{51CCB405-F4F9-45AE-BA1F-A9B51A4ED8C7} = {7881B112-7843-4542-B1F7-F99553FB9BB7}
 		{7ACC0D0A-032A-438F-B080-DBFFF71C0878} = {7881B112-7843-4542-B1F7-F99553FB9BB7}
 		{1EDF5A9B-962E-4E08-A18D-DDF6076F8AAD} = {7881B112-7843-4542-B1F7-F99553FB9BB7}
+		{4F3ADC43-F577-47AE-8D4D-B8CF71828589} = {7881B112-7843-4542-B1F7-F99553FB9BB7}
+		{D265E230-0F30-4805-B743-E95AFD739331} = {7881B112-7843-4542-B1F7-F99553FB9BB7}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {EE72A8B2-332A-4175-9319-6726D36E9D25}

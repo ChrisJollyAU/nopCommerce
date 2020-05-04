@@ -392,6 +392,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             {
                 redirect_uri = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl + "/PaymentZipMoney/ZipRedirect" : _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
             };
+            zipCheckout.metadata = new Dictionary<string, string>();
+            zipCheckout.metadata.Add("CustomerId", _workContext.CurrentCustomer.CustomerGuid.ToString());
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, zipMoneyPaymentSettings.UseSandbox);
             _logger.InsertLog(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout),_workContext.CurrentCustomer);
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
@@ -400,8 +402,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             {
                 _logger.InsertLog(LogLevel.Error, "zip error", zm.GetLastResponse());
             }
-            _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, "ZipCheckoutId", zcr.id,
-                _storeContext.CurrentStore.Id);
+            _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, "ZipCheckoutId", zcr.id);
             return JsonConvert.SerializeObject(zcr);
         }
 
@@ -411,21 +412,41 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 _workContext.CurrentCustomer);
             if (result == null) return null;
             if (checkoutid == null) return null;
+            int storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            ZipMoneyPaymentSettings zipMoneyPaymentSettings =
+                _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
+            string apikey = zipMoneyPaymentSettings.UseSandbox
+                ? zipMoneyPaymentSettings.SandboxAPIKey
+                : zipMoneyPaymentSettings.ProductionAPIKey;
+            ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, zipMoneyPaymentSettings.UseSandbox);
+            var checkoutr = zm.RetreiveCheckout(checkoutid).Result;
+            if (checkoutr.metadata != null)
+            {
+                if (checkoutr.metadata.ContainsKey("CustomerId"))
+                {
+                    var custguid = checkoutr.metadata["CustomerId"];
+                    var cc = _customerService.GetCustomerByGuid(Guid.Parse(custguid));
+                    if (cc != null)
+                    {
+                        if (cc.CustomerGuid != _workContext.CurrentCustomer.CustomerGuid)
+                        {
+                            _logger.InsertLog(LogLevel.Debug, "Different cust " + cc.CustomerGuid + " " +_workContext.CurrentCustomer.CustomerGuid,"",
+                _workContext.CurrentCustomer);
+                            _workContext.CurrentCustomer = cc;
+                        }
+                    }
+                }
+            }
             if (result.ToLowerInvariant().Equals("approved"))
             {
                 string savedcheckoutId = _workContext.CurrentCustomer
-                    .GetAttribute<string>("ZipCheckoutId", _genericAttributeService, _storeContext.CurrentStore.Id);
+                    .GetAttribute<string>("ZipCheckoutId", _genericAttributeService);
+                _logger.InsertLog(LogLevel.Debug, "saved checkoutid " + savedcheckoutId, savedcheckoutId, _workContext.CurrentCustomer);
                 if (savedcheckoutId != null && savedcheckoutId.Equals(checkoutid))
                 {
 //same session
                     PlaceOrderContainer details = GetOrderDetails();
                     decimal amount = details.OrderTotal;
-                    int storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
-                    ZipMoneyPaymentSettings zipMoneyPaymentSettings =
-                        _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
-                    string apikey = zipMoneyPaymentSettings.UseSandbox
-                        ? zipMoneyPaymentSettings.SandboxAPIKey
-                        : zipMoneyPaymentSettings.ProductionAPIKey;
                     ZipChargeRequest zipCharge = new ZipChargeRequest
                     {
                         authority = new ZipAuthority
@@ -439,7 +460,6 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     };
                     _logger.InsertLog(LogLevel.Debug, "ZipCharge JSON", JsonConvert.SerializeObject(zipCharge),
                         _workContext.CurrentCustomer);
-                    ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, zipMoneyPaymentSettings.UseSandbox);
                     ZipChargeResponse response = zm.CreateCharge(zipCharge).Result;
                     _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
                         _workContext.CurrentCustomer);
@@ -551,12 +571,16 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         public virtual IActionResult EnterPaymentInfo(IFormCollection form)
         {
             //validation
+            _logger.InsertLog(LogLevel.Debug, "ZipMoney: EnterPaymentInfo", "", _workContext.CurrentCustomer);
             List<ShoppingCartItem> cart = _workContext.CurrentCustomer.ShoppingCartItems
                 .Where(sci => sci.ShoppingCartType == ShoppingCartType.ShoppingCart)
                 .LimitPerStore(_storeContext.CurrentStore.Id)
                 .ToList();
             if (!cart.Any())
+            {
+                _logger.InsertLog(LogLevel.Debug, "ZipMoney: No items in cart", "", _workContext.CurrentCustomer);
                 return RedirectToRoute("ShoppingCart");
+            }
 
             if (_orderSettings.OnePageCheckoutEnabled)
                 return RedirectToRoute("CheckoutOnePage");
@@ -584,7 +608,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             {
                 //get payment info
                 ProcessPaymentRequest paymentInfo = paymentMethod.GetPaymentInfo(form);
-
+                _logger.InsertLog(LogLevel.Debug, "ZipMoney: Redirect to Checkout Confirm", "", _workContext.CurrentCustomer);
                 //session save
                 HttpContext.Session.Set("OrderPaymentInfo", paymentInfo);
                 return RedirectToRoute("CheckoutConfirm");

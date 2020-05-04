@@ -71,11 +71,13 @@ namespace Nop.Plugin.Payments.ZipMoney
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
             ProcessPaymentResult result;
+            _logger.InsertLog(LogLevel.Debug, "ZipMoney: Process Payment called", "", _workContext.CurrentCustomer);
             if (processPaymentRequest.CustomValues["ZipCheckoutResult"].ToString().ToLowerInvariant().Equals("approved"))
             {
                 ZipChargeResponse response = zipMoney
                     .CaptureCharge(processPaymentRequest.CustomValues["ZipChargeId"].ToString(),
                         processPaymentRequest.OrderTotal).Result;
+                _logger.InsertLog(LogLevel.Debug, "ZipMoney: CaptureCharge", zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
                 if (zipMoney.GetLastError() == null)
                 {
                     if (response.state == ChargeState.captured)
@@ -137,6 +139,7 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
         {
+            _logger.InsertLog(LogLevel.Debug, "ZipMoney: Capture called", "", _workContext.CurrentCustomer);
             string chargeId = capturePaymentRequest.Order.AuthorizationTransactionCode;
             string chargeresult = capturePaymentRequest.Order.AuthorizationTransactionResult;
             CapturePaymentResult result;
@@ -144,6 +147,7 @@ namespace Nop.Plugin.Payments.ZipMoney
             if (chargeresult.ToLowerInvariant().Equals("authorised"))
             {
                 response = zipMoney.CaptureCharge(chargeId, capturePaymentRequest.Order.OrderTotal).Result;
+                _logger.InsertLog(LogLevel.Debug, "ZipMoney: Capture Charge", zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
                 result = new CapturePaymentResult {NewPaymentStatus = PaymentStatus.Authorized};
                 if (response?.state == ChargeState.captured)
                 {
