@@ -38,6 +38,7 @@ namespace Nop.Plugin.Payments.BrainTree
         private readonly ILocalizationService _localizationService;
         private readonly IWebHelper _webHelper;
         private readonly ILogger _logger;
+        private readonly IOrderService _orderService;
         #endregion
 
         #region Ctor
@@ -47,6 +48,7 @@ namespace Nop.Plugin.Payments.BrainTree
             IOrderTotalCalculationService orderTotalCalculationService,
             BrainTreePaymentSettings brainTreePaymentSettings,
             ILocalizationService localizationService,
+            IOrderService orderService,
             ILogger logger,
             IWebHelper webHelper)
         {
@@ -56,6 +58,7 @@ namespace Nop.Plugin.Payments.BrainTree
             this._brainTreePaymentSettings = brainTreePaymentSettings;
             this._localizationService = localizationService;
             this._webHelper = webHelper;
+            this._orderService = orderService;
             this._logger = logger;
         }
 
@@ -71,7 +74,6 @@ namespace Nop.Plugin.Payments.BrainTree
         public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
         {
             var processPaymentResult = new ProcessPaymentResult();
-
             //get customer
             var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
             //get settings
@@ -88,31 +90,48 @@ namespace Nop.Plugin.Payments.BrainTree
                 PublicKey = publicKey,
                 PrivateKey = privateKey
             };
-
-            PaymentMethodNonce paymentMethodNonce = gateway.PaymentMethodNonce.Find((string)processPaymentRequest.CustomValues["nonce"]);
-            ThreeDSecureInfo info = paymentMethodNonce.ThreeDSecureInfo;
-
-            if (info == null || info.LiabilityShifted == false)
+            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "braintree customvalues", processPaymentRequest.CustomValues.ToString(), customer);
+            string device_data = "", nonce = "";
+            if (processPaymentRequest.CustomValues.ContainsKey("nonce"))
             {
-                processPaymentResult.AddError("3D Secure not verified. Please go back to payment methods and try again");
-                _logger.Debug("Braintree error. 3DS not provided or not shifted ", null, customer);
+                nonce = (string)processPaymentRequest.CustomValues["nonce"];
             }
-
+            else
+            {
+                _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree cannot find nonce", null, customer);
+            }
+            if (processPaymentRequest.CustomValues.ContainsKey("device_data"))
+            {
+                device_data = (string)processPaymentRequest.CustomValues["device_data"];
+            }
+            else
+            {
+                _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree cannot find device_data", null, customer);
+            }
+            PaymentMethodNonce paymentMethodNonce = gateway.PaymentMethodNonce.Find(nonce);
+            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "braintree nonce", paymentMethodNonce != null ? paymentMethodNonce.ToString() : "", customer);
+            ThreeDSecureInfo info = paymentMethodNonce.ThreeDSecureInfo;
+            if (paymentMethodNonce.Type == "CreditCard")
+            {
+                if (info == null || (info != null && info.LiabilityShifted == false))
+                {
+                    processPaymentResult.AddError("3D Secure not verified. Please go back to payment methods and try again");
+                    _logger.InsertLog(Core.Domain.Logging.LogLevel.Error,"Braintree error. 3DS not provided or not shifted", null, customer);
+                    return processPaymentResult;
+                }
+            }
+            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create transactionrequest", null, customer);
             //new transaction request
             var transactionRequest = new TransactionRequest
             {
                 Amount = processPaymentRequest.OrderTotal,
                 OrderId = processPaymentRequest.OrderGuid.ToString(),
                 Channel = BN_CODE,
-                DeviceData = (string)processPaymentRequest.CustomValues["device_data"],
-                PaymentMethodNonce = (string)processPaymentRequest.CustomValues["nonce"],
+                DeviceData = device_data,
+                PaymentMethodNonce = nonce,
                 Options = new TransactionOptionsRequest
                 {
-                    SubmitForSettlement = true,
-                    ThreeDSecure = new TransactionOptionsThreeDSecureRequest
-                    {
-                        Required = true
-                    }
+                    SubmitForSettlement = true
                 },
                 Customer = new CustomerRequest
                 {
@@ -124,41 +143,124 @@ namespace Nop.Plugin.Payments.BrainTree
                     Fax = customer.BillingAddress.FaxNumber
                 }
             };
-
-            //address request
-            var addressRequest = new AddressRequest
+            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create billingaddress", null, customer);
+            try
             {
-                FirstName = customer.BillingAddress.FirstName,
-                LastName = customer.BillingAddress.LastName,
-                StreetAddress = customer.BillingAddress.Address1,
-                PostalCode = customer.BillingAddress.ZipPostalCode,
-                Locality = customer.BillingAddress.City,
-                Company = customer.BillingAddress.Company,
-                Region = customer.BillingAddress.StateProvince.Name
-            };
-            transactionRequest.BillingAddress = addressRequest;
-            transactionRequest.ShippingAddress = new AddressRequest
+                var order = _orderService.GetOrderByGuid(processPaymentRequest.OrderGuid);
+                if (order != null)
+                {
+                    if (order.BillingAddress != null)
+                    {
+                        //address request
+                        var addressRequest = new AddressRequest
+                        {
+                            FirstName = order.BillingAddress.FirstName,
+                            LastName = order.BillingAddress.LastName,
+                            StreetAddress = order.BillingAddress.Address1,
+                            PostalCode = order.BillingAddress.ZipPostalCode,
+                            Locality = order.BillingAddress.City,
+                            Company = order.BillingAddress.Company,
+                            Region = order.BillingAddress.StateProvince.Name
+                        };
+                        transactionRequest.BillingAddress = addressRequest;
+                    }
+                    else
+                    {
+                        //address request
+                        var addressRequest = new AddressRequest
+                        {
+                            FirstName = customer.BillingAddress.FirstName,
+                            LastName = customer.BillingAddress.LastName,
+                            StreetAddress = customer.BillingAddress.Address1,
+                            PostalCode = customer.BillingAddress.ZipPostalCode,
+                            Locality = customer.BillingAddress.City,
+                            Company = customer.BillingAddress.Company,
+                            Region = customer.BillingAddress.StateProvince.Name
+                        };
+                        transactionRequest.BillingAddress = addressRequest;
+                    }
+                    _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create shippingrequest", null, customer);
+                    if (!order.PickUpInStore)
+                    {
+                        if (customer.ShippingAddress != null)
+                        {
+                            transactionRequest.ShippingAddress = new AddressRequest
+                            {
+                                FirstName = customer.ShippingAddress.FirstName,
+                                LastName = customer.ShippingAddress.LastName,
+                                StreetAddress = customer.ShippingAddress.Address1,
+                                PostalCode = customer.ShippingAddress.ZipPostalCode,
+                                Locality = customer.ShippingAddress.City,
+                                Company = customer.ShippingAddress.Company,
+                                Region = customer.ShippingAddress.StateProvince.Name
+                            };
+                        }
+                        else
+                        {
+                            transactionRequest.ShippingAddress = transactionRequest.BillingAddress;
+                        }
+                    }
+                    else
+                    {
+                        transactionRequest.ShippingAddress = transactionRequest.BillingAddress;
+                    }
+                }
+                else
+                {
+                    _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree order guid is null", null, customer);
+                    //address request
+                    var addressRequest = new AddressRequest
+                    {
+                        FirstName = customer.BillingAddress.FirstName,
+                        LastName = customer.BillingAddress.LastName,
+                        StreetAddress = customer.BillingAddress.Address1,
+                        PostalCode = customer.BillingAddress.ZipPostalCode,
+                        Locality = customer.BillingAddress.City,
+                        Company = customer.BillingAddress.Company,
+                        Region = customer.BillingAddress.StateProvince.Name
+                    };
+                    transactionRequest.BillingAddress = addressRequest;
+                    if (customer.ShippingAddress != null)
+                    {
+                        transactionRequest.ShippingAddress = new AddressRequest
+                        {
+                            FirstName = customer.ShippingAddress.FirstName,
+                            LastName = customer.ShippingAddress.LastName,
+                            StreetAddress = customer.ShippingAddress.Address1,
+                            PostalCode = customer.ShippingAddress.ZipPostalCode,
+                            Locality = customer.ShippingAddress.City,
+                            Company = customer.ShippingAddress.Company,
+                            Region = customer.ShippingAddress.StateProvince.Name
+                        };
+                    }
+                    else
+                    {
+                        transactionRequest.ShippingAddress = transactionRequest.BillingAddress;
+                    }
+                }
+            }
+            catch (Exception e)
             {
-                FirstName = customer.ShippingAddress.FirstName,
-                LastName = customer.ShippingAddress.LastName,
-                StreetAddress = customer.ShippingAddress.Address1,
-                PostalCode = customer.ShippingAddress.ZipPostalCode,
-                Locality = customer.ShippingAddress.City,
-                Company = customer.ShippingAddress.Company,
-                Region = customer.ShippingAddress.StateProvince.Name
-            };
-
+                processPaymentResult.AddError(e.Message);
+                return processPaymentResult;
+            }
+            
+            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create sale", null, customer);
             //sending a request
             var result = gateway.Transaction.Sale(transactionRequest);
 
             //result
             if (result.IsSuccess())
             {
+                _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree sale success", null, customer);
                 processPaymentResult.NewPaymentStatus = PaymentStatus.Paid;
-                processPaymentRequest.CustomValues["RiskData.Id"] = result.Target.RiskData.id;
-                processPaymentRequest.CustomValues["RiskData.DeviceData"] = result.Target.RiskData.deviceDataCaptured;
-                processPaymentRequest.CustomValues["RiskData.Decision"] = result.Target.RiskData.decision;
                 processPaymentRequest.CustomValues["Braintree.Id"] = result.Target.Id;
+                if (result.Target.RiskData != null)
+                {
+                    processPaymentRequest.CustomValues["RiskData.Id"] = result.Target.RiskData.id;
+                    processPaymentRequest.CustomValues["RiskData.DeviceData"] = result.Target.RiskData.deviceDataCaptured;
+                    processPaymentRequest.CustomValues["RiskData.Decision"] = result.Target.RiskData.decision;
+                }
                 if (result.Target.ThreeDSecureInfo != null)
                 {
                     processPaymentRequest.CustomValues["Braintree.3DS.Enrolled"] = result.Target.ThreeDSecureInfo.Enrolled;
@@ -166,11 +268,21 @@ namespace Nop.Plugin.Payments.BrainTree
                     processPaymentRequest.CustomValues["Braintree.3DS.LiabilityShiftPoss"] = result.Target.ThreeDSecureInfo.LiabilityShiftPossible;
                     processPaymentRequest.CustomValues["Braintree.3DS.Status"] = result.Target.ThreeDSecureInfo.Status;
                 }
+                if (result.Target.PayPalDetails != null)
+                {
+                    processPaymentRequest.CustomValues["Braintree.Paypal.PayerEmail"] = result.Target.PayPalDetails.PayerEmail;
+                    processPaymentRequest.CustomValues["Braintree.Paypal.PayerFirstName"] = result.Target.PayPalDetails.PayerFirstName;
+                    processPaymentRequest.CustomValues["Braintree.Paypal.PayerLastName"] = result.Target.PayPalDetails.PayerLastName;
+                    processPaymentRequest.CustomValues["Braintree.Paypal.PayerStatus"] = result.Target.PayPalDetails.PayerStatus;
+                    processPaymentRequest.CustomValues["Braintree.Paypal.SellerProtect"] = result.Target.PayPalDetails.SellerProtectionStatus;
+                    processPaymentRequest.CustomValues["Braintree.Paypal.AuthId"] = result.Target.PayPalDetails.AuthorizationId;
+                    processPaymentRequest.CustomValues["Braintree.Paypal.CaptureId"] = result.Target.PayPalDetails.CaptureId;
+                }
             }
             else
             {
                 processPaymentResult.AddError("Error processing payment." + result.Message);
-                _logger.Debug("Braintree error " + result.Message, null, customer);
+                _logger.Error("Braintree error " + result.Message, null, customer);
                 
             }
 
