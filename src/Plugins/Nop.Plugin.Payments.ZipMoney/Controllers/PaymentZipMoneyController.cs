@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Primitives;
@@ -13,6 +14,7 @@ using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Directory;
+using Nop.Core.Domain.Discounts;
 using Nop.Core.Domain.Localization;
 using Nop.Core.Domain.Logging;
 using Nop.Core.Domain.Orders;
@@ -30,6 +32,8 @@ using Nop.Services.Directory;
 using Nop.Services.Discounts;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
+using Nop.Services.Media;
+using Nop.Services.Messages;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Security;
@@ -45,6 +49,9 @@ using ZipMoneySDK.Models;
 
 namespace Nop.Plugin.Payments.ZipMoney.Controllers
 {
+    [AuthorizeAdmin]
+    [Area(AreaNames.Admin)]
+    [AutoValidateAntiforgeryToken]
     public class PaymentZipMoneyController : BasePaymentController
     {
         private readonly IAffiliateService _affiliateService;
@@ -63,31 +70,30 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         private readonly OrderSettings _orderSettings;
         private readonly IOrderTotalCalculationService _orderTotalCalculationService;
         private readonly IPaymentService _paymentService;
-        private readonly PaymentSettings _paymentSettings;
         private readonly IPermissionService _permissionService;
         private readonly IPriceFormatter _priceFormatter;
-        private readonly IProductAttributeFormatter _productAttributeFormatter;
-        private readonly IProductAttributeParser _productAttributeParser;
         private readonly IProductService _productService;
         private readonly ISettingService _settingService;
         private readonly ShippingSettings _shippingSettings;
         private readonly IShoppingCartService _shoppingCartService;
         private readonly IStateProvinceService _stateProvinceService;
         private readonly IStoreContext _storeContext;
-        private readonly IStoreService _storeService;
         private readonly ITaxService _taxService;
         private readonly TaxSettings _taxSettings;
         private readonly IWebHelper _webHelper;
         private readonly IWorkContext _workContext;
+        private readonly INotificationService _notificationService;
+        private readonly IDiscountService _discountService;
+        private readonly IPaymentPluginManager _paymentPluginManager;
+        private readonly IAddressService _addressService;
+        private readonly IPictureService _pictureService;
 
         public PaymentZipMoneyController(ISettingService settingService,
             IWorkContext workContext,
-            IStoreService storeService,
             IPaymentService paymentService, IOrderService orderService,
             IOrderProcessingService orderProcessingService,
             IWebHelper webHelper,
             IStoreContext storeContext,
-            PaymentSettings paymentSettings,
             IShoppingCartService shoppingCartService,
             IPermissionService permissionService,
             ICustomerService customerService,
@@ -99,10 +105,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             TaxSettings taxSettings,
             IPriceFormatter priceFormatter,
             IOrderTotalCalculationService orderTotalCalculationService,
-            IProductAttributeFormatter productAttributeFormatter,
             IProductService productService,
             ICheckoutAttributeFormatter checkoutAttributeFormatter,
-            IProductAttributeParser productAttributeParser,
             ShippingSettings shippingSettings,
             ICountryService countryService,
             IStateProvinceService stateProvinceService,
@@ -110,16 +114,19 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             IGenericAttributeService genericAttributeService,
             ICheckoutModelFactory checkoutModelFactory,
             ILogger logger,
+            INotificationService notificationService,
+            IPaymentPluginManager paymentPluginManager,
+            IDiscountService discountService,
+            IAddressService addressService,
+            IPictureService pictureService,
             ILocalizationService localizationService)
         {
             _workContext = workContext;
-            _storeService = storeService;
             _settingService = settingService;
             _paymentService = paymentService;
             _orderService = orderService;
             _orderProcessingService = orderProcessingService;
             _webHelper = webHelper;
-            _paymentSettings = paymentSettings;
             _localizationService = localizationService;
             _shoppingCartService = shoppingCartService;
             _permissionService = permissionService;
@@ -133,10 +140,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             _taxSettings = taxSettings;
             _priceFormatter = priceFormatter;
             _orderTotalCalculationService = orderTotalCalculationService;
-            _productAttributeFormatter = productAttributeFormatter;
             _productService = productService;
             _checkoutAttributeFormatter = checkoutAttributeFormatter;
-            _productAttributeParser = productAttributeParser;
             _shippingSettings = shippingSettings;
             _countryService = countryService;
             _stateProvinceService = stateProvinceService;
@@ -144,10 +149,13 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             _checkoutModelFactory = checkoutModelFactory;
             _logger = logger;
             _taxService = taxService;
+            _notificationService = notificationService;
+            _paymentPluginManager = paymentPluginManager;
+            _addressService = addressService;
+            _discountService = discountService;
+            _pictureService = pictureService;
         }
 
-        [AuthorizeAdmin]
-        [Area(AreaNames.Admin)]
         public IActionResult Configure()
         {
             //whether user has the authority
@@ -155,7 +163,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            int storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
             ZipMoneyPaymentSettings zipMoneyPaymentSettings =
                 _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
 
@@ -185,9 +193,6 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             return View("~/Plugins/Payments.ZipMoney/Views/Configure.cshtml", model);
         }
 
-        [AuthorizeAdmin]
-        [AdminAntiForgery]
-        [Area(AreaNames.Admin)]
         [HttpPost]
         public IActionResult Configure(ConfigurationModel model)
         {
@@ -199,7 +204,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 return Configure();
 
             //load settings for a chosen store scope
-            int storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
             ZipMoneyPaymentSettings zipMoneyPaymentSettings =
                 _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
 
@@ -227,7 +232,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             //now clear settings cache
             _settingService.ClearCache();
 
-            SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
             return Configure();
         }
@@ -242,9 +247,10 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             return RedirectToRoute("HomePage");
         }
 
+        [AllowAnonymous]
         public async Task<string> ZipCheckout()
         {
-            int storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
             ZipMoneyPaymentSettings zipMoneyPaymentSettings =
                 _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
             ZipCheckoutRequest zipCheckout = new ZipCheckoutRequest();
@@ -273,6 +279,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 
             }
             var refundstotalamount = orders.Sum(x => x.RefundedAmount);
+            var billcountry = _countryService.GetCountryByAddress(details.BillingAddress);
+            var billstate = _stateProvinceService.GetStateProvinceByAddress(details.BillingAddress);
             zipCheckout.shopper = new ZipShopper
             {
                 billing_address = new ZipAddress
@@ -282,9 +290,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     line1 = details.BillingAddress.Address1,
                     line2 = details.BillingAddress.Address2,
                     city = details.BillingAddress.City,
-                    country = details.BillingAddress.Country.TwoLetterIsoCode,
+                    country = billcountry != null ? billcountry.TwoLetterIsoCode : "AU",
                     postal_code = details.BillingAddress.ZipPostalCode,
-                    state = details.BillingAddress.StateProvince.Name
+                    state = billstate != null ? billstate.Name : ""
                 },
                 email = details.BillingAddress.Email,
                 phone = details.BillingAddress.PhoneNumber.Replace(" ", ""),
@@ -307,10 +315,12 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 currency = "AUD",
                 shipping = new ZipShipping
                 {
-                    pickup = details.PickUpInStore,
+                    pickup = details.PickupInStore,
                 },
                 items = new List<ZipOrderItem>()
             };
+            var shipcountry = _countryService.GetCountryByAddress(details.ShippingAddress);
+            var shipstate = _stateProvinceService.GetStateProvinceByAddress(details.ShippingAddress);
             if (details.ShippingAddress != null)
             {
                 zipCheckout.order.shipping.address = new ZipAddress
@@ -320,8 +330,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     first_name = details.ShippingAddress.FirstName,
                     last_name = details.ShippingAddress.LastName,
                     city = details.ShippingAddress.City,
-                    country = details.ShippingAddress.Country.TwoLetterIsoCode,
-                    state = details.ShippingAddress.StateProvince.Name,
+                    country = shipcountry != null ? shipcountry.TwoLetterIsoCode : "AU",
+                    state = shipstate != null ? shipstate.Name : "",
                     postal_code = details.ShippingAddress.ZipPostalCode
                 };
             }
@@ -334,37 +344,19 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
 
             foreach (ShoppingCartItem item in details.Cart)
             {
+                var product = _productService.GetProductById(item.ProductId);
                 ZipOrderItem zipOrderItem = new ZipOrderItem
                 {
-                    amount = item.Product.Price,
-                    name = item.Product.Name,
+                    amount = product.Price,
+                    name = product.Name,
                     quantity = item.Quantity,
                     type = OrderType.sku,
-                    product_code = item.Product.Sku,
+                    product_code = product.Sku,
                 };
 
-                string url = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl + "/content/images/" : _storeContext.CurrentStore.Url + "/content/images/";
-                string fname = "" + item.Product.ProductPictures.First().Picture.Id;
-                switch (item.Product.ProductPictures.First().Picture.MimeType)
-                {
-                    case "image/png":
-                        while (fname.Length < 7)
-                            fname = fname.Insert(0, "0");
-                        fname += "_0.png";
-                        break;
-                    case "image/gif":
-                        while (fname.Length < 7)
-                            fname = fname.Insert(0, "0");
-                        fname += "_0.gif";
-                        break;
-                    case "image/jpeg":
-                    default:
-                        while (fname.Length < 7)
-                            fname = fname.Insert(0, "0");
-                        fname += "_0.jpeg";
-                        break;
-                }
-                zipOrderItem.image_uri = url + fname;
+                string url = _webHelper.GetStoreLocation(null) + "content/images/";
+                var itempic = _pictureService.GetProductPicture(product, item.AttributesXml);
+                zipOrderItem.image_uri = _pictureService.GetPictureUrl(ref itempic);
                 zipCheckout.order.items.Add(zipOrderItem);
             }
             ZipOrderItem taxItem = new ZipOrderItem();
@@ -390,10 +382,10 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             
             zipCheckout.config = new ZipConfig
             {
-                redirect_uri = _storeContext.CurrentStore.SslEnabled ? _storeContext.CurrentStore.SecureUrl + "/PaymentZipMoney/ZipRedirect" : _storeContext.CurrentStore.Url + "/PaymentZipMoney/ZipRedirect"
+                redirect_uri = _webHelper.GetStoreLocation(null) + "PaymentZipMoney/ZipRedirect"
             };
-            zipCheckout.metadata = new Dictionary<string, string>();
-            zipCheckout.metadata.Add("CustomerId", _workContext.CurrentCustomer.CustomerGuid.ToString());
+            zipCheckout.metadata =
+                new Dictionary<string, string> {{"CustomerId", _workContext.CurrentCustomer.CustomerGuid.ToString()}};
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, zipMoneyPaymentSettings.UseSandbox);
             _logger.InsertLog(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout),_workContext.CurrentCustomer);
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
@@ -406,13 +398,14 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             return JsonConvert.SerializeObject(zcr);
         }
 
+        [AllowAnonymous]
         public IActionResult ZipRedirect(string result, string checkoutid)
         {
             _logger.InsertLog(LogLevel.Debug, "ZipRedirect called. " + result + ". " + checkoutid, "",
                 _workContext.CurrentCustomer);
             if (result == null) return null;
             if (checkoutid == null) return null;
-            int storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
             ZipMoneyPaymentSettings zipMoneyPaymentSettings =
                 _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
             string apikey = zipMoneyPaymentSettings.UseSandbox
@@ -439,8 +432,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             }
             if (result.ToLowerInvariant().Equals("approved"))
             {
-                string savedcheckoutId = _workContext.CurrentCustomer
-                    .GetAttribute<string>("ZipCheckoutId", _genericAttributeService);
+                string savedcheckoutId = _genericAttributeService.GetAttribute<string>(_workContext.CurrentCustomer, "ZipCheckoutId");
                 _logger.InsertLog(LogLevel.Debug, "saved checkoutid " + savedcheckoutId, savedcheckoutId, _workContext.CurrentCustomer);
                 if (savedcheckoutId != null && savedcheckoutId.Equals(checkoutid))
                 {
@@ -571,44 +563,44 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         public virtual IActionResult EnterPaymentInfo(IFormCollection form)
         {
             //validation
-            _logger.InsertLog(LogLevel.Debug, "ZipMoney: EnterPaymentInfo", "", _workContext.CurrentCustomer);
-            List<ShoppingCartItem> cart = _workContext.CurrentCustomer.ShoppingCartItems
-                .Where(sci => sci.ShoppingCartType == ShoppingCartType.ShoppingCart)
-                .LimitPerStore(_storeContext.CurrentStore.Id)
-                .ToList();
-            if (!cart.Any())
-            {
-                _logger.InsertLog(LogLevel.Debug, "ZipMoney: No items in cart", "", _workContext.CurrentCustomer);
+            if (_orderSettings.CheckoutDisabled)
                 return RedirectToRoute("ShoppingCart");
-            }
+
+            var cart = _shoppingCartService.GetShoppingCart(_workContext.CurrentCustomer, ShoppingCartType.ShoppingCart, _storeContext.CurrentStore.Id);
+
+            if (!cart.Any())
+                return RedirectToRoute("ShoppingCart");
 
             if (_orderSettings.OnePageCheckoutEnabled)
                 return RedirectToRoute("CheckoutOnePage");
 
-            if (_workContext.CurrentCustomer.IsGuest() && !_orderSettings.AnonymousCheckoutAllowed)
+            if (_customerService.IsGuest(_workContext.CurrentCustomer) && !_orderSettings.AnonymousCheckoutAllowed)
                 return Challenge();
 
             //Check whether payment workflow is required
-            bool isPaymentWorkflowRequired = _orderProcessingService.IsPaymentWorkflowRequired(cart);
+            var isPaymentWorkflowRequired = _orderProcessingService.IsPaymentWorkflowRequired(cart);
             if (!isPaymentWorkflowRequired)
+            {
                 return RedirectToRoute("CheckoutConfirm");
+            }
 
             //load payment method
-            string paymentMethodSystemName = _workContext.CurrentCustomer
-                .GetAttribute<string>(SystemCustomerAttributeNames.SelectedPaymentMethod, _genericAttributeService,
-                    _storeContext.CurrentStore.Id);
-            IPaymentMethod paymentMethod = _paymentService.LoadPaymentMethodBySystemName(paymentMethodSystemName);
+            var paymentMethodSystemName = _genericAttributeService.GetAttribute<string>(_workContext.CurrentCustomer,
+                NopCustomerDefaults.SelectedPaymentMethodAttribute, _storeContext.CurrentStore.Id);
+            var paymentMethod = _paymentPluginManager.LoadPluginBySystemName(paymentMethodSystemName);
             if (paymentMethod == null)
                 return RedirectToRoute("CheckoutPaymentMethod");
 
-            IList<string> warnings = paymentMethod.ValidatePaymentForm(form);
-            foreach (string warning in warnings)
+            var warnings = paymentMethod.ValidatePaymentForm(form);
+            foreach (var warning in warnings)
                 ModelState.AddModelError("", warning);
             if (ModelState.IsValid)
             {
                 //get payment info
-                ProcessPaymentRequest paymentInfo = paymentMethod.GetPaymentInfo(form);
-                _logger.InsertLog(LogLevel.Debug, "ZipMoney: Redirect to Checkout Confirm", "", _workContext.CurrentCustomer);
+                var paymentInfo = paymentMethod.GetPaymentInfo(form);
+                //set previous order GUID (if exists)
+                _paymentService.GenerateOrderGuid(paymentInfo);
+
                 //session save
                 HttpContext.Session.Set("OrderPaymentInfo", paymentInfo);
                 return RedirectToRoute("CheckoutConfirm");
@@ -616,75 +608,81 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
 
             //If we got this far, something failed, redisplay form
             //model
-            CheckoutPaymentInfoModel model = _checkoutModelFactory.PreparePaymentInfoModel(paymentMethod);
+            var model = _checkoutModelFactory.PreparePaymentInfoModel(paymentMethod);
             return View(model);
         }
 
         private PlaceOrderContainer GetOrderDetails()
         {
-            PlaceOrderContainer details = new PlaceOrderContainer();
             int StoreId = _storeContext.CurrentStore.Id;
-            //customer
-            details.Customer = _customerService.GetCustomerById(_workContext.CurrentCustomer.Id);
+            var details = new PlaceOrderContainer
+            {
+                //customer
+                Customer = _customerService.GetCustomerById(_workContext.CurrentCustomer.Id)
+            };
+            if (details.Customer == null)
+                throw new ArgumentException("Customer is not set");
 
             //affiliate
-            Affiliate affiliate = _affiliateService.GetAffiliateById(details.Customer.AffiliateId);
+            var affiliate = _affiliateService.GetAffiliateById(details.Customer.AffiliateId);
             if (affiliate != null && affiliate.Active && !affiliate.Deleted)
                 details.AffiliateId = affiliate.Id;
 
+            //check whether customer is guest
+            if (_customerService.IsGuest(details.Customer) && !_orderSettings.AnonymousCheckoutAllowed)
+                throw new NopException("Anonymous checkout is not allowed");
+
             //customer currency
-            Currency currencyTmp = _currencyService.GetCurrencyById(
-                details.Customer.GetAttribute<int>(SystemCustomerAttributeNames.CurrencyId, StoreId));
-            Currency customerCurrency = currencyTmp != null && currencyTmp.Published
-                ? currencyTmp
-                : _workContext.WorkingCurrency;
-            Currency primaryStoreCurrency = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
+            var currencyTmp = _currencyService.GetCurrencyById(
+                _genericAttributeService.GetAttribute<int>(details.Customer, NopCustomerDefaults.CurrencyIdAttribute, StoreId));
+            var customerCurrency = currencyTmp != null && currencyTmp.Published ? currencyTmp : _workContext.WorkingCurrency;
+            var primaryStoreCurrency = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
             details.CustomerCurrencyCode = customerCurrency.CurrencyCode;
             details.CustomerCurrencyRate = customerCurrency.Rate / primaryStoreCurrency.Rate;
 
             //customer language
             details.CustomerLanguage = _languageService.GetLanguageById(
-                details.Customer.GetAttribute<int>(SystemCustomerAttributeNames.LanguageId, StoreId));
+                _genericAttributeService.GetAttribute<int>(details.Customer, NopCustomerDefaults.LanguageIdAttribute, StoreId));
             if (details.CustomerLanguage == null || !details.CustomerLanguage.Published)
                 details.CustomerLanguage = _workContext.WorkingLanguage;
 
             //billing address
-            if (details.Customer.BillingAddress == null)
+            if (details.Customer.BillingAddressId is null)
                 throw new NopException("Billing address is not provided");
 
-            if (!CommonHelper.IsValidEmail(details.Customer.BillingAddress.Email))
+            var billingAddress = _customerService.GetCustomerBillingAddress(details.Customer);
+
+            if (!CommonHelper.IsValidEmail(billingAddress?.Email))
                 throw new NopException("Email is not valid");
 
-            details.BillingAddress = (Address) details.Customer.BillingAddress.Clone();
-            if (details.BillingAddress.Country != null && !details.BillingAddress.Country.AllowsBilling)
-                throw new NopException($"Country '{details.BillingAddress.Country.Name}' is not allowed for billing");
+            details.BillingAddress = _addressService.CloneAddress(billingAddress);
+
+            if (_countryService.GetCountryByAddress(details.BillingAddress) is Country billingCountry && !billingCountry.AllowsBilling)
+                throw new NopException($"Country '{billingCountry.Name}' is not allowed for billing");
 
             //checkout attributes
-            details.CheckoutAttributesXml =
-                details.Customer.GetAttribute<string>(SystemCustomerAttributeNames.CheckoutAttributes, StoreId);
-            details.CheckoutAttributeDescription =
-                _checkoutAttributeFormatter.FormatAttributes(details.CheckoutAttributesXml, details.Customer);
+            details.CheckoutAttributesXml = _genericAttributeService.GetAttribute<string>(details.Customer, NopCustomerDefaults.CheckoutAttributes, StoreId);
+            details.CheckoutAttributeDescription = _checkoutAttributeFormatter.FormatAttributes(details.CheckoutAttributesXml, details.Customer);
 
             //load shopping cart
-            details.Cart = details.Customer.ShoppingCartItems
-                .Where(sci => sci.ShoppingCartType == ShoppingCartType.ShoppingCart)
-                .LimitPerStore(StoreId).ToList();
+            details.Cart = _shoppingCartService.GetShoppingCart(details.Customer, ShoppingCartType.ShoppingCart, StoreId);
 
             if (!details.Cart.Any())
                 throw new NopException("Cart is empty");
 
             //validate the entire shopping cart
-            IList<string> warnings =
-                _shoppingCartService.GetShoppingCartWarnings(details.Cart, details.CheckoutAttributesXml, true);
+            var warnings = _shoppingCartService.GetShoppingCartWarnings(details.Cart, details.CheckoutAttributesXml, true);
             if (warnings.Any())
                 throw new NopException(warnings.Aggregate(string.Empty, (current, next) => $"{current}{next};"));
 
             //validate individual cart items
-            foreach (ShoppingCartItem sci in details.Cart)
+            foreach (var sci in details.Cart)
             {
-                IList<string> sciWarnings = _shoppingCartService.GetShoppingCartItemWarnings(details.Customer,
-                    sci.ShoppingCartType, sci.Product, StoreId, sci.AttributesXml,
-                    sci.CustomerEnteredPrice, sci.RentalStartDateUtc, sci.RentalEndDateUtc, sci.Quantity, false);
+                var product = _productService.GetProductById(sci.ProductId);
+
+                var sciWarnings = _shoppingCartService.GetShoppingCartItemWarnings(details.Customer,
+                    sci.ShoppingCartType, product, StoreId, sci.AttributesXml,
+                    sci.CustomerEnteredPrice, sci.RentalStartDateUtc, sci.RentalEndDateUtc, sci.Quantity, false, sci.Id);
                 if (sciWarnings.Any())
                     throw new NopException(sciWarnings.Aggregate(string.Empty, (current, next) => $"{current}{next};"));
             }
@@ -692,42 +690,32 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             //min totals validation
             if (!ValidateMinOrderSubtotalAmount(details.Cart))
             {
-                decimal minOrderSubtotalAmount =
-                    _currencyService.ConvertFromPrimaryStoreCurrency(_orderSettings.MinOrderSubtotalAmount,
-                        _workContext.WorkingCurrency);
-                throw new NopException(string.Format(
-                    _localizationService.GetResource("Checkout.MinOrderSubtotalAmount"),
+                var minOrderSubtotalAmount = _currencyService.ConvertFromPrimaryStoreCurrency(_orderSettings.MinOrderSubtotalAmount, _workContext.WorkingCurrency);
+                throw new NopException(string.Format(_localizationService.GetResource("Checkout.MinOrderSubtotalAmount"),
                     _priceFormatter.FormatPrice(minOrderSubtotalAmount, true, false)));
             }
 
             if (!ValidateMinOrderTotalAmount(details.Cart))
             {
-                decimal minOrderTotalAmount =
-                    _currencyService.ConvertFromPrimaryStoreCurrency(_orderSettings.MinOrderTotalAmount,
-                        _workContext.WorkingCurrency);
+                var minOrderTotalAmount = _currencyService.ConvertFromPrimaryStoreCurrency(_orderSettings.MinOrderTotalAmount, _workContext.WorkingCurrency);
                 throw new NopException(string.Format(_localizationService.GetResource("Checkout.MinOrderTotalAmount"),
                     _priceFormatter.FormatPrice(minOrderTotalAmount, true, false)));
             }
 
             //tax display type
             if (_taxSettings.AllowCustomersToSelectTaxDisplayType)
-                details.CustomerTaxDisplayType =
-                    (TaxDisplayType) details.Customer.GetAttribute<int>(SystemCustomerAttributeNames.TaxDisplayTypeId,
-                        StoreId);
+                details.CustomerTaxDisplayType = (TaxDisplayType)_genericAttributeService.GetAttribute<int>(details.Customer, NopCustomerDefaults.TaxDisplayTypeIdAttribute, StoreId);
             else
                 details.CustomerTaxDisplayType = _taxSettings.TaxDisplayType;
 
             //sub total (incl tax)
-            _orderTotalCalculationService.GetShoppingCartSubTotal(details.Cart, true,
-                out decimal orderSubTotalDiscountAmount,
-                out List<DiscountForCaching> orderSubTotalAppliedDiscounts, out decimal subTotalWithoutDiscountBase,
-                out decimal _);
+            _orderTotalCalculationService.GetShoppingCartSubTotal(details.Cart, true, out var orderSubTotalDiscountAmount, out var orderSubTotalAppliedDiscounts, out var subTotalWithoutDiscountBase, out var _);
             details.OrderSubTotalInclTax = subTotalWithoutDiscountBase;
             details.OrderSubTotalDiscountInclTax = orderSubTotalDiscountAmount;
 
             //discount history
-            foreach (DiscountForCaching disc in orderSubTotalAppliedDiscounts)
-                if (!details.AppliedDiscounts.ContainsDiscount(disc))
+            foreach (var disc in orderSubTotalAppliedDiscounts)
+                if (!_discountService.ContainsDiscount(details.AppliedDiscounts, disc))
                     details.AppliedDiscounts.Add(disc);
 
             //sub total (excl tax)
@@ -737,105 +725,89 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             details.OrderSubTotalDiscountExclTax = orderSubTotalDiscountAmount;
 
             //shipping info
-            if (details.Cart.RequiresShipping(_productService, _productAttributeParser))
+            if (_shoppingCartService.ShoppingCartRequiresShipping(details.Cart))
             {
-                PickupPoint pickupPoint =
-                    details.Customer.GetAttribute<PickupPoint>(SystemCustomerAttributeNames.SelectedPickupPoint,
-                        StoreId);
-                if (_shippingSettings.AllowPickUpInStore && pickupPoint != null)
+                var pickupPoint = _genericAttributeService.GetAttribute<PickupPoint>(details.Customer,
+                    NopCustomerDefaults.SelectedPickupPointAttribute, StoreId);
+                if (_shippingSettings.AllowPickupInStore && pickupPoint != null)
                 {
-                    Country country = _countryService.GetCountryByTwoLetterIsoCode(pickupPoint.CountryCode);
-                    StateProvince state = _stateProvinceService.GetStateProvinceByAbbreviation(
-                        pickupPoint.StateAbbreviation,
-                        country?.Id);
+                    var country = _countryService.GetCountryByTwoLetterIsoCode(pickupPoint.CountryCode);
+                    var state = _stateProvinceService.GetStateProvinceByAbbreviation(pickupPoint.StateAbbreviation, country?.Id);
 
-                    details.PickUpInStore = true;
+                    details.PickupInStore = true;
                     details.PickupAddress = new Address
                     {
                         Address1 = pickupPoint.Address,
                         City = pickupPoint.City,
-                        Country = country,
-                        StateProvince = state,
+                        County = pickupPoint.County,
+                        CountryId = country?.Id,
+                        StateProvinceId = state?.Id,
                         ZipPostalCode = pickupPoint.ZipPostalCode,
                         CreatedOnUtc = DateTime.UtcNow
                     };
                 }
                 else
                 {
-                    if (details.Customer.ShippingAddress == null)
+                    if (details.Customer.ShippingAddressId == null)
                         throw new NopException("Shipping address is not provided");
 
-                    if (!CommonHelper.IsValidEmail(details.Customer.ShippingAddress.Email))
+                    var shippingAddress = _customerService.GetCustomerShippingAddress(details.Customer);
+
+                    if (!CommonHelper.IsValidEmail(shippingAddress?.Email))
                         throw new NopException("Email is not valid");
 
                     //clone shipping address
-                    details.ShippingAddress = (Address) details.Customer.ShippingAddress.Clone();
-                    if (details.ShippingAddress.Country != null && !details.ShippingAddress.Country.AllowsShipping)
-                        throw new NopException(
-                            $"Country '{details.ShippingAddress.Country.Name}' is not allowed for shipping");
+                    details.ShippingAddress = _addressService.CloneAddress(shippingAddress);
+
+                    if (_countryService.GetCountryByAddress(details.ShippingAddress) is Country shippingCountry && !shippingCountry.AllowsShipping)
+                        throw new NopException($"Country '{shippingCountry.Name}' is not allowed for shipping");
                 }
 
-                ShippingOption shippingOption =
-                    details.Customer.GetAttribute<ShippingOption>(SystemCustomerAttributeNames.SelectedShippingOption,
-                        StoreId);
+                var shippingOption = _genericAttributeService.GetAttribute<ShippingOption>(details.Customer,
+                    NopCustomerDefaults.SelectedShippingOptionAttribute, StoreId);
                 if (shippingOption != null)
                 {
                     details.ShippingMethodName = shippingOption.Name;
-                    details.ShippingRateComputationMethodSystemName =
-                        shippingOption.ShippingRateComputationMethodSystemName;
+                    details.ShippingRateComputationMethodSystemName = shippingOption.ShippingRateComputationMethodSystemName;
                 }
 
                 details.ShippingStatus = ShippingStatus.NotYetShipped;
             }
             else
-            {
                 details.ShippingStatus = ShippingStatus.ShippingNotRequired;
-            }
 
             //shipping total
-            decimal? orderShippingTotalInclTax = _orderTotalCalculationService.GetShoppingCartShippingTotal(
-                details.Cart, true,
-                out decimal _, out List<DiscountForCaching> shippingTotalDiscounts);
-            decimal? orderShippingTotalExclTax =
-                _orderTotalCalculationService.GetShoppingCartShippingTotal(details.Cart, false);
+            var orderShippingTotalInclTax = _orderTotalCalculationService.GetShoppingCartShippingTotal(details.Cart, true, out var _, out var shippingTotalDiscounts);
+            var orderShippingTotalExclTax = _orderTotalCalculationService.GetShoppingCartShippingTotal(details.Cart, false);
             if (!orderShippingTotalInclTax.HasValue || !orderShippingTotalExclTax.HasValue)
                 throw new NopException("Shipping total couldn't be calculated");
 
             details.OrderShippingTotalInclTax = orderShippingTotalInclTax.Value;
             details.OrderShippingTotalExclTax = orderShippingTotalExclTax.Value;
 
-            foreach (DiscountForCaching disc in shippingTotalDiscounts)
-                if (!details.AppliedDiscounts.ContainsDiscount(disc))
+            foreach (var disc in shippingTotalDiscounts)
+                if (!_discountService.ContainsDiscount(details.AppliedDiscounts, disc))
                     details.AppliedDiscounts.Add(disc);
 
             //payment total
-            decimal paymentAdditionalFee =
-                _paymentService.GetAdditionalHandlingFee(details.Cart, "Payment.ZipMoney");
-            details.PaymentAdditionalFeeInclTax =
-                _taxService.GetPaymentMethodAdditionalFee(paymentAdditionalFee, true, details.Customer);
-            details.PaymentAdditionalFeeExclTax =
-                _taxService.GetPaymentMethodAdditionalFee(paymentAdditionalFee, false, details.Customer);
+            var paymentAdditionalFee = _paymentService.GetAdditionalHandlingFee(details.Cart, "Payment.ZipMoney");
+            details.PaymentAdditionalFeeInclTax = _taxService.GetPaymentMethodAdditionalFee(paymentAdditionalFee, true, details.Customer);
+            details.PaymentAdditionalFeeExclTax = _taxService.GetPaymentMethodAdditionalFee(paymentAdditionalFee, false, details.Customer);
 
             //tax amount
-            details.OrderTaxTotal =
-                _orderTotalCalculationService.GetTaxTotal(details.Cart,
-                    out SortedDictionary<decimal, decimal> taxRatesDictionary);
+            details.OrderTaxTotal = _orderTotalCalculationService.GetTaxTotal(details.Cart, out var taxRatesDictionary);
 
             //VAT number
-            VatNumberStatus customerVatStatus =
-                (VatNumberStatus) details.Customer.GetAttribute<int>(SystemCustomerAttributeNames.VatNumberStatusId);
+            var customerVatStatus = (VatNumberStatus)_genericAttributeService.GetAttribute<int>(details.Customer, NopCustomerDefaults.VatNumberStatusIdAttribute);
             if (_taxSettings.EuVatEnabled && customerVatStatus == VatNumberStatus.Valid)
-                details.VatNumber = details.Customer.GetAttribute<string>(SystemCustomerAttributeNames.VatNumber);
+                details.VatNumber = _genericAttributeService.GetAttribute<string>(details.Customer, NopCustomerDefaults.VatNumberAttribute);
 
             //tax rates
             details.TaxRates = taxRatesDictionary.Aggregate(string.Empty, (current, next) =>
                 $"{current}{next.Key.ToString(CultureInfo.InvariantCulture)}:{next.Value.ToString(CultureInfo.InvariantCulture)};   ");
 
             //order total (and applied discounts, gift cards, reward points)
-            decimal? orderTotal = _orderTotalCalculationService.GetShoppingCartTotal(details.Cart,
-                out decimal orderDiscountAmount,
-                out List<DiscountForCaching> orderAppliedDiscounts, out List<AppliedGiftCard> appliedGiftCards,
-                out int redeemedRewardPoints, out decimal redeemedRewardPointsAmount);
+            var orderTotal = _orderTotalCalculationService.GetShoppingCartTotal(details.Cart, out var orderDiscountAmount, out var orderAppliedDiscounts, out var appliedGiftCards, out var redeemedRewardPoints, out var redeemedRewardPointsAmount);
             if (!orderTotal.HasValue)
                 throw new NopException("Order total couldn't be calculated");
 
@@ -846,50 +818,52 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             details.OrderTotal = orderTotal.Value;
 
             //discount history
-            foreach (DiscountForCaching disc in orderAppliedDiscounts)
-                if (!details.AppliedDiscounts.ContainsDiscount(disc))
+            foreach (var disc in orderAppliedDiscounts)
+                if (!_discountService.ContainsDiscount(details.AppliedDiscounts, disc))
                     details.AppliedDiscounts.Add(disc);
 
-
             //recurring or standard shopping cart?
-            details.IsRecurringShoppingCart = details.Cart.IsRecurring();
-            if (details.IsRecurringShoppingCart)
-            {
-                string recurringCyclesError = details.Cart.GetRecurringCycleInfo(_localizationService,
-                    out int recurringCycleLength, out RecurringProductCyclePeriod recurringCyclePeriod,
-                    out int recurringTotalCycles);
-                if (!string.IsNullOrEmpty(recurringCyclesError))
-                    throw new NopException(recurringCyclesError);
+            details.IsRecurringShoppingCart = _shoppingCartService.ShoppingCartIsRecurring(details.Cart);
+            if (!details.IsRecurringShoppingCart)
+                return details;
 
-                //RecurringCycleLength = recurringCycleLength;
-                //RecurringCyclePeriod = recurringCyclePeriod;
-                //RecurringTotalCycles = recurringTotalCycles;
-            }
+            var recurringCyclesError = _shoppingCartService.GetRecurringCycleInfo(details.Cart,
+                out var recurringCycleLength, out var recurringCyclePeriod, out var recurringTotalCycles);
+            if (!string.IsNullOrEmpty(recurringCyclesError))
+                throw new NopException(recurringCyclesError);
+
+            //processPaymentRequest.RecurringCycleLength = recurringCycleLength;
+            //processPaymentRequest.RecurringCyclePeriod = recurringCyclePeriod;
+            //processPaymentRequest.RecurringTotalCycles = recurringTotalCycles;
+
             return details;
         }
 
+        /// <summary>
+        /// Validate minimum order sub-total amount
+        /// </summary>
+        /// <param name="cart">Shopping cart</param>
+        /// <returns>true - OK; false - minimum order sub-total amount is not reached</returns>
         public virtual bool ValidateMinOrderSubtotalAmount(IList<ShoppingCartItem> cart)
         {
             if (cart == null)
                 throw new ArgumentNullException(nameof(cart));
 
             //min order amount sub-total validation
-            if (cart.Any() && _orderSettings.MinOrderSubtotalAmount > decimal.Zero)
-            {
-                //subtotal
-                _orderTotalCalculationService.GetShoppingCartSubTotal(cart,
-                    _orderSettings.MinOrderSubtotalAmountIncludingTax, out decimal _, out List<DiscountForCaching> _,
-                    out decimal subTotalWithoutDiscountBase, out decimal _);
+            if (!cart.Any() || _orderSettings.MinOrderSubtotalAmount <= decimal.Zero)
+                return true;
 
-                if (subTotalWithoutDiscountBase < _orderSettings.MinOrderSubtotalAmount)
-                    return false;
-            }
+            //subtotal
+            _orderTotalCalculationService.GetShoppingCartSubTotal(cart, _orderSettings.MinOrderSubtotalAmountIncludingTax, out var _, out var _, out var subTotalWithoutDiscountBase, out var _);
+
+            if (subTotalWithoutDiscountBase < _orderSettings.MinOrderSubtotalAmount)
+                return false;
 
             return true;
         }
 
         /// <summary>
-        ///     Validate minimum order total amount
+        /// Validate minimum order total amount
         /// </summary>
         /// <param name="cart">Shopping cart</param>
         /// <returns>true - OK; false - minimum order total amount is not reached</returns>
@@ -898,199 +872,202 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             if (cart == null)
                 throw new ArgumentNullException(nameof(cart));
 
-            if (cart.Any() && _orderSettings.MinOrderTotalAmount > decimal.Zero)
-            {
-                decimal? shoppingCartTotalBase = _orderTotalCalculationService.GetShoppingCartTotal(cart);
-                if (shoppingCartTotalBase.HasValue && shoppingCartTotalBase.Value < _orderSettings.MinOrderTotalAmount)
-                    return false;
-            }
+            if (!cart.Any() || _orderSettings.MinOrderTotalAmount <= decimal.Zero)
+                return true;
+
+            var shoppingCartTotalBase = _orderTotalCalculationService.GetShoppingCartTotal(cart);
+
+            if (shoppingCartTotalBase.HasValue && shoppingCartTotalBase.Value < _orderSettings.MinOrderTotalAmount)
+                return false;
 
             return true;
         }
 
 
-        //nested
+        /// <summary>
+        /// PlaceOrder container
+        /// </summary>
         protected class PlaceOrderContainer
         {
-            /// <summary>
-            ///     Ctor
-            /// </summary>
             public PlaceOrderContainer()
             {
                 Cart = new List<ShoppingCartItem>();
-                AppliedDiscounts = new List<DiscountForCaching>();
+                AppliedDiscounts = new List<Discount>();
                 AppliedGiftCards = new List<AppliedGiftCard>();
             }
 
             /// <summary>
-            ///     Customer
+            /// Customer
             /// </summary>
             public Customer Customer { get; set; }
 
             /// <summary>
-            ///     Customer language
+            /// Customer language
             /// </summary>
             public Language CustomerLanguage { get; set; }
 
             /// <summary>
-            ///     Affiliate identifier
+            /// Affiliate identifier
             /// </summary>
             public int AffiliateId { get; set; }
 
             /// <summary>
-            ///     TAx display type
+            /// TAx display type
             /// </summary>
             public TaxDisplayType CustomerTaxDisplayType { get; set; }
 
             /// <summary>
-            ///     Selected currency
+            /// Selected currency
             /// </summary>
             public string CustomerCurrencyCode { get; set; }
 
             /// <summary>
-            ///     Customer currency rate
+            /// Customer currency rate
             /// </summary>
             public decimal CustomerCurrencyRate { get; set; }
 
             /// <summary>
-            ///     Billing address
+            /// Billing address
             /// </summary>
             public Address BillingAddress { get; set; }
 
             /// <summary>
-            ///     Shipping address
+            /// Shipping address
             /// </summary>
             public Address ShippingAddress { get; set; }
 
             /// <summary>
-            ///     Shipping status
+            /// Shipping status
             /// </summary>
             public ShippingStatus ShippingStatus { get; set; }
 
             /// <summary>
-            ///     Selected shipping method
+            /// Selected shipping method
             /// </summary>
             public string ShippingMethodName { get; set; }
 
             /// <summary>
-            ///     Shipping rate computation method system name
+            /// Shipping rate computation method system name
             /// </summary>
             public string ShippingRateComputationMethodSystemName { get; set; }
 
             /// <summary>
-            ///     Is pickup in store selected?
+            /// Is pickup in store selected?
             /// </summary>
-            public bool PickUpInStore { get; set; }
+            public bool PickupInStore { get; set; }
 
             /// <summary>
-            ///     Selected pickup address
+            /// Selected pickup address
             /// </summary>
             public Address PickupAddress { get; set; }
 
             /// <summary>
-            ///     Is recurring shopping cart
+            /// Is recurring shopping cart
             /// </summary>
             public bool IsRecurringShoppingCart { get; set; }
 
             /// <summary>
-            ///     Initial order (used with recurring payments)
+            /// Initial order (used with recurring payments)
             /// </summary>
             public Order InitialOrder { get; set; }
 
             /// <summary>
-            ///     Checkout attributes
+            /// Checkout attributes
             /// </summary>
             public string CheckoutAttributeDescription { get; set; }
 
             /// <summary>
-            ///     Shopping cart
+            /// Shopping cart
             /// </summary>
             public string CheckoutAttributesXml { get; set; }
 
             /// <summary>
+            /// 
             /// </summary>
             public IList<ShoppingCartItem> Cart { get; set; }
 
             /// <summary>
-            ///     Applied discounts
+            /// Applied discounts
             /// </summary>
-            public List<DiscountForCaching> AppliedDiscounts { get; set; }
+            public List<Discount> AppliedDiscounts { get; set; }
 
             /// <summary>
-            ///     Applied gift cards
+            /// Applied gift cards
             /// </summary>
             public List<AppliedGiftCard> AppliedGiftCards { get; set; }
 
             /// <summary>
+            /// Order subtotal (incl tax)
             /// </summary>
             public decimal OrderSubTotalInclTax { get; set; }
 
             /// <summary>
+            /// Order subtotal (excl tax)
             /// </summary>
             public decimal OrderSubTotalExclTax { get; set; }
 
             /// <summary>
-            ///     Subtotal discount (incl tax)
+            /// Subtotal discount (incl tax)
             /// </summary>
             public decimal OrderSubTotalDiscountInclTax { get; set; }
 
             /// <summary>
-            ///     Subtotal discount (excl tax)
+            /// Subtotal discount (excl tax)
             /// </summary>
             public decimal OrderSubTotalDiscountExclTax { get; set; }
 
             /// <summary>
-            ///     Shipping (incl tax)
+            /// Shipping (incl tax)
             /// </summary>
             public decimal OrderShippingTotalInclTax { get; set; }
 
             /// <summary>
-            ///     Shipping (excl tax)
+            /// Shipping (excl tax)
             /// </summary>
             public decimal OrderShippingTotalExclTax { get; set; }
 
             /// <summary>
-            ///     Payment additional fee (incl tax)
+            /// Payment additional fee (incl tax)
             /// </summary>
             public decimal PaymentAdditionalFeeInclTax { get; set; }
 
             /// <summary>
-            ///     Payment additional fee (excl tax)
+            /// Payment additional fee (excl tax)
             /// </summary>
             public decimal PaymentAdditionalFeeExclTax { get; set; }
 
             /// <summary>
-            ///     Tax
+            /// Tax
             /// </summary>
             public decimal OrderTaxTotal { get; set; }
 
             /// <summary>
-            ///     VAT number
+            /// VAT number
             /// </summary>
             public string VatNumber { get; set; }
 
             /// <summary>
-            ///     Tax rates
+            /// Tax rates
             /// </summary>
             public string TaxRates { get; set; }
 
             /// <summary>
-            ///     Order total discount amount
+            /// Order total discount amount
             /// </summary>
             public decimal OrderDiscountAmount { get; set; }
 
             /// <summary>
-            ///     Redeemed reward points
+            /// Redeemed reward points
             /// </summary>
             public int RedeemedRewardPoints { get; set; }
 
             /// <summary>
-            ///     Redeemed reward points amount
+            /// Redeemed reward points amount
             /// </summary>
             public decimal RedeemedRewardPointsAmount { get; set; }
 
             /// <summary>
-            ///     Order total
+            /// Order total
             /// </summary>
             public decimal OrderTotal { get; set; }
         }

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using Microsoft.AspNetCore.Http;
@@ -7,7 +7,6 @@ using Nop.Core;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
-using Nop.Core.Plugins;
 using Nop.Services.Cms;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
@@ -20,6 +19,7 @@ using ZipMoneySDK.Models;
 using Nop.Services.Logging;
 using Newtonsoft.Json;
 using Nop.Core.Domain.Logging;
+using Nop.Services.Plugins;
 
 namespace Nop.Plugin.Payments.ZipMoney
 {
@@ -264,14 +264,14 @@ namespace Nop.Plugin.Payments.ZipMoney
             return processPaymentRequest;
         }
 
+        public string GetPublicViewComponentName()
+        {
+            return "PaymentZipMoney";
+        }
+
         public override string GetConfigurationPageUrl()
         {
             return $"{_webHelper.GetStoreLocation()}Admin/PaymentZipMoney/Configure";
-        }
-
-        public void GetPublicViewComponent(out string viewComponentName)
-        {
-            viewComponentName = "PaymentZipMoney";
         }
 
         public bool SupportCapture => true;
@@ -295,6 +295,8 @@ namespace Nop.Plugin.Payments.ZipMoney
             base.Uninstall();
         }
 
+        public bool HideInWidgetList { get; }
+
         public IList<string> GetWidgetZones()
         {
             return new List<string>()
@@ -306,25 +308,26 @@ namespace Nop.Plugin.Payments.ZipMoney
             };
         }
 
-        public void GetPublicViewComponent(string widgetZone, out string viewComponentName)
+        public string GetWidgetViewComponentName(string widgetZone)
         {
-            viewComponentName = "";
             if (widgetZone == "checkout_payment_method_top")
             {
-                viewComponentName = "ZipMoneyInfo";
+                return "ZipMoneyInfo";
             }
             else if (widgetZone == "order_summary_cart_footer")
             {
-                viewComponentName = "ZipMoneyCartPage";
+                return "ZipMoneyCartPage";
             }
             else if (widgetZone == "productdetails_inside_overview_buttons_before")
             {
-                viewComponentName = "ZipMoneyProductPage";
+                return "ZipMoneyProductPage";
             }
             else if (widgetZone == "checkout_confirm_top")
             {
-                viewComponentName = "ZipMoneyReferralConfirm";
+                return "ZipMoneyReferralConfirm";
             }
+
+            return "";
         }
     }
 }
