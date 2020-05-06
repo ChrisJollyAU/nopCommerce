@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc.Rendering;
 using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Directory;
 using Nop.Plugin.Pickup.PickupInStore.Domain;
+using Nop.Plugin.Pickup.PickupInStore.Factories;
 using Nop.Plugin.Pickup.PickupInStore.Models;
 using Nop.Plugin.Pickup.PickupInStore.Services;
 using Nop.Services.Common;
@@ -15,7 +16,6 @@ using Nop.Services.Security;
 using Nop.Services.Stores;
 using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
-using Nop.Web.Framework.Kendoui;
 using Nop.Web.Framework.Mvc;
 using Nop.Web.Framework.Mvc.Filters;
 
@@ -23,6 +23,7 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
 {
     [Area(AreaNames.Admin)]
     [AuthorizeAdmin]
+    [AutoValidateAntiforgeryToken]
     public class PickupInStoreController : BasePluginController
     {
         #region Fields
@@ -32,8 +33,10 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
         private readonly ILocalizationService _localizationService;
         private readonly IPermissionService _permissionService;
         private readonly IStateProvinceService _stateProvinceService;
+        private readonly IStorePickupPointModelFactory _storePickupPointModelFactory;
         private readonly IStorePickupPointService _storePickupPointService;
         private readonly IStoreService _storeService;
+        private readonly AddressSettings _addressSettings;
 
         #endregion
 
@@ -44,16 +47,20 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
             ILocalizationService localizationService,
             IPermissionService permissionService,
             IStateProvinceService stateProvinceService,
+            IStorePickupPointModelFactory storePickupPointModelFactory,
             IStorePickupPointService storePickupPointService,
-            IStoreService storeService)
+            IStoreService storeService,
+            AddressSettings customerSettings)
         {
-            this._addressService = addressService;
-            this._countryService = countryService;
-            this._localizationService = localizationService;
-            this._permissionService = permissionService;
-            this._stateProvinceService = stateProvinceService;
-            this._storePickupPointService = storePickupPointService;
-            this._storeService = storeService;
+            _addressService = addressService;
+            _countryService = countryService;
+            _localizationService = localizationService;
+            _permissionService = permissionService;
+            _stateProvinceService = stateProvinceService;
+            _storePickupPointModelFactory = storePickupPointModelFactory;
+            _storePickupPointService = storePickupPointService;
+            _storeService = storeService;
+            _addressSettings = customerSettings;
         }
 
         #endregion
@@ -65,36 +72,22 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
                 return AccessDeniedView();
 
-            return View("~/Plugins/Pickup.PickupInStore/Views/Configure.cshtml");
+            //prepare model
+            var model = _storePickupPointModelFactory.PrepareStorePickupPointSearchModel(new StorePickupPointSearchModel());
+
+            return View("~/Plugins/Pickup.PickupInStore/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
-        [AdminAntiForgery]
-        public IActionResult List(DataSourceRequest command)
+        public IActionResult List(StorePickupPointSearchModel searchModel)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
-                return AccessDeniedKendoGridJson();
+                return AccessDeniedDataTablesJson();
 
-            var pickupPoints = _storePickupPointService.GetAllStorePickupPoints(pageIndex: command.Page - 1, pageSize: command.PageSize);
-            var model = pickupPoints.Select(point =>
-            {
-                var store = _storeService.GetStoreById(point.StoreId);
-                return new StorePickupPointModel
-                {
-                    Id = point.Id,
-                    Name = point.Name,
-                    OpeningHours = point.OpeningHours,
-                    PickupFee = point.PickupFee,
-                    DisplayOrder = point.DisplayOrder,
-                    StoreName = store?.Name ?? (point.StoreId == 0 ? _localizationService.GetResource("Admin.Configuration.Settings.StoreScope.AllStores") : string.Empty)
-                };
-            }).ToList();
+            //prepare model
+            var model = _storePickupPointModelFactory.PrepareStorePickupPointListModel(searchModel);
 
-            return Json(new DataSourceResult
-            {
-                Data = model,
-                Total = pickupPoints.TotalCount
-            });
+            return Json(model);
         }
 
         public IActionResult Create()
@@ -102,7 +95,17 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
                 return AccessDeniedView();
 
-            var model = new StorePickupPointModel();
+            var model = new StorePickupPointModel
+            {
+                Address =
+                {
+                    CountryEnabled = _addressSettings.CountryEnabled,
+                    StateProvinceEnabled = _addressSettings.StateProvinceEnabled,
+                    ZipPostalCodeEnabled = _addressSettings.ZipPostalCodeEnabled,
+                    CityEnabled = _addressSettings.CityEnabled,
+                    CountyEnabled = _addressSettings.CountyEnabled
+                }
+            };
 
             model.Address.AvailableCountries.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.SelectCountry"), Value = "0" });
             foreach (var country in _countryService.GetAllCountries(showHidden: true))
@@ -117,7 +120,7 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
                     model.Address.AvailableStates.Add(new SelectListItem { Text = state.Name, Value = state.Id.ToString() });
             }
             else
-                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "0" });
+                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.Other"), Value = "0" });
 
             model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Settings.StoreScope.AllStores"), Value = "0" });
             foreach (var store in _storeService.GetAllStores())
@@ -127,7 +130,6 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
         public IActionResult Create(StorePickupPointModel model)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
@@ -137,6 +139,7 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
             {
                 Address1 = model.Address.Address1,
                 City = model.Address.City,
+                County = model.Address.County,
                 CountryId = model.Address.CountryId,
                 StateProvinceId = model.Address.StateProvinceId,
                 ZipPostalCode = model.Address.ZipPostalCode,
@@ -152,7 +155,10 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
                 OpeningHours = model.OpeningHours,
                 PickupFee = model.PickupFee,
                 DisplayOrder = model.DisplayOrder,
-                StoreId = model.StoreId
+                StoreId = model.StoreId,
+                Latitude = model.Latitude,
+                Longitude = model.Longitude,
+                TransitDays = model.TransitDays
             };
             _storePickupPointService.InsertStorePickupPoint(pickupPoint);
 
@@ -178,7 +184,10 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
                 OpeningHours = pickupPoint.OpeningHours,
                 PickupFee = pickupPoint.PickupFee,
                 DisplayOrder = pickupPoint.DisplayOrder,
-                StoreId = pickupPoint.StoreId
+                StoreId = pickupPoint.StoreId,
+                Latitude = pickupPoint.Latitude,
+                Longitude = pickupPoint.Longitude,
+                TransitDays = pickupPoint.TransitDays
             };
 
             var address = _addressService.GetAddressById(pickupPoint.AddressId);
@@ -188,9 +197,15 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
                 {
                     Address1 = address.Address1,
                     City = address.City,
+                    County = address.County,
                     CountryId = address.CountryId,
                     StateProvinceId = address.StateProvinceId,
-                    ZipPostalCode = address.ZipPostalCode
+                    ZipPostalCode = address.ZipPostalCode,
+                    CountryEnabled = _addressSettings.CountryEnabled,
+                    StateProvinceEnabled = _addressSettings.StateProvinceEnabled,
+                    ZipPostalCodeEnabled = _addressSettings.ZipPostalCodeEnabled,
+                    CityEnabled = _addressSettings.CityEnabled,
+                    CountyEnabled = _addressSettings.CountyEnabled
                 };
             }
 
@@ -207,7 +222,7 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
                     model.Address.AvailableStates.Add(new SelectListItem { Text = state.Name, Value = state.Id.ToString(), Selected = (address != null && state.Id == address.StateProvinceId) });
             }
             else
-                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.OtherNonUS"), Value = "0" });
+                model.Address.AvailableStates.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Address.Other"), Value = "0" });
 
             model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Configuration.Settings.StoreScope.AllStores"), Value = "0" });
             foreach (var store in _storeService.GetAllStores())
@@ -217,11 +232,13 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
         public IActionResult Edit(StorePickupPointModel model)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
                 return AccessDeniedView();
+
+            if (!ModelState.IsValid)
+                return Edit(model.Id);
 
             var pickupPoint = _storePickupPointService.GetStorePickupPointById(model.Id);
             if (pickupPoint == null)
@@ -230,6 +247,7 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
             var address = _addressService.GetAddressById(pickupPoint.AddressId) ?? new Address { CreatedOnUtc = DateTime.UtcNow };
             address.Address1 = model.Address.Address1;
             address.City = model.Address.City;
+            address.County = model.Address.County;
             address.CountryId = model.Address.CountryId;
             address.StateProvinceId = model.Address.StateProvinceId;
             address.ZipPostalCode = model.Address.ZipPostalCode;
@@ -245,6 +263,9 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
             pickupPoint.PickupFee = model.PickupFee;
             pickupPoint.DisplayOrder = model.DisplayOrder;
             pickupPoint.StoreId = model.StoreId;
+            pickupPoint.Latitude = model.Latitude;
+            pickupPoint.Longitude = model.Longitude;
+            pickupPoint.TransitDays = model.TransitDays;
             _storePickupPointService.UpdateStorePickupPoint(pickupPoint);
 
             ViewBag.RefreshPage = true;
@@ -253,7 +274,6 @@ namespace Nop.Plugin.Pickup.PickupInStore.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
         public IActionResult Delete(int id)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))

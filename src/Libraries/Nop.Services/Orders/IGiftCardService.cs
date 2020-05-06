@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
@@ -61,7 +61,7 @@ namespace Nop.Services.Orders
         /// <param name="purchasedWithOrderItemId">Purchased with order item identifier</param>
         /// <returns>Gift card entries</returns>
         IList<GiftCard> GetGiftCardsByPurchasedWithOrderItemId(int purchasedWithOrderItemId);
-        
+
         /// <summary>
         /// Get active gift cards that are applied by a customer
         /// </summary>
@@ -74,5 +74,45 @@ namespace Nop.Services.Orders
         /// </summary>
         /// <returns>Result</returns>
         string GenerateGiftCardCode();
+
+        /// <summary>
+        /// Delete gift card usage history
+        /// </summary>
+        /// <param name="order">Order</param>
+        void DeleteGiftCardUsageHistory(Order order);
+
+        /// <summary>
+        /// Gets a gift card remaining amount
+        /// </summary>
+        /// <param name="giftCard">Gift card</param>
+        /// <returns>Gift card remaining amount</returns>
+        decimal GetGiftCardRemainingAmount(GiftCard giftCard);
+
+        /// <summary>
+        /// Gets a gift card usage history entries
+        /// </summary>
+        /// <param name="giftCard">Gift card</param>
+        /// <returns>Result</returns>
+        IList<GiftCardUsageHistory> GetGiftCardUsageHistory(GiftCard giftCard);
+
+        /// <summary>
+        /// Gets a gift card usage history entries
+        /// </summary>
+        /// <param name="order">Order</param>
+        /// <returns>Result</returns>
+        IList<GiftCardUsageHistory> GetGiftCardUsageHistory(Order order);
+
+        /// <summary>
+        /// Inserts a gift card usage history entry
+        /// </summary>
+        /// <param name="giftCardUsageHistory">Gift card usage history entry</param>
+        void InsertGiftCardUsageHistory(GiftCardUsageHistory giftCardUsageHistory);
+
+        /// <summary>
+        /// Is gift card valid
+        /// </summary>
+        /// <param name="giftCard">Gift card</param>
+        /// <returns>Result</returns>
+        bool IsGiftCardValid(GiftCard giftCard);
     }
 }

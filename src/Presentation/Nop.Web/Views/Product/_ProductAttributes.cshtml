@@ -2,6 +2,7 @@
 @using Nop.Core.Domain.Catalog
 @using Nop.Core.Domain.Media
 @using System.Text
+@using Nop.Services.Catalog
 @using Nop.Services.Media
 @inject IDownloadService downloadService
 @inject CatalogSettings catalogSettings
@@ -11,9 +12,9 @@
         <dl>
             @foreach (var attribute in Model)
             {
-                var controlId = $"product_attribute_{attribute.Id}";
+                var controlId = $"{NopCatalogDefaults.ProductAttributePrefix}{attribute.Id}";
                 var textPrompt = !string.IsNullOrEmpty(attribute.TextPrompt) ? attribute.TextPrompt : attribute.Name;
-                <dt id="@($"product_attribute_label_{attribute.Id}")">
+                <dt id="@($"{NopCatalogDefaults.ProductAttributePrefix}label_{attribute.Id}")">
                     <label class="text-prompt">
                         @textPrompt
                     </label>
@@ -28,7 +29,7 @@
                         </div>
                     }
                 </dt>
-                <dd id="@($"product_attribute_input_{attribute.Id}")">
+                <dd id="@($"{NopCatalogDefaults.ProductAttributePrefix}input_{attribute.Id}")">
                     @switch (attribute.AttributeControlType)
                     {
                         case AttributeControlType.DropdownList:
@@ -54,7 +55,7 @@
                                         <input type="text" name="@(controlId)_@(attributeValue.Id)_qty" id="@(controlId)_@(attributeValue.Id)_qty" value="@(attributeValue.Quantity)" />
                                     </div>
                                 }
-                                <script type="text/javascript" asp-location="Footer">
+                                <script asp-location="Footer">
                                     $(document).ready(function() {
                                         showHideDropdownQuantity("@controlId");
                                     });
@@ -85,7 +86,7 @@
                                         </li>
                                     }
                                 </ul>
-                                <script type="text/javascript" asp-location="Footer">
+                                <script asp-location="Footer">
                                     $(document).ready(function() {
                                         showHideRadioQuantity("@controlId");
                                     });
@@ -112,7 +113,7 @@
                                                 <div class="qty-box" id="@(controlId)_@(attributeValue.Id)_qty_box" style="display:none">
                                                     <label for="@(controlId)_@(attributeValue.Id)_qty">@(T("Products.ProductAttributes.PriceAdjustment.Quantity").Text)</label>
                                                     <input type="text" name="@(controlId)_@(attributeValue.Id)_qty" id="@(controlId)_@(attributeValue.Id)_qty" value="@(attributeValue.Quantity)" />
-                                                    <script type="text/javascript" asp-location="Footer">
+                                                    <script asp-location="Footer">
                                                         $(document).ready(function() {
                                                             showHideCheckboxQuantity('@(controlId)_@(attributeValue.Id)');
                                                         })
@@ -126,12 +127,12 @@
                             break;
                         case AttributeControlType.TextBox:
                             {
-                                <input name="@(controlId)" type="text" class="textbox" id="@(controlId)" value="@attribute.DefaultValue" />
+                                <input name="@(controlId)" type="text" class="textbox" id="@(controlId)" value="@(attribute.DefaultValue)" />
                             }
                             break;
                         case AttributeControlType.MultilineTextbox:
                             {
-                                <textarea cols="20" id="@(controlId)" name="@(controlId)">@attribute.DefaultValue</textarea>
+                                <textarea cols="20" id="@(controlId)" name="@(controlId)">@(attribute.DefaultValue)</textarea>
                             }
                             break;
                         case AttributeControlType.Datepicker:
@@ -141,10 +142,10 @@
                                     asp-month-name="@(controlId + "_month")" 
                                     asp-year-name="@(controlId + "_year")"
                                     asp-begin-year="@(DateTime.Now.Year)"
-                                    asp-end-year="@(DateTime.Now.Year + 1)"
-                                    asp-selected-day="@attribute.SelectedDay"
-                                    asp-selected-month="@attribute.SelectedMonth"
-                                    asp-selected-year="@attribute.SelectedYear"
+                                    asp-end-year="@(DateTime.Now.Year + catalogSettings.CountDisplayedYearsDatePicker)"
+                                    asp-selected-day="@(attribute.SelectedDay)"
+                                    asp-selected-month="@(attribute.SelectedMonth)"
+                                    asp-selected-year="@(attribute.SelectedYear)"
                                 />
                             }
                             break;
@@ -157,8 +158,8 @@
                                 }
 
                                 //register CSS and JS
-                                Html.AddCssFileParts(ResourceLocation.Footer, "~/lib/fineuploader/fineuploader-4.2.2.min.css");
-                                Html.AddScriptParts(ResourceLocation.Footer, "~/lib/fineuploader/jquery.fineuploader-4.2.2.min.js");
+                                Html.AddCssFileParts(ResourceLocation.Footer, "~/lib/fineuploader/fine-uploader.min.css");
+                                Html.AddScriptParts(ResourceLocation.Footer, "~/lib/fineuploader/jquery.fine-uploader.min.js");
 
                                 //ex. ['jpg', 'jpeg', 'png', 'gif'] or []
                                 var allowedFileExtensions = string.Join(", ", attribute.AllowedFileExtensions.Select(x => "'" + x.Trim() + "'").ToList());
@@ -205,7 +206,7 @@
                                         </ul>
                                     </div>
                                 </script>
-                                <script type="text/javascript" asp-location="Footer">
+                                <script asp-location="Footer">
                                     $(document).ready(function() {
                                         $("#@(controlId)uploader").fineUploader({
                                             request: {
@@ -227,7 +228,7 @@
                                             }
                                         });
 
-                                        $("#@(controlId + "remove")").click(function(e) {
+                                        $("#@(controlId + "remove")").on('click', function(e) {
                                             $("#@(controlId + "downloadurl")").html("");
                                             $("#@(controlId)").val('');
                                             $(this).hide();
@@ -279,9 +280,9 @@
                                         <input type="text" name="@(controlId)_@(attributeValue.Id)_qty" id="@(controlId)_@(attributeValue.Id)_qty" value="@(attributeValue.Quantity)" />
                                     </div>
                                 }
-                                <script type="text/javascript" asp-location="Footer">
+                                <script asp-location="Footer">
                                     $(document).ready(function() {
-                                        $('.attributes #color-squares-@(attribute.Id)').delegate('input', 'click', function(event) {
+                                        $('.attributes #color-squares-@(attribute.Id)').on('click', 'input', function(event) {
                                             $('.attributes #color-squares-@(attribute.Id)').find('li').removeClass('selected-value');
                                             $(this).closest('li').addClass('selected-value');
                                         });
@@ -320,9 +321,9 @@
                                         <input type="text" name="@(controlId)_@(attributeValue.Id)_qty" id="@(controlId)_@(attributeValue.Id)_qty" value="@(attributeValue.Quantity)" />
                                     </div>
                                 }
-                                <script type="text/javascript" asp-location="Footer">
+                                <script asp-location="Footer">
                                     $(document).ready(function() {
-                                        $('.attributes #image-squares-@(attribute.Id)').delegate('input', 'click', function(event) {
+                                        $('.attributes #image-squares-@(attribute.Id)').on('click', 'input', function(event) {
                                             $('.attributes #image-squares-@(attribute.Id)').find('li').removeClass('selected-value');
                                             $(this).closest('li').addClass('selected-value');
                                         });
@@ -335,7 +336,7 @@
                 </dd>
             }
         </dl>
-        <script type="text/javascript" asp-location="Footer">
+        <script asp-location="Footer">
             function showHideDropdownQuantity(id) {
                 $('select[name=' + id + '] > option').each(function() {
                     $('#' + id + '_' + this.value + '_qty_box').hide();
@@ -358,9 +359,7 @@
             };
         </script>
     </div>
-}
-@if (Model.Count > 0)
-{
+
     //dynamic update support
     var attributesHaveConditions = Model.Any(x => x.HasCondition);
     var attributesHaveAssociatedPictures = Model.Any(x => x.ProductId > 0);
@@ -372,12 +371,12 @@
         //generate change event script
         foreach (var attribute in Model)
         {
-            var controlId = $"product_attribute_{attribute.Id}";
+            var controlId = $"{NopCatalogDefaults.ProductAttributePrefix}{attribute.Id}";
             switch (attribute.AttributeControlType)
             {
                 case AttributeControlType.DropdownList:
                     {
-                        attributeChangeScriptsBuilder.AppendFormat("$('#{0}').change(function(){{{1}();}});\n", controlId, attributeChangeHandlerFuncName);
+                        attributeChangeScriptsBuilder.AppendFormat("$('#{0}').on('change', function(){{{1}();}});\n", controlId, attributeChangeHandlerFuncName);
                     }
                     break;
                 case AttributeControlType.RadioList:
@@ -386,7 +385,7 @@
                     {
                         foreach (var attributeValue in attribute.Values)
                         {
-                            attributeChangeScriptsBuilder.AppendFormat("$('#{0}_{1}').click(function(){{{2}();}});\n", controlId, attributeValue.Id, attributeChangeHandlerFuncName);
+                            attributeChangeScriptsBuilder.AppendFormat("$('#{0}_{1}').on('click', function(){{{2}();}});\n", controlId, attributeValue.Id, attributeChangeHandlerFuncName);
                         }
                     }
                     break;
@@ -395,7 +394,7 @@
                     {
                         foreach (var attributeValue in attribute.Values)
                         {
-                            attributeChangeScriptsBuilder.AppendFormat("$('#{0}_{1}').click(function(){{{2}();}});\n", controlId, attributeValue.Id, attributeChangeHandlerFuncName);
+                            attributeChangeScriptsBuilder.AppendFormat("$('#{0}_{1}').on('click', function(){{{2}();}});\n", controlId, attributeValue.Id, attributeChangeHandlerFuncName);
                         }
                     }
                     break;
@@ -411,16 +410,21 @@
 
         //render scripts
         //almost the same implementation is used in the \Views\Product\_RentalInfo.cshtml file
-        <script type="text/javascript" asp-location="Footer">
+        <script asp-location="Footer">
             function @(attributeChangeHandlerFuncName)() {
                 $.ajax({
                     cache: false,
-                    url: '@Html.Raw(Url.Action("productdetails_attributechange", "shoppingcart", new {productId = productId, validateAttributeConditions = attributesHaveConditions, loadPicture = attributesHaveAssociatedPictures }))',
+                    url: "@Html.Raw(Url.Action("productdetails_attributechange", "shoppingcart", new {productId = productId, validateAttributeConditions = attributesHaveConditions, loadPicture = attributesHaveAssociatedPictures }))",
                     data: $('#product-details-form').serialize(),
-                    type: 'post',
-                    success: function(data) {
+                    type: "POST",
+                    success: function (data, textStatus, jqXHR) {
                         if (data.price) {
                             $('.price-value-@productId').text(data.price);
+                        }
+                        if (data.basepricepangv) {
+                            $('#base-price-pangv-@productId').text(data.basepricepangv);
+                        } else {
+                            $('#base-price-pangv-@productId').hide();
                         }
                         if (data.sku) {
                             $('#sku-@productId').text(data.sku).parent(".sku").show();
@@ -442,14 +446,14 @@
                         }
                         if (data.enabledattributemappingids) {
                             for (var i = 0; i < data.enabledattributemappingids.length; i++) {
-                                $('#product_attribute_label_' + data.enabledattributemappingids[i]).show();
-                                $('#product_attribute_input_' + data.enabledattributemappingids[i]).show();
+                                $('#@(NopCatalogDefaults.ProductAttributePrefix)label_' + data.enabledattributemappingids[i]).show();
+                                $('#@(NopCatalogDefaults.ProductAttributePrefix)input_' + data.enabledattributemappingids[i]).show();
                             }
                         }
                         if (data.disabledattributemappingids) {
                             for (var i = 0; i < data.disabledattributemappingids.length; i++) {
-                                $('#product_attribute_label_' + data.disabledattributemappingids[i]).hide();
-                                $('#product_attribute_input_' + data.disabledattributemappingids[i]).hide();
+                                $('#@(NopCatalogDefaults.ProductAttributePrefix)label_' + data.disabledattributemappingids[i]).hide();
+                                $('#@(NopCatalogDefaults.ProductAttributePrefix)input_' + data.disabledattributemappingids[i]).hide();
                             }
                         }
                         if (data.pictureDefaultSizeUrl) {
@@ -461,7 +465,7 @@
                         if (data.message) {
                             alert(data.message);
                         }
-                        $.event.trigger({ type: "product_attributes_changed", changedData: data });
+                        $(document).trigger({ type: "product_attributes_changed", changedData: data });
                     }
                 });
             }

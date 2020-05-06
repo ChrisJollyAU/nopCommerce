@@ -1,18 +1,18 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Nop.Web.Areas.Admin.Extensions;
-using Nop.Web.Areas.Admin.Models.Messages;
 using Nop.Core.Domain.Messages;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
 using Nop.Services.Messages;
 using Nop.Services.Security;
 using Nop.Services.Stores;
+using Nop.Web.Areas.Admin.Factories;
+using Nop.Web.Areas.Admin.Infrastructure.Mapper.Extensions;
+using Nop.Web.Areas.Admin.Models.Messages;
 using Nop.Web.Framework.Controllers;
-using Nop.Web.Framework.Kendoui;
 using Nop.Web.Framework.Mvc.Filters;
 
 namespace Nop.Web.Areas.Admin.Controllers
@@ -21,49 +21,46 @@ namespace Nop.Web.Areas.Admin.Controllers
     {
         #region Fields
 
-        private readonly IMessageTemplateService _messageTemplateService;
-        private readonly IEmailAccountService _emailAccountService;
-        private readonly ILanguageService _languageService;
-        private readonly ILocalizedEntityService _localizedEntityService;
-        private readonly ILocalizationService _localizationService;
-        private readonly IMessageTokenProvider _messageTokenProvider;
-        private readonly IPermissionService _permissionService;
-        private readonly IStoreService _storeService;
-        private readonly IStoreMappingService _storeMappingService;
-        private readonly IWorkflowMessageService _workflowMessageService;
         private readonly ICustomerActivityService _customerActivityService;
+        private readonly ILocalizationService _localizationService;
+        private readonly ILocalizedEntityService _localizedEntityService;
+        private readonly IMessageTemplateModelFactory _messageTemplateModelFactory;
+        private readonly IMessageTemplateService _messageTemplateService;
+        private readonly INotificationService _notificationService;
+        private readonly IPermissionService _permissionService;
+        private readonly IStoreMappingService _storeMappingService;
+        private readonly IStoreService _storeService;
+        private readonly IWorkflowMessageService _workflowMessageService;
 
         #endregion Fields
 
         #region Ctor
 
-        public MessageTemplateController(IMessageTemplateService messageTemplateService, 
-            IEmailAccountService emailAccountService,
-            ILanguageService languageService, 
+        public MessageTemplateController(ICustomerActivityService customerActivityService,
+            ILocalizationService localizationService,
             ILocalizedEntityService localizedEntityService,
-            ILocalizationService localizationService, 
-            IMessageTokenProvider messageTokenProvider, 
+            IMessageTemplateModelFactory messageTemplateModelFactory,
+            IMessageTemplateService messageTemplateService,
+            INotificationService notificationService,
             IPermissionService permissionService,
-            IStoreService storeService,
             IStoreMappingService storeMappingService,
-            IWorkflowMessageService workflowMessageService,
-            ICustomerActivityService customerActivityService)
+            IStoreService storeService,
+            IWorkflowMessageService workflowMessageService)
         {
-            this._messageTemplateService = messageTemplateService;
-            this._emailAccountService = emailAccountService;
-            this._languageService = languageService;
-            this._localizedEntityService = localizedEntityService;
-            this._localizationService = localizationService;
-            this._messageTokenProvider = messageTokenProvider;
-            this._permissionService = permissionService;
-            this._storeService = storeService;
-            this._storeMappingService = storeMappingService;
-            this._workflowMessageService = workflowMessageService;
-            this._customerActivityService = customerActivityService;
+            _customerActivityService = customerActivityService;
+            _localizationService = localizationService;
+            _localizedEntityService = localizedEntityService;
+            _messageTemplateModelFactory = messageTemplateModelFactory;
+            _messageTemplateService = messageTemplateService;
+            _notificationService = notificationService;
+            _permissionService = permissionService;
+            _storeMappingService = storeMappingService;
+            _storeService = storeService;
+            _workflowMessageService = workflowMessageService;
         }
 
         #endregion
-        
+
         #region Utilities
 
         protected virtual void UpdateLocales(MessageTemplate mt, MessageTemplateModel model)
@@ -91,30 +88,11 @@ namespace Nop.Web.Areas.Admin.Controllers
                     localized.LanguageId);
             }
         }
-        
-        protected virtual void PrepareStoresMappingModel(MessageTemplateModel model, MessageTemplate messageTemplate, bool excludeProperties)
-        {
-            if (model == null)
-                throw new ArgumentNullException(nameof(model));
-
-            if (!excludeProperties && messageTemplate != null)
-                model.SelectedStoreIds = _storeMappingService.GetStoresIdsWithAccess(messageTemplate).ToList();
-
-            var allStores = _storeService.GetAllStores();
-            foreach (var store in allStores)
-            {
-                model.AvailableStores.Add(new SelectListItem
-                {
-                    Text = store.Name,
-                    Value = store.Id.ToString(),
-                    Selected = model.SelectedStoreIds.Contains(store.Id)
-                });
-            }
-        }
 
         protected virtual void SaveStoreMappings(MessageTemplate messageTemplate, MessageTemplateModel model)
         {
             messageTemplate.LimitedToStores = model.SelectedStoreIds.Any();
+            _messageTemplateService.UpdateMessageTemplate(messageTemplate);
 
             var existingStoreMappings = _storeMappingService.GetStoreMappings(messageTemplate);
             var allStores = _storeService.GetAllStores();
@@ -137,7 +115,7 @@ namespace Nop.Web.Areas.Admin.Controllers
         }
 
         #endregion
-        
+
         #region Methods
 
         public virtual IActionResult Index()
@@ -150,44 +128,22 @@ namespace Nop.Web.Areas.Admin.Controllers
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageMessageTemplates))
                 return AccessDeniedView();
 
-            var model = new MessageTemplateListModel();
-            //stores
-            model.AvailableStores.Add(new SelectListItem { Text = _localizationService.GetResource("Admin.Common.All"), Value = "0" });
-            foreach (var s in _storeService.GetAllStores())
-                model.AvailableStores.Add(new SelectListItem { Text = s.Name, Value = s.Id.ToString() });
-            
+            //prepare model
+            var model = _messageTemplateModelFactory.PrepareMessageTemplateSearchModel(new MessageTemplateSearchModel());
+
             return View(model);
         }
 
         [HttpPost]
-        public virtual IActionResult List(DataSourceRequest command, MessageTemplateListModel model)
+        public virtual IActionResult List(MessageTemplateSearchModel searchModel)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageMessageTemplates))
-                return AccessDeniedKendoGridJson();
+                return AccessDeniedDataTablesJson();
 
-            var messageTemplates = _messageTemplateService.GetAllMessageTemplates(model.SearchStoreId);
-            var gridModel = new DataSourceResult
-            {
-                Data = messageTemplates.Select(x =>
-                {
-                    var templateModel = x.ToModel();
-                    PrepareStoresMappingModel(templateModel, x, false);
-                    var stores = _storeService
-                            .GetAllStores()
-                            .Where(s => !x.LimitedToStores || templateModel.SelectedStoreIds.Contains(s.Id))
-                            .ToList();
-                    for (var i = 0; i < stores.Count; i++)
-                    {
-                        templateModel.ListOfStores += stores[i].Name;
-                        if (i != stores.Count - 1)
-                            templateModel.ListOfStores += ", ";
-                    }
-                    return templateModel;
-                }),
-                Total = messageTemplates.Count
-            };
+            //prepare model
+            var model = _messageTemplateModelFactory.PrepareMessageTemplateListModel(searchModel);
 
-            return Json(gridModel);
+            return Json(model);
         }
 
         public virtual IActionResult Edit(int id)
@@ -195,47 +151,13 @@ namespace Nop.Web.Areas.Admin.Controllers
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageMessageTemplates))
                 return AccessDeniedView();
 
+            //try to get a message template with the specified id
             var messageTemplate = _messageTemplateService.GetMessageTemplateById(id);
             if (messageTemplate == null)
-                //no message template found with the specified id
                 return RedirectToAction("List");
-            
-            var model = messageTemplate.ToModel();
-            model.SendImmediately = !model.DelayBeforeSend.HasValue;
-            model.HasAttachedDownload = model.AttachedDownloadId > 0;
-            var allowedTokens = string.Join(", ", _messageTokenProvider.GetListOfAllowedTokens(messageTemplate.GetTokenGroups()));
-            model.AllowedTokens = $"{allowedTokens}{Environment.NewLine}{Environment.NewLine}{_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Tokens.ConditionalStatement")}{Environment.NewLine}";
 
-            //available email accounts
-            foreach (var ea in _emailAccountService.GetAllEmailAccounts())
-                model.AvailableEmailAccounts.Add(new SelectListItem { Text = ea.DisplayName, Value = ea.Id.ToString() });
-
-            //store
-            PrepareStoresMappingModel(model, messageTemplate, false);
-
-            //locales
-            AddLocales(_languageService, model.Locales, (locale, languageId) =>
-            {
-                locale.BccEmailAddresses = messageTemplate.GetLocalized(x => x.BccEmailAddresses, languageId, false, false);
-                locale.Subject = messageTemplate.GetLocalized(x => x.Subject, languageId, false, false);
-                locale.Body = messageTemplate.GetLocalized(x => x.Body, languageId, false, false);
-                locale.EmailAccountId = messageTemplate.GetLocalized(x => x.EmailAccountId, languageId, false, false);
-
-                //available email accounts (we add "Standard" value for localizable field)
-                locale.AvailableEmailAccounts.Add(new SelectListItem
-                {
-                    Text = _localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Fields.EmailAccount.Standard"),
-                    Value = "0"
-                });
-
-                foreach (var ea in _emailAccountService.GetAllEmailAccounts())
-                    locale.AvailableEmailAccounts.Add(new SelectListItem
-                    {
-                        Text = ea.DisplayName,
-                        Value = ea.Id.ToString(),
-                        Selected =  ea.Id == locale.EmailAccountId
-                    });
-            });
+            //prepare model
+            var model = _messageTemplateModelFactory.PrepareMessageTemplateModel(null, messageTemplate);
 
             return View(model);
         }
@@ -247,11 +169,11 @@ namespace Nop.Web.Areas.Admin.Controllers
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageMessageTemplates))
                 return AccessDeniedView();
 
+            //try to get a message template with the specified id
             var messageTemplate = _messageTemplateService.GetMessageTemplateById(model.Id);
             if (messageTemplate == null)
-                //no message template found with the specified id
                 return RedirectToAction("List");
-            
+
             if (ModelState.IsValid)
             {
                 messageTemplate = model.ToEntity(messageTemplate);
@@ -264,7 +186,8 @@ namespace Nop.Web.Areas.Admin.Controllers
                 _messageTemplateService.UpdateMessageTemplate(messageTemplate);
 
                 //activity log
-                _customerActivityService.InsertActivity("EditMessageTemplate", _localizationService.GetResource("ActivityLog.EditMessageTemplate"), messageTemplate.Id);
+                _customerActivityService.InsertActivity("EditMessageTemplate",
+                    string.Format(_localizationService.GetResource("ActivityLog.EditMessageTemplate"), messageTemplate.Id), messageTemplate);
 
                 //stores
                 SaveStoreMappings(messageTemplate, model);
@@ -272,44 +195,18 @@ namespace Nop.Web.Areas.Admin.Controllers
                 //locales
                 UpdateLocales(messageTemplate, model);
 
-                SuccessNotification(_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Updated"));
-                
-                if (continueEditing)
-                {
-                    return RedirectToAction("Edit",  new {id = messageTemplate.Id});
-                }
-                return RedirectToAction("List");
+                _notificationService.SuccessNotification(_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Updated"));
+
+                if (!continueEditing)
+                    return RedirectToAction("List");
+
+                return RedirectToAction("Edit", new { id = messageTemplate.Id });
             }
-            
+
+            //prepare model
+            model = _messageTemplateModelFactory.PrepareMessageTemplateModel(model, messageTemplate, true);
+
             //if we got this far, something failed, redisplay form
-            model.HasAttachedDownload = model.AttachedDownloadId > 0;
-            var allowedTokens = string.Join(", ", _messageTokenProvider.GetListOfAllowedTokens(messageTemplate.GetTokenGroups()));
-            model.AllowedTokens = $"{allowedTokens}{Environment.NewLine}{Environment.NewLine}{_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Tokens.ConditionalStatement")}{Environment.NewLine}";
-
-            //available email accounts
-            foreach (var ea in _emailAccountService.GetAllEmailAccounts())
-                model.AvailableEmailAccounts.Add(new SelectListItem { Text = ea.DisplayName, Value = ea.Id.ToString() });
-
-            //locales (update email account dropdownlists)
-            foreach (var locale in model.Locales)
-            {
-                //available email accounts (we add "Standard" value for localizable field)
-                locale.AvailableEmailAccounts.Add(new SelectListItem
-                {
-                    Text = _localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Fields.EmailAccount.Standard"),
-                    Value = "0"
-                });
-                foreach (var ea in _emailAccountService.GetAllEmailAccounts())
-                    locale.AvailableEmailAccounts.Add(new SelectListItem
-                    {
-                        Text = ea.DisplayName,
-                        Value = ea.Id.ToString(),
-                        Selected = ea.Id == locale.EmailAccountId
-                    });
-            }
-
-            //store
-            PrepareStoresMappingModel(model, messageTemplate, true);
             return View(model);
         }
 
@@ -319,17 +216,19 @@ namespace Nop.Web.Areas.Admin.Controllers
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageMessageTemplates))
                 return AccessDeniedView();
 
+            //try to get a message template with the specified id
             var messageTemplate = _messageTemplateService.GetMessageTemplateById(id);
             if (messageTemplate == null)
-                //no message template found with the specified id
                 return RedirectToAction("List");
 
             _messageTemplateService.DeleteMessageTemplate(messageTemplate);
 
             //activity log
-            _customerActivityService.InsertActivity("DeleteMessageTemplate", _localizationService.GetResource("ActivityLog.DeleteMessageTemplate"), messageTemplate.Id);
+            _customerActivityService.InsertActivity("DeleteMessageTemplate",
+                string.Format(_localizationService.GetResource("ActivityLog.DeleteMessageTemplate"), messageTemplate.Id), messageTemplate);
 
-            SuccessNotification(_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Deleted"));
+            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Deleted"));
+
             return RedirectToAction("List");
         }
 
@@ -340,20 +239,22 @@ namespace Nop.Web.Areas.Admin.Controllers
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageMessageTemplates))
                 return AccessDeniedView();
 
+            //try to get a message template with the specified id
             var messageTemplate = _messageTemplateService.GetMessageTemplateById(model.Id);
             if (messageTemplate == null)
-                //No message template found with the specified id
                 return RedirectToAction("List");
 
             try
             {
                 var newMessageTemplate = _messageTemplateService.CopyMessageTemplate(messageTemplate);
-                SuccessNotification(_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Copied"));
+
+                _notificationService.SuccessNotification(_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Copied"));
+
                 return RedirectToAction("Edit", new { id = newMessageTemplate.Id });
             }
             catch (Exception exc)
             {
-                ErrorNotification(exc.Message);
+                _notificationService.ErrorNotification(exc.Message);
                 return RedirectToAction("Edit", new { id = model.Id });
             }
         }
@@ -363,52 +264,44 @@ namespace Nop.Web.Areas.Admin.Controllers
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageMessageTemplates))
                 return AccessDeniedView();
 
+            //try to get a message template with the specified id
             var messageTemplate = _messageTemplateService.GetMessageTemplateById(id);
             if (messageTemplate == null)
-                //No message template found with the specified id
                 return RedirectToAction("List");
 
-            var model = new TestMessageTemplateModel
-            {
-                Id = messageTemplate.Id,
-                LanguageId = languageId
-            };
-
-            //filter tokens to the current template
-            var subject = messageTemplate.GetLocalized(mt => mt.Subject, languageId);
-            var body = messageTemplate.GetLocalized(mt => mt.Body, languageId);
-            model.Tokens = _messageTokenProvider.GetListOfAllowedTokens().Where(x => subject.Contains(x) || body.Contains(x)).ToList();
+            //prepare model
+            var model = _messageTemplateModelFactory
+                .PrepareTestMessageTemplateModel(new TestMessageTemplateModel(), messageTemplate, languageId);
 
             return View(model);
         }
 
         [HttpPost, ActionName("TestTemplate")]
         [FormValueRequired("send-test")]
-        public virtual IActionResult TestTemplate(TestMessageTemplateModel model)
+        public virtual IActionResult TestTemplate(TestMessageTemplateModel model, IFormCollection form)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageMessageTemplates))
                 return AccessDeniedView();
 
+            //try to get a message template with the specified id
             var messageTemplate = _messageTemplateService.GetMessageTemplateById(model.Id);
             if (messageTemplate == null)
-                //No message template found with the specified id
                 return RedirectToAction("List");
 
             var tokens = new List<Token>();
-            var form = model.Form;
             foreach (var formKey in form.Keys)
                 if (formKey.StartsWith("token_", StringComparison.InvariantCultureIgnoreCase))
                 {
-                    var tokenKey = formKey.Substring("token_".Length).Replace("%", "");
-                    var stringValue = form[formKey];
+                    var tokenKey = formKey.Substring("token_".Length).Replace("%", string.Empty);
+                    var stringValue = form[formKey].ToString();
 
                     //try get non-string value
                     object tokenValue;
-                    if (bool.TryParse(stringValue, out bool boolValue))
+                    if (bool.TryParse(stringValue, out var boolValue))
                         tokenValue = boolValue;
-                    else if (int.TryParse(stringValue, out int intValue))
+                    else if (int.TryParse(stringValue, out var intValue))
                         tokenValue = intValue;
-                    else if (decimal.TryParse(stringValue, out decimal decimalValue))
+                    else if (decimal.TryParse(stringValue, out var decimalValue))
                         tokenValue = decimalValue;
                     else
                         tokenValue = stringValue;
@@ -420,10 +313,10 @@ namespace Nop.Web.Areas.Admin.Controllers
 
             if (ModelState.IsValid)
             {
-                SuccessNotification(_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Test.Success"));
+                _notificationService.SuccessNotification(_localizationService.GetResource("Admin.ContentManagement.MessageTemplates.Test.Success"));
             }
 
-            return RedirectToAction("Edit", new {id = messageTemplate.Id});
+            return RedirectToAction("Edit", new { id = messageTemplate.Id });
         }
 
         #endregion

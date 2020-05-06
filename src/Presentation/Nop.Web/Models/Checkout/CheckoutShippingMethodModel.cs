@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using Nop.Core.Domain.Shipping;
-using Nop.Web.Framework.Mvc.Models;
+using Nop.Web.Framework.Models;
 
 namespace Nop.Web.Models.Checkout
 {
@@ -18,6 +18,9 @@ namespace Nop.Web.Models.Checkout
 
         public IList<string> Warnings { get; set; }
 
+        public bool DisplayPickupInStore { get; set; }
+        public CheckoutPickupPointsModel PickupPointsModel { get; set; }
+
         #region Nested classes
 
         public partial class ShippingMethodModel : BaseNopModel
@@ -28,7 +31,7 @@ namespace Nop.Web.Models.Checkout
             public string Fee { get; set; }
             public bool Selected { get; set; }
 
-            public ShippingOption ShippingOption { get; set; } 
+            public ShippingOption ShippingOption { get; set; }
         }
 
         #endregion

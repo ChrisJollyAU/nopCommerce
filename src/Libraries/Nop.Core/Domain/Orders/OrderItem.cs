@@ -1,6 +1,4 @@
-using System;
-using System.Collections.Generic;
-using Nop.Core.Domain.Catalog;
+﻿using System;
 
 namespace Nop.Core.Domain.Orders
 {
@@ -9,8 +7,6 @@ namespace Nop.Core.Domain.Orders
     /// </summary>
     public partial class OrderItem : BaseEntity
     {
-        private ICollection<GiftCard> _associatedGiftCards;
-
         /// <summary>
         /// Gets or sets the order item identifier
         /// </summary>
@@ -32,32 +28,32 @@ namespace Nop.Core.Domain.Orders
         public int Quantity { get; set; }
 
         /// <summary>
-        /// Gets or sets the unit price in primary store currency (incl tax)
+        /// Gets or sets the unit price in primary store currency (include tax)
         /// </summary>
         public decimal UnitPriceInclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the unit price in primary store currency (excl tax)
+        /// Gets or sets the unit price in primary store currency (exclude tax)
         /// </summary>
         public decimal UnitPriceExclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the price in primary store currency (incl tax)
+        /// Gets or sets the price in primary store currency (include tax)
         /// </summary>
         public decimal PriceInclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the price in primary store currency (excl tax)
+        /// Gets or sets the price in primary store currency (exclude tax)
         /// </summary>
         public decimal PriceExclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the discount amount (incl tax)
+        /// Gets or sets the discount amount (include tax)
         /// </summary>
         public decimal DiscountAmountInclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the discount amount (excl tax)
+        /// Gets or sets the discount amount (exclude tax)
         /// </summary>
         public decimal DiscountAmountExclTax { get; set; }
 
@@ -106,24 +102,5 @@ namespace Nop.Core.Domain.Orders
         /// Gets or sets the rental product end date (null if it's not a rental product)
         /// </summary>
         public DateTime? RentalEndDateUtc { get; set; }
-
-        /// <summary>
-        /// Gets the order
-        /// </summary>
-        public virtual Order Order { get; set; }
-
-        /// <summary>
-        /// Gets the product
-        /// </summary>
-        public virtual Product Product { get; set; }
-
-        /// <summary>
-        /// Gets or sets the associated gift card
-        /// </summary>
-        public virtual ICollection<GiftCard> AssociatedGiftCards
-        {
-            get { return _associatedGiftCards ?? (_associatedGiftCards = new List<GiftCard>()); }
-            protected set { _associatedGiftCards = value; }
-        }
     }
 }

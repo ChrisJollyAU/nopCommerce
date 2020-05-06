@@ -1,4 +1,5 @@
-﻿using Nop.Core.Domain.Catalog;
+﻿using FluentAssertions;
+using Nop.Core.Domain.Catalog;
 using NUnit.Framework;
 
 namespace Nop.Core.Tests.Domain
@@ -12,7 +13,7 @@ namespace Nop.Core.Tests.Domain
             var p1 = new Product();
             var p2 = new Product();
 
-            Assert.AreNotEqual(p1, p2, "Different transient entities should not be equal");
+            p1.Should().NotBe(p2, "Different transient entities should not be equal");
         }
 
         [Test]
@@ -21,17 +22,7 @@ namespace Nop.Core.Tests.Domain
             var p1 = new Product();
             var p2 = p1;
 
-            Assert.AreEqual(p1, p2, "Two references to the same transient entity should be equal");
-        }
-
-        [Test]
-        public void Two_references_with_the_same_id_should_be_equal() {
-            
-            var id = 10;
-            var p1 = new Product { Id = id };
-            var p2 = new Product { Id = id };
-
-            Assert.AreEqual(p1, p2, "Entities with the same id should be equal");
+            p1.Should().Be(p2, "Two references to the same transient entity should be equal");
         }
 
         [Test]
@@ -40,7 +31,7 @@ namespace Nop.Core.Tests.Domain
             var p1 = new Product { Id = 2 };
             var p2 = new Product { Id = 5 };
 
-            Assert.AreNotEqual(p1, p2, "Entities with different ids should not be equal");
+            p1.Should().NotBe(p2, "Entities with different ids should not be equal");
         }
 
         [Test]
@@ -49,7 +40,7 @@ namespace Nop.Core.Tests.Domain
             var p1 = new Product { Id = 1 };
             var p2 = new Product();
 
-            Assert.AreNotEqual(p1, p2, "Entity and transient entity should not be equal");
+            p1.Should().NotBe(p2, "Entity and transient entity should not be equal");
         }
 
         [Test]
@@ -59,21 +50,9 @@ namespace Nop.Core.Tests.Domain
 
             var c1 = new Category { Id = id };
 
-            Assert.AreNotEqual(p1, c1, "Entities of different types should not be equal, even if they have the same id");
+            p1.Should().NotBe(c1, "Entities of different types should not be equal, even if they have the same id");
         }
 
-        [Test]
-        public void Equality_works_using_operators() {
-
-            var p1 = new Product { Id = 1 };
-            var p2 = new Product { Id = 1 };
-
-            Assert.IsTrue(p1 == p2);
-
-            var p3 = new Product();
-
-            Assert.IsTrue(p1 != p3);
-        }
     }
 
 }

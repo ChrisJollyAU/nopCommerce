@@ -4,35 +4,32 @@ using Nop.Services.Customers;
 using Nop.Services.Security;
 using Nop.Web.Factories;
 using Nop.Web.Framework;
-using Nop.Web.Framework.Mvc.Filters;
-using Nop.Web.Framework.Security;
 
 namespace Nop.Web.Controllers
 {
-    [HttpsRequirement(SslRequirement.No)]
     public partial class ProfileController : BasePublicController
     {
-        private readonly IProfileModelFactory _profileModelFactory;
+        private readonly CustomerSettings _customerSettings;
         private readonly ICustomerService _customerService;
         private readonly IPermissionService _permissionService;
-        private readonly CustomerSettings _customerSettings;
+        private readonly IProfileModelFactory _profileModelFactory;
 
-        public ProfileController(IProfileModelFactory profileModelFactory,
+        public ProfileController(CustomerSettings customerSettings,
             ICustomerService customerService,
             IPermissionService permissionService,
-            CustomerSettings customerSettings)
+            IProfileModelFactory profileModelFactory)
         {
-            this._profileModelFactory = profileModelFactory;
-            this._customerService = customerService;
-            this._permissionService = permissionService;
-            this._customerSettings = customerSettings;
+            _customerSettings = customerSettings;
+            _customerService = customerService;
+            _permissionService = permissionService;
+            _profileModelFactory = profileModelFactory;
         }
 
         public virtual IActionResult Index(int? id, int? pageNumber)
         {
             if (!_customerSettings.AllowViewingProfiles)
             {
-                return RedirectToRoute("HomePage");
+                return RedirectToRoute("Homepage");
             }
 
             var customerId = 0;
@@ -42,9 +39,9 @@ namespace Nop.Web.Controllers
             }
 
             var customer = _customerService.GetCustomerById(customerId);
-            if (customer == null || customer.IsGuest())
+            if (customer == null || _customerService.IsGuest(customer))
             {
-                return RedirectToRoute("HomePage");
+                return RedirectToRoute("Homepage");
             }
 
             //display "edit" (manage) link

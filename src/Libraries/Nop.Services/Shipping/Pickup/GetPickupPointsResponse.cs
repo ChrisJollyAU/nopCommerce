@@ -8,9 +8,6 @@ namespace Nop.Services.Shipping.Pickup
     /// </summary>
     public partial class GetPickupPointsResponse
     {
-        /// <summary>
-        /// Ctor
-        /// </summary>
         public GetPickupPointsResponse()
         {
             Errors = new List<string>();
@@ -30,10 +27,7 @@ namespace Nop.Services.Shipping.Pickup
         /// <summary>
         /// Gets a value indicating whether request has been completed successfully
         /// </summary>
-        public bool Success
-        {
-            get { return Errors.Count == 0; }
-        }
+        public bool Success => Errors.Count == 0;
 
         /// <summary>
         /// Add error

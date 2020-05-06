@@ -1,16 +1,13 @@
-using System;
-using System.Collections.Generic;
-using Nop.Core.Domain.Localization;
+﻿using System;
+using Nop.Core.Domain.Stores;
 
 namespace Nop.Core.Domain.Polls
 {
     /// <summary>
     /// Represents a poll
     /// </summary>
-    public partial class Poll : BaseEntity
+    public partial class Poll : BaseEntity, IStoreMappingSupported
     {
-        private ICollection<PollAnswer> _pollAnswers;
-
         /// <summary>
         /// Gets or sets the language identifier
         /// </summary>
@@ -34,7 +31,7 @@ namespace Nop.Core.Domain.Polls
         /// <summary>
         /// Gets or sets a value indicating whether the entity should be shown on home page
         /// </summary>
-        public bool ShowOnHomePage { get; set; }
+        public bool ShowOnHomepage { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether the anonymous votes are allowed
@@ -47,6 +44,11 @@ namespace Nop.Core.Domain.Polls
         public int DisplayOrder { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the entity is limited/restricted to certain stores
+        /// </summary>
+        public bool LimitedToStores { get; set; }
+
+        /// <summary>
         /// Gets or sets the poll start date and time
         /// </summary>
         public DateTime? StartDateUtc { get; set; }
@@ -55,19 +57,5 @@ namespace Nop.Core.Domain.Polls
         /// Gets or sets the poll end date and time
         /// </summary>
         public DateTime? EndDateUtc { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the news comments
-        /// </summary>
-        public virtual ICollection<PollAnswer> PollAnswers
-        {
-            get { return _pollAnswers ?? (_pollAnswers = new List<PollAnswer>()); }
-            protected set { _pollAnswers = value; }
-        }
-        
-        /// <summary>
-        /// Gets or sets the language
-        /// </summary>
-        public virtual Language Language { get; set; }
     }
 }

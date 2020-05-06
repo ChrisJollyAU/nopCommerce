@@ -7,10 +7,9 @@ namespace Nop.Core.Domain.Configuration
     /// </summary>
     public partial class Setting : BaseEntity, ILocalizedEntity
     {
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        public Setting() { }
+        public Setting()
+        {
+        }
 
         /// <summary>
         /// Ctor
@@ -18,12 +17,13 @@ namespace Nop.Core.Domain.Configuration
         /// <param name="name">Name</param>
         /// <param name="value">Value</param>
         /// <param name="storeId">Store identifier</param>
-        public Setting(string name, string value, int storeId = 0) {
-            this.Name = name;
-            this.Value = value;
-            this.StoreId = storeId;
+        public Setting(string name, string value, int storeId = 0)
+        {
+            Name = name;
+            Value = value;
+            StoreId = storeId;
         }
-        
+
         /// <summary>
         /// Gets or sets the name
         /// </summary>

@@ -1,6 +1,10 @@
+﻿using System;
 using System.Linq;
-using System.Linq.Dynamic;
+using System.Linq.Dynamic.Core;
 using FluentValidation;
+using LinqToDB;
+using LinqToDB.Mapping;
+using Nop.Core;
 using Nop.Core.Infrastructure;
 using Nop.Data;
 using Nop.Services.Localization;
@@ -10,89 +14,117 @@ namespace Nop.Web.Framework.Validators
     /// <summary>
     /// Base class for validators
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    public abstract class BaseNopValidator<T> : AbstractValidator<T> where T : class
+    /// <typeparam name="TModel">Type of model being validated</typeparam>
+    public abstract class BaseNopValidator<TModel> : AbstractValidator<TModel> where TModel : class
     {
-        /// <summary>
-        /// Ctor
-        /// </summary>
+        #region Ctor
+
         protected BaseNopValidator()
         {
             PostInitialize();
         }
 
+        #endregion
+
+        #region Utilities
+
         /// <summary>
-        /// Developers can override this method in custom partial classes
-        /// in order to add some custom initialization code to constructors
+        /// Developers can override this method in custom partial classes in order to add some custom initialization code to constructors
         /// </summary>
         protected virtual void PostInitialize()
         {
-
         }
 
         /// <summary>
         /// Sets validation rule(s) to appropriate database model
         /// </summary>
-        /// <typeparam name="TObject">Object type</typeparam>
-        /// <param name="dbContext">Database context</param>
+        /// <typeparam name="TEntity">Entity type</typeparam>
+        /// <param name="dataProvider">Data provider</param>
         /// <param name="filterStringPropertyNames">Properties to skip</param>
-        protected virtual void SetDatabaseValidationRules<TObject>(IDbContext dbContext, params string[] filterStringPropertyNames)
+        protected virtual void SetDatabaseValidationRules<TEntity>(INopDataProvider dataProvider, params string[] filterStringPropertyNames)
+            where TEntity : BaseEntity
         {
-            SetStringPropertiesMaxLength<TObject>(dbContext, filterStringPropertyNames);
-            SetDecimalMaxValue<TObject>(dbContext);
+            if (dataProvider is null)
+                throw new ArgumentNullException(nameof(dataProvider));
+
+            var entityDescriptor = dataProvider.GetEntityDescriptor<TEntity>();
+
+            SetStringPropertiesMaxLength(entityDescriptor, filterStringPropertyNames);
+            SetDecimalMaxValue(entityDescriptor);
         }
 
         /// <summary>
         /// Sets length validation rule(s) to string properties according to appropriate database model
         /// </summary>
-        /// <typeparam name="TObject">Object type</typeparam>
-        /// <param name="dbContext">Database context</param>
+        /// <param name="entityDescriptor">Entity descriptor</param>
         /// <param name="filterPropertyNames">Properties to skip</param>
-        protected virtual void SetStringPropertiesMaxLength<TObject>(IDbContext dbContext, params string[] filterPropertyNames)
+        protected virtual void SetStringPropertiesMaxLength(EntityDescriptor entityDescriptor, params string[] filterPropertyNames)
         {
-            if (dbContext == null)
+            if (entityDescriptor is null)
                 return;
 
-            var dbObjectType = typeof(TObject);
+            //filter model properties for which need to get max lengths
+            var modelPropertyNames = typeof(TModel).GetProperties()
+                .Where(property => property.PropertyType == typeof(string) && !filterPropertyNames.Contains(property.Name))
+                .Select(property => property.Name).ToList();
 
-            var names = typeof(T).GetProperties()
-                .Where(p => p.PropertyType == typeof(string) && !filterPropertyNames.Contains(p.Name))
-                .Select(p => p.Name).ToArray();
+            //get max length of these properties
+            var columnsMaxLengths = entityDescriptor.Columns.Where(column =>
+                modelPropertyNames.Contains(column.ColumnName) && column.MemberType == typeof(string) && column.Length.HasValue);
 
-            var maxLength = dbContext.GetColumnsMaxLength(dbObjectType.Name, names);
-            var expression = maxLength.Keys.ToDictionary(name => name, name => DynamicExpression.ParseLambda<T, string>(name, null));
-
-            foreach (var expr in expression)
+            //create expressions for the validation rules
+            var maxLengthExpressions = columnsMaxLengths.Select(property => new
             {
-                RuleFor(expr.Value).Length(0, maxLength[expr.Key]);
+                MaxLength = property.Length.Value,
+                // We must using identifiers of the form @SomeName to avoid problems with parsing fields that match reserved words https://github.com/StefH/System.Linq.Dynamic.Core/wiki/Dynamic-Expressions#substitution-values
+                Expression = DynamicExpressionParser.ParseLambda<TModel, string>(null, false, "@" + property.ColumnName)
+            }).ToList();
+
+            //define string length validation rules
+            foreach (var expression in maxLengthExpressions)
+            {
+                RuleFor(expression.Expression).Length(0, expression.MaxLength);
             }
         }
 
         /// <summary>
         /// Sets max value validation rule(s) to decimal properties according to appropriate database model
         /// </summary>
-        /// <typeparam name="TObject">Object type</typeparam>
-        /// <param name="dbContext">Database context</param>
-        protected virtual void SetDecimalMaxValue<TObject>(IDbContext dbContext)
+        /// <param name="entityDescriptor">Entity descriptor</param>
+        protected virtual void SetDecimalMaxValue(EntityDescriptor entityDescriptor)
         {
-            var localizationService = EngineContext.Current.Resolve<ILocalizationService>();
-
-            if (dbContext == null)
+            if (entityDescriptor is null)
                 return;
 
-            var dbObjectType = typeof(TObject);
+            //filter model properties for which need to get max values
+            var modelPropertyNames = typeof(TModel).GetProperties()
+                .Where(property => property.PropertyType == typeof(decimal))
+                .Select(property => property.Name).ToList();
 
-            var names = typeof(T).GetProperties()
-                .Where(p => p.PropertyType == typeof(decimal))
-                .Select(p => p.Name).ToArray();
+            //get max values of these properties
+            var decimalColumnsMaxValues = entityDescriptor.Columns.Where(column =>
+                modelPropertyNames.Contains(column.ColumnName) &&
+                column.DataType == DataType.Decimal && column.Length.HasValue && column.Precision.HasValue);
 
-            var maxValues = dbContext.GetDecimalMaxValue(dbObjectType.Name, names);
-            var expression = maxValues.Keys.ToDictionary(name => name, name => DynamicExpression.ParseLambda<T, decimal>(name, null));
+            if (!decimalColumnsMaxValues.Any())
+                return;
 
-            foreach (var expr in expression)
+            //create expressions for the validation rules
+            var maxValueExpressions = decimalColumnsMaxValues.Select(column => new
             {
-                RuleFor(expr.Value).IsDecimal(maxValues[expr.Key]).WithMessage(string.Format(localizationService.GetResource("Nop.Web.Framework.Validators.MaxDecimal"), maxValues[expr.Key] - 1));
+                MaxValue = (decimal)Math.Pow(10, column.Length.Value - column.Precision.Value),
+                Expression = DynamicExpressionParser.ParseLambda<TModel, decimal>(null, false, column.ColumnName)
+            }).ToList();
+
+            //define decimal validation rules
+            var localizationService = EngineContext.Current.Resolve<ILocalizationService>();
+            foreach (var expression in maxValueExpressions)
+            {
+                RuleFor(expression.Expression).IsDecimal(expression.MaxValue)
+                    .WithMessage(string.Format(localizationService.GetResource("Nop.Web.Framework.Validators.MaxDecimal"), expression.MaxValue - 1));
             }
         }
+
+        #endregion
     }
 }

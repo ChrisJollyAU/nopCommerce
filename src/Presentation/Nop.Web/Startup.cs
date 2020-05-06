@@ -1,8 +1,10 @@
-﻿using System;
+﻿using Autofac;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Nop.Core.Configuration;
+using Nop.Core.Infrastructure;
 using Nop.Web.Framework.Infrastructure.Extensions;
 
 namespace Nop.Web
@@ -12,25 +14,21 @@ namespace Nop.Web
     /// </summary>
     public class Startup
     {
-        #region Properties
+        #region Fields
 
-        /// <summary>
-        /// Get configuration root of the application
-        /// </summary>
-        public IConfigurationRoot Configuration { get; }
+        private readonly IConfiguration _configuration;
+        private readonly IWebHostEnvironment _webHostEnvironment;
+        private IEngine _engine;
+        private NopConfig _nopConfig;
 
         #endregion
 
         #region Ctor
 
-        public Startup(IHostingEnvironment environment)
+        public Startup(IConfiguration configuration, IWebHostEnvironment webHostEnvironment)
         {
-            //create configuration
-            Configuration = new ConfigurationBuilder()
-                .SetBasePath(environment.ContentRootPath)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-                .AddEnvironmentVariables()
-                .Build();
+            _configuration = configuration;
+            _webHostEnvironment = webHostEnvironment;
         }
 
         #endregion
@@ -39,9 +37,14 @@ namespace Nop.Web
         /// Add services to the application and configure service provider
         /// </summary>
         /// <param name="services">Collection of service descriptors</param>
-        public IServiceProvider ConfigureServices(IServiceCollection services)
+        public void ConfigureServices(IServiceCollection services)
         {
-            return services.ConfigureApplicationServices(Configuration);
+            (_engine, _nopConfig) = services.ConfigureApplicationServices(_configuration, _webHostEnvironment);
+        }
+
+        public void ConfigureContainer(ContainerBuilder builder)
+        {
+            _engine.RegisterDependencies(builder, _nopConfig);
         }
 
         /// <summary>
@@ -51,6 +54,8 @@ namespace Nop.Web
         public void Configure(IApplicationBuilder application)
         {
             application.ConfigureRequestPipeline();
+
+            application.StartEngine();
         }
     }
 }

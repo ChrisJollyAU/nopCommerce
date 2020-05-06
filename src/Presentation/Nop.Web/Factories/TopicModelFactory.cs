@@ -9,7 +9,6 @@ using Nop.Services.Security;
 using Nop.Services.Seo;
 using Nop.Services.Stores;
 using Nop.Services.Topics;
-using Nop.Web.Infrastructure.Cache;
 using Nop.Web.Models.Topics;
 
 namespace Nop.Web.Factories
@@ -21,33 +20,33 @@ namespace Nop.Web.Factories
     {
         #region Fields
 
-        private readonly ITopicService _topicService;
-        private readonly IWorkContext _workContext;
-        private readonly IStoreContext _storeContext;
-        private readonly IStaticCacheManager _cacheManager;
-        private readonly IStoreMappingService _storeMappingService;
         private readonly IAclService _aclService;
+        private readonly ILocalizationService _localizationService;
+        private readonly IStoreContext _storeContext;
+        private readonly IStoreMappingService _storeMappingService;
+        private readonly ITopicService _topicService;
         private readonly ITopicTemplateService _topicTemplateService;
+        private readonly IUrlRecordService _urlRecordService;
 
         #endregion
 
         #region Ctor
 
-        public TopicModelFactory(ITopicService topicService,
-            IWorkContext workContext,
+        public TopicModelFactory(IAclService aclService,
+            ILocalizationService localizationService,
             IStoreContext storeContext,
-            IStaticCacheManager cacheManager,
             IStoreMappingService storeMappingService,
-            IAclService aclService,
-            ITopicTemplateService topicTemplateService)
+            ITopicService topicService,
+            ITopicTemplateService topicTemplateService,
+            IUrlRecordService urlRecordService)
         {
-            this._topicService = topicService;
-            this._workContext = workContext;
-            this._storeContext = storeContext;
-            this._cacheManager = cacheManager;
-            this._storeMappingService = storeMappingService;
-            this._aclService = aclService;
-            this._topicTemplateService = topicTemplateService;
+            _aclService = aclService;
+            _localizationService = localizationService;
+            _storeContext = storeContext;
+            _storeMappingService = storeMappingService;
+            _topicService = topicService;
+            _topicTemplateService = topicTemplateService;
+            _urlRecordService = urlRecordService;
         }
 
         #endregion
@@ -70,14 +69,15 @@ namespace Nop.Web.Factories
                 SystemName = topic.SystemName,
                 IncludeInSitemap = topic.IncludeInSitemap,
                 IsPasswordProtected = topic.IsPasswordProtected,
-                Title = topic.IsPasswordProtected ? "" : topic.GetLocalized(x => x.Title),
-                Body = topic.IsPasswordProtected ? "" : topic.GetLocalized(x => x.Body),
-                MetaKeywords = topic.GetLocalized(x => x.MetaKeywords),
-                MetaDescription = topic.GetLocalized(x => x.MetaDescription),
-                MetaTitle = topic.GetLocalized(x => x.MetaTitle),
-                SeName = topic.GetSeName(),
+                Title = topic.IsPasswordProtected ? string.Empty : _localizationService.GetLocalized(topic, x => x.Title),
+                Body = topic.IsPasswordProtected ? string.Empty : _localizationService.GetLocalized(topic, x => x.Body),
+                MetaKeywords = _localizationService.GetLocalized(topic, x => x.MetaKeywords),
+                MetaDescription = _localizationService.GetLocalized(topic, x => x.MetaDescription),
+                MetaTitle = _localizationService.GetLocalized(topic, x => x.MetaTitle),
+                SeName = _urlRecordService.GetSeName(topic),
                 TopicTemplateId = topic.TopicTemplateId
             };
+
             return model;
         }
 
@@ -89,31 +89,27 @@ namespace Nop.Web.Factories
         /// Get the topic model by topic identifier
         /// </summary>
         /// <param name="topicId">Topic identifier</param>
+        /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Topic model</returns>
-        public virtual TopicModel PrepareTopicModelById(int topicId)
+        public virtual TopicModel PrepareTopicModelById(int topicId, bool showHidden = false)
         {
-            var cacheKey = string.Format(ModelCacheEventConsumer.TOPIC_MODEL_BY_ID_KEY,
-                topicId,
-                _workContext.WorkingLanguage.Id,
-                _storeContext.CurrentStore.Id,
-                string.Join(",", _workContext.CurrentCustomer.GetCustomerRoleIds()));
-            var cachedModel = _cacheManager.Get(cacheKey, () =>
-            {
-                var topic = _topicService.GetTopicById(topicId);
-                if (topic == null)
-                    return null;
-                if (!topic.Published)
-                    return null;
-                //Store mapping
-                if (!_storeMappingService.Authorize(topic))
-                    return null;
-                //ACL (access control list)
-                if (!_aclService.Authorize(topic))
-                    return null;
-                return PrepareTopicModel(topic);
-            });
+            var topic = _topicService.GetTopicById(topicId);
 
-            return cachedModel;
+            if (topic == null)
+                return null;
+
+            if (showHidden)
+                return PrepareTopicModel(topic);
+
+            if (!topic.Published ||
+                //ACL (access control list)
+                !_aclService.Authorize(topic) ||
+                //store mapping
+                !_storeMappingService.Authorize(topic))
+
+                return null;
+
+            return PrepareTopicModel(topic);
         }
 
         /// <summary>
@@ -123,26 +119,12 @@ namespace Nop.Web.Factories
         /// <returns>Topic model</returns>
         public virtual TopicModel PrepareTopicModelBySystemName(string systemName)
         {
-            var cacheKey = string.Format(ModelCacheEventConsumer.TOPIC_MODEL_BY_SYSTEMNAME_KEY,
-                systemName,
-                _workContext.WorkingLanguage.Id,
-                _storeContext.CurrentStore.Id,
-                string.Join(",", _workContext.CurrentCustomer.GetCustomerRoleIds()));
-            var cachedModel = _cacheManager.Get(cacheKey, () =>
-            {
-                //load by store
-                var topic = _topicService.GetTopicBySystemName(systemName, _storeContext.CurrentStore.Id);
-                if (topic == null)
-                    return null;
-                if (!topic.Published)
-                    return null;
-                //ACL (access control list)
-                if (!_aclService.Authorize(topic))
-                    return null;
-                return PrepareTopicModel(topic);
-            });
+            //load by store
+            var topic = _topicService.GetTopicBySystemName(systemName, _storeContext.CurrentStore.Id);
+            if (topic == null)
+                return null;
 
-            return cachedModel;
+            return PrepareTopicModel(topic);
         }
 
         /// <summary>
@@ -152,17 +134,13 @@ namespace Nop.Web.Factories
         /// <returns>View path</returns>
         public virtual string PrepareTemplateViewPath(int topicTemplateId)
         {
-            var templateCacheKey = string.Format(ModelCacheEventConsumer.TOPIC_TEMPLATE_MODEL_KEY, topicTemplateId);
-            var templateViewPath = _cacheManager.Get(templateCacheKey, () =>
-            {
-                var template = _topicTemplateService.GetTopicTemplateById(topicTemplateId);
-                if (template == null)
-                    template = _topicTemplateService.GetAllTopicTemplates().FirstOrDefault();
-                if (template == null)
-                    throw new Exception("No default template could be loaded");
-                return template.ViewPath;
-            });
-            return templateViewPath;
+            var template = _topicTemplateService.GetTopicTemplateById(topicTemplateId) ??
+                           _topicTemplateService.GetAllTopicTemplates().FirstOrDefault();
+
+            if (template == null)
+                throw new Exception("No default template could be loaded");
+
+            return template.ViewPath;
         }
 
         #endregion

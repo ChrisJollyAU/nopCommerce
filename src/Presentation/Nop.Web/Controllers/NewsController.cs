@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
-using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Localization;
 using Nop.Core.Domain.News;
+using Nop.Core.Domain.Security;
+using Nop.Core.Rss;
+using Nop.Services.Customers;
 using Nop.Services.Events;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
@@ -18,78 +20,78 @@ using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc;
 using Nop.Web.Framework.Mvc.Filters;
-using Nop.Web.Framework.Mvc.Rss;
-using Nop.Web.Framework.Security;
-using Nop.Web.Framework.Security.Captcha;
 using Nop.Web.Models.News;
 
 namespace Nop.Web.Controllers
 {
-    [HttpsRequirement(SslRequirement.No)]
     public partial class NewsController : BasePublicController
     {
         #region Fields
 
+        private readonly CaptchaSettings _captchaSettings;
+        private readonly ICustomerActivityService _customerActivityService;
+        private readonly ICustomerService _customerService;
+        private readonly IEventPublisher _eventPublisher;
+        private readonly ILocalizationService _localizationService;
         private readonly INewsModelFactory _newsModelFactory;
         private readonly INewsService _newsService;
-        private readonly IWorkContext _workContext;
-        private readonly IStoreContext _storeContext;
-        private readonly ILocalizationService _localizationService;
-        private readonly IWorkflowMessageService _workflowMessageService;
-        private readonly IWebHelper _webHelper;
-        private readonly ICustomerActivityService _customerActivityService;
-        private readonly IStoreMappingService _storeMappingService;
         private readonly IPermissionService _permissionService;
-        private readonly IEventPublisher _eventPublisher;
-
-        private readonly NewsSettings _newsSettings;
+        private readonly IStoreContext _storeContext;
+        private readonly IStoreMappingService _storeMappingService;
+        private readonly IUrlRecordService _urlRecordService;
+        private readonly IWebHelper _webHelper;
+        private readonly IWorkContext _workContext;
+        private readonly IWorkflowMessageService _workflowMessageService;
         private readonly LocalizationSettings _localizationSettings;
-        private readonly CaptchaSettings _captchaSettings;
-        
+        private readonly NewsSettings _newsSettings;
+
         #endregion
-        
+
         #region Ctor
 
-        public NewsController(INewsModelFactory newsModelFactory,
-            INewsService newsService,
-            IWorkContext workContext, 
-            IStoreContext storeContext,
-            ILocalizationService localizationService,
-            IWorkflowMessageService workflowMessageService,
-            IWebHelper webHelper,
+        public NewsController(CaptchaSettings captchaSettings,
             ICustomerActivityService customerActivityService,
-            IStoreMappingService storeMappingService,
-            IPermissionService permissionService,
+            ICustomerService customerService,
             IEventPublisher eventPublisher,
-            NewsSettings newsSettings,
-            LocalizationSettings localizationSettings, 
-            CaptchaSettings captchaSettings)
+            ILocalizationService localizationService,
+            INewsModelFactory newsModelFactory,
+            INewsService newsService,
+            IPermissionService permissionService,
+            IStoreContext storeContext,
+            IStoreMappingService storeMappingService,
+            IUrlRecordService urlRecordService,
+            IWebHelper webHelper,
+            IWorkContext workContext,
+            IWorkflowMessageService workflowMessageService,
+            LocalizationSettings localizationSettings,
+            NewsSettings newsSettings)
         {
-            this._newsModelFactory = newsModelFactory;
-            this._newsService = newsService;
-            this._workContext = workContext;
-            this._storeContext = storeContext;
-            this._localizationService = localizationService;
-            this._workflowMessageService = workflowMessageService;
-            this._webHelper = webHelper;
-            this._customerActivityService = customerActivityService;
-            this._storeMappingService = storeMappingService;
-            this._permissionService = permissionService;
-            this._eventPublisher = eventPublisher;
-
-            this._newsSettings = newsSettings;
-            this._localizationSettings = localizationSettings;
-            this._captchaSettings = captchaSettings;
+            _captchaSettings = captchaSettings;
+            _customerActivityService = customerActivityService;
+            _customerService = customerService;
+            _eventPublisher = eventPublisher;
+            _localizationService = localizationService;
+            _newsModelFactory = newsModelFactory;
+            _newsService = newsService;
+            _permissionService = permissionService;
+            _storeContext = storeContext;
+            _storeMappingService = storeMappingService;
+            _urlRecordService = urlRecordService;
+            _webHelper = webHelper;
+            _workContext = workContext;
+            _workflowMessageService = workflowMessageService;
+            _localizationSettings = localizationSettings;
+            _newsSettings = newsSettings;
         }
-        
+
         #endregion
-        
+
         #region Methods
 
         public virtual IActionResult List(NewsPagingFilteringModel command)
         {
             if (!_newsSettings.Enabled)
-                return RedirectToRoute("HomePage");
+                return RedirectToRoute("Homepage");
 
             var model = _newsModelFactory.PrepareNewsItemListModel(command);
             return View(model);
@@ -98,7 +100,7 @@ namespace Nop.Web.Controllers
         public virtual IActionResult ListRss(int languageId)
         {
             var feed = new RssFeed(
-                $"{_storeContext.CurrentStore.GetLocalized(x => x.Name)}: News",
+                $"{_localizationService.GetLocalized(_storeContext.CurrentStore, x => x.Name)}: News",
                 "News",
                 new Uri(_webHelper.GetStoreLocation()),
                 DateTime.UtcNow);
@@ -110,7 +112,7 @@ namespace Nop.Web.Controllers
             var newsItems = _newsService.GetAllNews(languageId, _storeContext.CurrentStore.Id);
             foreach (var n in newsItems)
             {
-                var newsUrl = Url.RouteUrl("NewsItem", new { SeName = n.GetSeName(n.LanguageId, ensureTwoPublishedLanguages: false) }, _webHelper.IsCurrentConnectionSecured() ? "https" : "http");
+                var newsUrl = Url.RouteUrl("NewsItem", new { SeName = _urlRecordService.GetSeName(n, n.LanguageId, ensureTwoPublishedLanguages: false) }, _webHelper.CurrentRequestProtocol);
                 items.Add(new RssItem(n.Title, n.Short, new Uri(newsUrl), $"urn:store:{_storeContext.CurrentStore.Id}:news:blog:{n.Id}", n.CreatedOnUtc));
             }
             feed.Items = items;
@@ -120,47 +122,55 @@ namespace Nop.Web.Controllers
         public virtual IActionResult NewsItem(int newsItemId)
         {
             if (!_newsSettings.Enabled)
-                return RedirectToRoute("HomePage");
+                return RedirectToRoute("Homepage");
 
             var newsItem = _newsService.GetNewsById(newsItemId);
-            if (newsItem == null ||
+            if (newsItem == null)
+                return InvokeHttp404();
+
+            var notAvailable =
+                //published?
                 !newsItem.Published ||
-                (newsItem.StartDateUtc.HasValue && newsItem.StartDateUtc.Value >= DateTime.UtcNow) ||
-                (newsItem.EndDateUtc.HasValue && newsItem.EndDateUtc.Value <= DateTime.UtcNow) ||
+                //availability dates
+                !_newsService.IsNewsAvailable(newsItem) ||
                 //Store mapping
-                !_storeMappingService.Authorize(newsItem))
-                return RedirectToRoute("HomePage");
+                !_storeMappingService.Authorize(newsItem);
+            //Check whether the current user has a "Manage news" permission (usually a store owner)
+            //We should allows him (her) to use "Preview" functionality
+            var hasAdminAccess = _permissionService.Authorize(StandardPermissionProvider.AccessAdminPanel) && _permissionService.Authorize(StandardPermissionProvider.ManageNews);
+            if (notAvailable && !hasAdminAccess)
+                return InvokeHttp404();
 
             var model = new NewsItemModel();
             model = _newsModelFactory.PrepareNewsItemModel(model, newsItem, true);
 
             //display "edit" (manage) link
-            if (_permissionService.Authorize(StandardPermissionProvider.AccessAdminPanel) && _permissionService.Authorize(StandardPermissionProvider.ManageNews))
-                DisplayEditLink(Url.Action("Edit", "News", new { id = newsItem.Id, area = AreaNames.Admin }));
+            if (hasAdminAccess)
+                DisplayEditLink(Url.Action("NewsItemEdit", "News", new { id = newsItem.Id, area = AreaNames.Admin }));
 
             return View(model);
         }
 
         [HttpPost, ActionName("NewsItem")]
-        [PublicAntiForgery]
+        [AutoValidateAntiforgeryToken]
         [FormValueRequired("add-comment")]
         [ValidateCaptcha]
         public virtual IActionResult NewsCommentAdd(int newsItemId, NewsItemModel model, bool captchaValid)
         {
             if (!_newsSettings.Enabled)
-                return RedirectToRoute("HomePage");
+                return RedirectToRoute("Homepage");
 
             var newsItem = _newsService.GetNewsById(newsItemId);
             if (newsItem == null || !newsItem.Published || !newsItem.AllowComments)
-                return RedirectToRoute("HomePage");
+                return RedirectToRoute("Homepage");
 
             //validate CAPTCHA
             if (_captchaSettings.Enabled && _captchaSettings.ShowOnNewsCommentPage && !captchaValid)
             {
-                ModelState.AddModelError("", _captchaSettings.GetWrongCaptchaMessage(_localizationService));
+                ModelState.AddModelError("", _localizationService.GetResource("Common.WrongCaptchaMessage"));
             }
 
-            if (_workContext.CurrentCustomer.IsGuest() && !_newsSettings.AllowNotRegisteredUsersToLeaveComments)
+            if (_customerService.IsGuest(_workContext.CurrentCustomer) && !_newsSettings.AllowNotRegisteredUsersToLeaveComments)
             {
                 ModelState.AddModelError("", _localizationService.GetResource("News.Comments.OnlyRegisteredUsersLeaveComments"));
             }
@@ -177,15 +187,16 @@ namespace Nop.Web.Controllers
                     StoreId = _storeContext.CurrentStore.Id,
                     CreatedOnUtc = DateTime.UtcNow,
                 };
-                newsItem.NewsComments.Add(comment);
-                _newsService.UpdateNews(newsItem);
+
+                _newsService.InsertNewsComment(comment);
 
                 //notify a store owner;
                 if (_newsSettings.NotifyAboutNewNewsComments)
                     _workflowMessageService.SendNewsCommentNotificationMessage(comment, _localizationSettings.DefaultAdminLanguageId);
 
                 //activity log
-                _customerActivityService.InsertActivity("PublicStore.AddNewsComment", _localizationService.GetResource("ActivityLog.PublicStore.AddNewsComment"));
+                _customerActivityService.InsertActivity("PublicStore.AddNewsComment",
+                    _localizationService.GetResource("ActivityLog.PublicStore.AddNewsComment"), comment);
 
                 //raise event
                 if (comment.IsApproved)
@@ -193,18 +204,18 @@ namespace Nop.Web.Controllers
 
                 //The text boxes should be cleared after a comment has been posted
                 //That' why we reload the page
-                TempData["nop.news.addcomment.result"] = comment.IsApproved 
+                TempData["nop.news.addcomment.result"] = comment.IsApproved
                     ? _localizationService.GetResource("News.Comments.SuccessfullyAdded")
                     : _localizationService.GetResource("News.Comments.SeeAfterApproving");
 
-                return RedirectToRoute("NewsItem", new { SeName = newsItem.GetSeName(newsItem.LanguageId, ensureTwoPublishedLanguages: false) });
+                return RedirectToRoute("NewsItem", new { SeName = _urlRecordService.GetSeName(newsItem, newsItem.LanguageId, ensureTwoPublishedLanguages: false) });
             }
 
             //If we got this far, something failed, redisplay form
             model = _newsModelFactory.PrepareNewsItemModel(model, newsItem, true);
             return View(model);
         }
-        
+
         #endregion
     }
 }

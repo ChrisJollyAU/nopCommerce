@@ -2,10 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using Nop.Core.Caching;
-using Nop.Core.Data;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Messages;
 using Nop.Core.Domain.Stores;
+using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Events;
 using Nop.Services.Localization;
 using Nop.Services.Stores;
@@ -15,75 +17,46 @@ namespace Nop.Services.Messages
     /// <summary>
     /// Message template service
     /// </summary>
-    public partial class MessageTemplateService: IMessageTemplateService
+    public partial class MessageTemplateService : IMessageTemplateService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : store ID
-        /// </remarks>
-        private const string MESSAGETEMPLATES_ALL_KEY = "Nop.messagetemplate.all-{0}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : template name
-        /// {1} : store ID
-        /// </remarks>
-        private const string MESSAGETEMPLATES_BY_NAME_KEY = "Nop.messagetemplate.name-{0}-{1}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string MESSAGETEMPLATES_PATTERN_KEY = "Nop.messagetemplate.";
-
-        #endregion
-
         #region Fields
 
+        private readonly CatalogSettings _catalogSettings;
+        private readonly ICacheKeyService _cacheKeyService;
+        private readonly IStaticCacheManager _staticCacheManager;
+        private readonly IEventPublisher _eventPublisher;
+        private readonly ILanguageService _languageService;
+        private readonly ILocalizationService _localizationService;
+        private readonly ILocalizedEntityService _localizedEntityService;
         private readonly IRepository<MessageTemplate> _messageTemplateRepository;
         private readonly IRepository<StoreMapping> _storeMappingRepository;
-        private readonly ILanguageService _languageService;
         private readonly IStoreMappingService _storeMappingService;
-        private readonly ILocalizedEntityService _localizedEntityService;
-        private readonly CatalogSettings _catalogSettings;
-        private readonly IEventPublisher _eventPublisher;
-        private readonly ICacheManager _cacheManager;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="cacheManager">Cache manager</param>
-        /// <param name="storeMappingRepository">Store mapping repository</param>
-        /// <param name="languageService">Language service</param>
-        /// <param name="localizedEntityService">Localized entity service</param>
-        /// <param name="storeMappingService">Store mapping service</param>
-        /// <param name="messageTemplateRepository">Message template repository</param>
-        /// <param name="catalogSettings">Catalog settings</param>
-        /// <param name="eventPublisher">Event published</param>
-        public MessageTemplateService(ICacheManager cacheManager,
-            IRepository<StoreMapping> storeMappingRepository,
+        public MessageTemplateService(CatalogSettings catalogSettings,
+            ICacheKeyService cacheKeyService,
+            IStaticCacheManager staticCacheManager,
+            IEventPublisher eventPublisher,
             ILanguageService languageService,
+            ILocalizationService localizationService,
             ILocalizedEntityService localizedEntityService,
-            IStoreMappingService storeMappingService,
             IRepository<MessageTemplate> messageTemplateRepository,
-            CatalogSettings catalogSettings,
-            IEventPublisher eventPublisher)
+            IRepository<StoreMapping> storeMappingRepository,
+            IStoreMappingService storeMappingService)
         {
-            this._cacheManager = cacheManager;
-            this._storeMappingRepository = storeMappingRepository;
-            this._languageService = languageService;
-            this._localizedEntityService = localizedEntityService;
-            this._storeMappingService = storeMappingService;
-            this._messageTemplateRepository = messageTemplateRepository;
-            this._catalogSettings = catalogSettings;
-            this._eventPublisher = eventPublisher;
+            _catalogSettings = catalogSettings;
+            _cacheKeyService = cacheKeyService;
+            _staticCacheManager = staticCacheManager;
+            _eventPublisher = eventPublisher;
+            _languageService = languageService;
+            _localizationService = localizationService;
+            _localizedEntityService = localizedEntityService;
+            _messageTemplateRepository = messageTemplateRepository;
+            _storeMappingRepository = storeMappingRepository;
+            _storeMappingService = storeMappingService;
         }
 
         #endregion
@@ -101,8 +74,6 @@ namespace Nop.Services.Messages
 
             _messageTemplateRepository.Delete(messageTemplate);
 
-            _cacheManager.RemoveByPattern(MESSAGETEMPLATES_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityDeleted(messageTemplate);
         }
@@ -117,8 +88,6 @@ namespace Nop.Services.Messages
                 throw new ArgumentNullException(nameof(messageTemplate));
 
             _messageTemplateRepository.Insert(messageTemplate);
-
-            _cacheManager.RemoveByPattern(MESSAGETEMPLATES_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityInserted(messageTemplate);
@@ -135,8 +104,6 @@ namespace Nop.Services.Messages
 
             _messageTemplateRepository.Update(messageTemplate);
 
-            _cacheManager.RemoveByPattern(MESSAGETEMPLATES_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityUpdated(messageTemplate);
         }
@@ -151,37 +118,34 @@ namespace Nop.Services.Messages
             if (messageTemplateId == 0)
                 return null;
 
-            return _messageTemplateRepository.GetById(messageTemplateId);
+            return _messageTemplateRepository.ToCachedGetById(messageTemplateId);
         }
 
         /// <summary>
-        /// Gets a message template
+        /// Gets message templates by the name
         /// </summary>
         /// <param name="messageTemplateName">Message template name</param>
-        /// <param name="storeId">Store identifier</param>
-        /// <returns>Message template</returns>
-        public virtual MessageTemplate GetMessageTemplateByName(string messageTemplateName, int storeId)
+        /// <param name="storeId">Store identifier; pass null to load all records</param>
+        /// <returns>List of message templates</returns>
+        public virtual IList<MessageTemplate> GetMessageTemplatesByName(string messageTemplateName, int? storeId = null)
         {
             if (string.IsNullOrWhiteSpace(messageTemplateName))
-                throw new ArgumentException("messageTemplateName");
+                throw new ArgumentException(nameof(messageTemplateName));
 
-            var key = string.Format(MESSAGETEMPLATES_BY_NAME_KEY, messageTemplateName, storeId);
-            return _cacheManager.Get(key, () =>
+            var key = _cacheKeyService.PrepareKeyForDefaultCache(NopMessageDefaults.MessageTemplatesByNameCacheKey, messageTemplateName, storeId);
+
+            return _staticCacheManager.Get(key, () =>
             {
-                var query = _messageTemplateRepository.Table;
-                query = query.Where(t => t.Name == messageTemplateName);
-                query = query.OrderBy(t => t.Id);
-                var templates = query.ToList();
+                //get message templates with the passed name
+                var templates = _messageTemplateRepository.Table
+                    .Where(messageTemplate => messageTemplate.Name.Equals(messageTemplateName))
+                    .OrderBy(messageTemplate => messageTemplate.Id).ToList();
 
-                //store mapping
-                if (storeId > 0)
-                {
-                    templates = templates
-                        .Where(t => _storeMappingService.Authorize(t, storeId))
-                        .ToList();
-                }
+                //filter by the store
+                if (storeId.HasValue && storeId.Value > 0)
+                    templates = templates.Where(messageTemplate => _storeMappingService.Authorize(messageTemplate, storeId.Value)).ToList();
 
-                return templates.FirstOrDefault();
+                return templates;
             });
         }
 
@@ -192,33 +156,35 @@ namespace Nop.Services.Messages
         /// <returns>Message template list</returns>
         public virtual IList<MessageTemplate> GetAllMessageTemplates(int storeId)
         {
-            var key = string.Format(MESSAGETEMPLATES_ALL_KEY, storeId);
-            return _cacheManager.Get(key, () =>
-            {
-                var query = _messageTemplateRepository.Table;
-                query = query.OrderBy(t => t.Name);
+            var key = _cacheKeyService.PrepareKeyForDefaultCache(NopMessageDefaults.MessageTemplatesAllCacheKey, storeId);
 
-                //Store mapping
-                if (storeId > 0 && !_catalogSettings.IgnoreStoreLimitations)
-                {
-                    query = from t in query
-                            join sm in _storeMappingRepository.Table
-                            on new { c1 = t.Id, c2 = "MessageTemplate" } equals new { c1 = sm.EntityId, c2 = sm.EntityName } into tSm
-                            from sm in tSm.DefaultIfEmpty()
-                            where !t.LimitedToStores || storeId == sm.StoreId
-                            select t;
+            var query = _messageTemplateRepository.Table;
+            query = query.OrderBy(t => t.Name);
 
-                    //only distinct items (group by ID)
-                    query = from t in query
-                            group t by t.Id
-                            into tGroup
-                            orderby tGroup.Key
-                            select tGroup.FirstOrDefault();
-                    query = query.OrderBy(t => t.Name);
-                }
+            if (storeId <= 0 || _catalogSettings.IgnoreStoreLimitations)
+                return query.ToCachedList(key);
 
-                return query.ToList();
-            });
+            //store mapping
+            query = from t in query
+                join sm in _storeMappingRepository.Table
+                    on new
+                    {
+                        c1 = t.Id,
+                        c2 = nameof(MessageTemplate)
+                    } 
+                    equals new
+                    {
+                        c1 = sm.EntityId,
+                        c2 = sm.EntityName
+                    } 
+                    into tSm
+                from sm in tSm.DefaultIfEmpty()
+                where !t.LimitedToStores || storeId == sm.StoreId
+                select t;
+
+            query = query.Distinct().OrderBy(t => t.Name);
+
+            return query.ToCachedList(key);
         }
 
         /// <summary>
@@ -252,19 +218,19 @@ namespace Nop.Services.Messages
             //localization
             foreach (var lang in languages)
             {
-                var bccEmailAddresses = messageTemplate.GetLocalized(x => x.BccEmailAddresses, lang.Id, false, false);
+                var bccEmailAddresses = _localizationService.GetLocalized(messageTemplate, x => x.BccEmailAddresses, lang.Id, false, false);
                 if (!string.IsNullOrEmpty(bccEmailAddresses))
                     _localizedEntityService.SaveLocalizedValue(mtCopy, x => x.BccEmailAddresses, bccEmailAddresses, lang.Id);
 
-                var subject = messageTemplate.GetLocalized(x => x.Subject, lang.Id, false, false);
+                var subject = _localizationService.GetLocalized(messageTemplate, x => x.Subject, lang.Id, false, false);
                 if (!string.IsNullOrEmpty(subject))
                     _localizedEntityService.SaveLocalizedValue(mtCopy, x => x.Subject, subject, lang.Id);
 
-                var body = messageTemplate.GetLocalized(x => x.Body, lang.Id, false, false);
+                var body = _localizationService.GetLocalized(messageTemplate, x => x.Body, lang.Id, false, false);
                 if (!string.IsNullOrEmpty(body))
                     _localizedEntityService.SaveLocalizedValue(mtCopy, x => x.Body, body, lang.Id);
 
-                var emailAccountId = messageTemplate.GetLocalized(x => x.EmailAccountId, lang.Id, false, false);
+                var emailAccountId = _localizationService.GetLocalized(messageTemplate, x => x.EmailAccountId, lang.Id, false, false);
                 if (emailAccountId > 0)
                     _localizedEntityService.SaveLocalizedValue(mtCopy, x => x.EmailAccountId, emailAccountId, lang.Id);
             }

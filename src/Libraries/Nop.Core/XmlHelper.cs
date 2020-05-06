@@ -23,7 +23,7 @@ namespace Nop.Core
         {
             if (str == null)
                 return null;
-            str = Regex.Replace(str, @"[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD]", "", RegexOptions.Compiled);
+            str = Regex.Replace(str, @"[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD]", string.Empty, RegexOptions.Compiled);
             return XmlEncodeAsIs(str);
         }
 
@@ -36,12 +36,10 @@ namespace Nop.Core
         {
             if (str == null)
                 return null;
-            using (var sw = new StringWriter())
-            using (var xwr = new XmlTextWriter(sw))
-            {
-                xwr.WriteString(str);
-                return sw.ToString();
-            }
+            using var sw = new StringWriter();
+            using var xwr = new XmlTextWriter(sw);
+            xwr.WriteString(str);
+            return sw.ToString();
         }
 
         /// <summary>
@@ -53,7 +51,7 @@ namespace Nop.Core
         {
             if (str == null)
                 return null;
-            str = Regex.Replace(str, @"[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD]", "", RegexOptions.Compiled);
+            str = Regex.Replace(str, @"[^\u0009\u000A\u000D\u0020-\uD7FF\uE000-\uFFFD]", string.Empty, RegexOptions.Compiled);
             return XmlEncodeAttributeAsIs(str);
         }
 
@@ -87,11 +85,9 @@ namespace Nop.Core
         {
             var xmlS = new XmlSerializer(typeof(DateTime));
             var sb = new StringBuilder();
-            using (var sw = new StringWriter(sb))
-            {
-                xmlS.Serialize(sw, dateTime);
-                return sb.ToString();
-            }
+            using var sw = new StringWriter(sb);
+            xmlS.Serialize(sw, dateTime);
+            return sb.ToString();
         }
 
         /// <summary>
@@ -102,11 +98,9 @@ namespace Nop.Core
         public static DateTime DeserializeDateTime(string dateTime)
         {
             var xmlS = new XmlSerializer(typeof(DateTime));
-            using (var sr = new StringReader(dateTime))
-            {
-                var test = xmlS.Deserialize(sr);
-                return (DateTime)test;
-            }
+            using var sr = new StringReader(dateTime);
+            var test = xmlS.Deserialize(sr);
+            return (DateTime)test;
         }
 
         #endregion

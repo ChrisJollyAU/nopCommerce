@@ -10,14 +10,14 @@ namespace Nop.Web.Components
 
         public CurrencySelectorViewComponent(ICommonModelFactory commonModelFactory)
         {
-            this._commonModelFactory = commonModelFactory;
+            _commonModelFactory = commonModelFactory;
         }
 
         public IViewComponentResult Invoke()
         {
             var model = _commonModelFactory.PrepareCurrencySelectorModel();
             if (model.AvailableCurrencies.Count == 1)
-                Content("");
+                return Content("");
 
             return View(model);
         }

@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Caching;
-using Nop.Core.Data;
 using Nop.Core.Domain.Directory;
+using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Events;
 
 namespace Nop.Services.Directory
@@ -14,72 +15,29 @@ namespace Nop.Services.Directory
     /// </summary>
     public partial class MeasureService : IMeasureService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        private const string MEASUREDIMENSIONS_ALL_KEY = "Nop.measuredimension.all";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : dimension ID
-        /// </remarks>
-        private const string MEASUREDIMENSIONS_BY_ID_KEY = "Nop.measuredimension.id-{0}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        private const string MEASUREWEIGHTS_ALL_KEY = "Nop.measureweight.all";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : weight ID
-        /// </remarks>
-        private const string MEASUREWEIGHTS_BY_ID_KEY = "Nop.measureweight.id-{0}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string MEASUREDIMENSIONS_PATTERN_KEY = "Nop.measuredimension.";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string MEASUREWEIGHTS_PATTERN_KEY = "Nop.measureweight.";
-
-        #endregion
-
         #region Fields
 
+        private readonly ICacheKeyService _cacheKeyService;
+        private readonly IEventPublisher _eventPublisher;
         private readonly IRepository<MeasureDimension> _measureDimensionRepository;
         private readonly IRepository<MeasureWeight> _measureWeightRepository;
-        private readonly ICacheManager _cacheManager;
         private readonly MeasureSettings _measureSettings;
-        private readonly IEventPublisher _eventPublisher;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="cacheManager">Cache manager</param>
-        /// <param name="measureDimensionRepository">Dimension repository</param>
-        /// <param name="measureWeightRepository">Weight repository</param>
-        /// <param name="measureSettings">Measure settings</param>
-        /// <param name="eventPublisher">Event published</param>
-        public MeasureService(ICacheManager cacheManager,
+        public MeasureService(ICacheKeyService cacheKeyService,
+            IEventPublisher eventPublisher,
             IRepository<MeasureDimension> measureDimensionRepository,
             IRepository<MeasureWeight> measureWeightRepository,
-            MeasureSettings measureSettings,
-            IEventPublisher eventPublisher)
+            MeasureSettings measureSettings)
         {
-            _cacheManager = cacheManager;
+            _cacheKeyService = cacheKeyService;
+            _eventPublisher = eventPublisher;
             _measureDimensionRepository = measureDimensionRepository;
             _measureWeightRepository = measureWeightRepository;
             _measureSettings = measureSettings;
-            _eventPublisher = eventPublisher;
         }
 
         #endregion
@@ -99,8 +57,6 @@ namespace Nop.Services.Directory
 
             _measureDimensionRepository.Delete(measureDimension);
 
-            _cacheManager.RemoveByPattern(MEASUREDIMENSIONS_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityDeleted(measureDimension);
         }
@@ -115,8 +71,7 @@ namespace Nop.Services.Directory
             if (measureDimensionId == 0)
                 return null;
 
-            var key = string.Format(MEASUREDIMENSIONS_BY_ID_KEY, measureDimensionId);
-            return _cacheManager.Get(key, () => _measureDimensionRepository.GetById(measureDimensionId));
+            return _measureDimensionRepository.ToCachedGetById(measureDimensionId);
         }
 
         /// <summary>
@@ -142,16 +97,12 @@ namespace Nop.Services.Directory
         /// <returns>Measure dimensions</returns>
         public virtual IList<MeasureDimension> GetAllMeasureDimensions()
         {
-            var key = MEASUREDIMENSIONS_ALL_KEY;
-            return _cacheManager.Get(key, () =>
-            {
-                var query = from md in _measureDimensionRepository.Table
-                    orderby md.DisplayOrder, md.Id
-                    select md;
-                var measureDimensions = query.ToList();
-                return measureDimensions;
+            var query = from md in _measureDimensionRepository.Table
+                orderby md.DisplayOrder, md.Id
+                select md;
+            var measureDimensions = query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopDirectoryDefaults.MeasureDimensionsAllCacheKey));
 
-            });
+            return measureDimensions;
         }
 
         /// <summary>
@@ -164,8 +115,6 @@ namespace Nop.Services.Directory
                 throw new ArgumentNullException(nameof(measure));
 
             _measureDimensionRepository.Insert(measure);
-
-            _cacheManager.RemoveByPattern(MEASUREDIMENSIONS_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityInserted(measure);
@@ -181,8 +130,6 @@ namespace Nop.Services.Directory
                 throw new ArgumentNullException(nameof(measure));
 
             _measureDimensionRepository.Update(measure);
-
-            _cacheManager.RemoveByPattern(MEASUREDIMENSIONS_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityUpdated(measure);
@@ -211,8 +158,10 @@ namespace Nop.Services.Directory
                 result = ConvertToPrimaryMeasureDimension(result, sourceMeasureDimension);
                 result = ConvertFromPrimaryMeasureDimension(result, targetMeasureDimension);
             }
+
             if (round)
                 result = Math.Round(result, 2);
+
             return result;
         }
 
@@ -230,13 +179,14 @@ namespace Nop.Services.Directory
 
             var result = value;
             var baseDimensionIn = GetMeasureDimensionById(_measureSettings.BaseDimensionId);
-            if (result != decimal.Zero && sourceMeasureDimension.Id != baseDimensionIn.Id)
-            {
-                var exchangeRatio = sourceMeasureDimension.Ratio;
-                if (exchangeRatio == decimal.Zero)
-                    throw new NopException($"Exchange ratio not set for dimension [{sourceMeasureDimension.Name}]");
-                result = result / exchangeRatio;
-            }
+            if (result == decimal.Zero || sourceMeasureDimension.Id == baseDimensionIn.Id) 
+                return result;
+
+            var exchangeRatio = sourceMeasureDimension.Ratio;
+            if (exchangeRatio == decimal.Zero)
+                throw new NopException($"Exchange ratio not set for dimension [{sourceMeasureDimension.Name}]");
+            result = result / exchangeRatio;
+
             return result;
         }
 
@@ -254,13 +204,14 @@ namespace Nop.Services.Directory
 
             var result = value;
             var baseDimensionIn = GetMeasureDimensionById(_measureSettings.BaseDimensionId);
-            if (result != decimal.Zero && targetMeasureDimension.Id != baseDimensionIn.Id)
-            {
-                var exchangeRatio = targetMeasureDimension.Ratio;
-                if (exchangeRatio == decimal.Zero)
-                    throw new NopException($"Exchange ratio not set for dimension [{targetMeasureDimension.Name}]");
-                result = result * exchangeRatio;
-            }
+            if (result == decimal.Zero || targetMeasureDimension.Id == baseDimensionIn.Id) 
+                return result;
+
+            var exchangeRatio = targetMeasureDimension.Ratio;
+            if (exchangeRatio == decimal.Zero)
+                throw new NopException($"Exchange ratio not set for dimension [{targetMeasureDimension.Name}]");
+            result = result * exchangeRatio;
+
             return result;
         }
 
@@ -279,8 +230,6 @@ namespace Nop.Services.Directory
 
             _measureWeightRepository.Delete(measureWeight);
 
-            _cacheManager.RemoveByPattern(MEASUREWEIGHTS_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityDeleted(measureWeight);
         }
@@ -295,8 +244,7 @@ namespace Nop.Services.Directory
             if (measureWeightId == 0)
                 return null;
 
-            var key = string.Format(MEASUREWEIGHTS_BY_ID_KEY, measureWeightId);
-            return _cacheManager.Get(key, () => _measureWeightRepository.GetById(measureWeightId));
+            return _measureWeightRepository.ToCachedGetById(measureWeightId);
         }
 
         /// <summary>
@@ -322,15 +270,12 @@ namespace Nop.Services.Directory
         /// <returns>Measure weights</returns>
         public virtual IList<MeasureWeight> GetAllMeasureWeights()
         {
-            var key = MEASUREWEIGHTS_ALL_KEY;
-            return _cacheManager.Get(key, () =>
-            {
-                var query = from mw in _measureWeightRepository.Table
-                    orderby mw.DisplayOrder, mw.Id
-                    select mw;
-                var measureWeights = query.ToList();
-                return measureWeights;
-            });
+            var query = from mw in _measureWeightRepository.Table
+                orderby mw.DisplayOrder, mw.Id
+                select mw;
+            var measureWeights = query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopDirectoryDefaults.MeasureWeightsAllCacheKey));
+
+            return measureWeights;
         }
 
         /// <summary>
@@ -343,8 +288,6 @@ namespace Nop.Services.Directory
                 throw new ArgumentNullException(nameof(measure));
 
             _measureWeightRepository.Insert(measure);
-
-            _cacheManager.RemoveByPattern(MEASUREWEIGHTS_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityInserted(measure);
@@ -360,8 +303,6 @@ namespace Nop.Services.Directory
                 throw new ArgumentNullException(nameof(measure));
 
             _measureWeightRepository.Update(measure);
-
-            _cacheManager.RemoveByPattern(MEASUREWEIGHTS_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityUpdated(measure);
@@ -390,8 +331,10 @@ namespace Nop.Services.Directory
                 result = ConvertToPrimaryMeasureWeight(result, sourceMeasureWeight);
                 result = ConvertFromPrimaryMeasureWeight(result, targetMeasureWeight);
             }
+
             if (round)
                 result = Math.Round(result, 2);
+
             return result;
         }
 
@@ -408,13 +351,14 @@ namespace Nop.Services.Directory
 
             var result = value;
             var baseWeightIn = GetMeasureWeightById(_measureSettings.BaseWeightId);
-            if (result != decimal.Zero && sourceMeasureWeight.Id != baseWeightIn.Id)
-            {
-                var exchangeRatio = sourceMeasureWeight.Ratio;
-                if (exchangeRatio == decimal.Zero)
-                    throw new NopException($"Exchange ratio not set for weight [{sourceMeasureWeight.Name}]");
-                result = result / exchangeRatio;
-            }
+            if (result == decimal.Zero || sourceMeasureWeight.Id == baseWeightIn.Id)
+                return result;
+
+            var exchangeRatio = sourceMeasureWeight.Ratio;
+            if (exchangeRatio == decimal.Zero)
+                throw new NopException($"Exchange ratio not set for weight [{sourceMeasureWeight.Name}]");
+            result = result / exchangeRatio;
+
             return result;
         }
 
@@ -432,13 +376,14 @@ namespace Nop.Services.Directory
 
             var result = value;
             var baseWeightIn = GetMeasureWeightById(_measureSettings.BaseWeightId);
-            if (result != decimal.Zero && targetMeasureWeight.Id != baseWeightIn.Id)
-            {
-                var exchangeRatio = targetMeasureWeight.Ratio;
-                if (exchangeRatio == decimal.Zero)
-                    throw new NopException($"Exchange ratio not set for weight [{targetMeasureWeight.Name}]");
-                result = result * exchangeRatio;
-            }
+            if (result == decimal.Zero || targetMeasureWeight.Id == baseWeightIn.Id) 
+                return result;
+
+            var exchangeRatio = targetMeasureWeight.Ratio;
+            if (exchangeRatio == decimal.Zero)
+                throw new NopException($"Exchange ratio not set for weight [{targetMeasureWeight.Name}]");
+            result = result * exchangeRatio;
+
             return result;
         }
 

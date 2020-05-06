@@ -1,13 +1,15 @@
 ﻿using FluentValidation;
-using Nop.Web.Areas.Admin.Models.Common;
+using Nop.Core.Domain.Common;
+using Nop.Data;
 using Nop.Services.Localization;
+using Nop.Web.Areas.Admin.Models.Common;
 using Nop.Web.Framework.Validators;
 
 namespace Nop.Web.Areas.Admin.Validators.Common
 {
     public partial class AddressValidator : BaseNopValidator<AddressModel>
     {
-        public AddressValidator(ILocalizationService localizationService)
+        public AddressValidator(ILocalizationService localizationService, INopDataProvider dataProvider)
         {
             RuleFor(x => x.FirstName)
                 .NotEmpty()
@@ -37,6 +39,10 @@ namespace Nop.Web.Areas.Admin.Validators.Common
                 .NotEqual(0)
                 .WithMessage(localizationService.GetResource("Admin.Address.Fields.Country.Required"))
                 .When(x => x.CountryEnabled && x.CountryRequired);
+            RuleFor(x => x.County)
+                .NotEmpty()
+                .WithMessage(localizationService.GetResource("Admin.Address.Fields.County.Required"))
+                .When(x => x.CountyEnabled && x.CountyRequired);
             RuleFor(x => x.City)
                 .NotEmpty()
                 .WithMessage(localizationService.GetResource("Admin.Address.Fields.City.Required"))
@@ -61,6 +67,8 @@ namespace Nop.Web.Areas.Admin.Validators.Common
                 .NotEmpty()
                 .WithMessage(localizationService.GetResource("Admin.Address.Fields.FaxNumber.Required"))
                 .When(x => x.FaxEnabled && x.FaxRequired);
+
+            SetDatabaseValidationRules<Address>(dataProvider);
         }
     }
 }

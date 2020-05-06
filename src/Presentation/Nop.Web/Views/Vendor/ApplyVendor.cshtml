@@ -1,5 +1,4 @@
-﻿@using System.Text.Encodings.Web
-@model ApplyVendorModel
+﻿@model ApplyVendorModel
 @{
     Layout = "_ColumnsOne";
 
@@ -14,7 +13,7 @@
     </div>
     <div class="page-body">
         @await Component.InvokeAsync("TopicBlock", new { systemName = "ApplyVendor" })
-        @await Component.InvokeAsync("Widget", new { widgetZone = "applyvendor_top" })
+        @await Component.InvokeAsync("Widget", new { widgetZone = PublicWidgetZones.ApplyVendorTop })
         @if (Model.DisableFormInput)
         {
             <div class="result">
@@ -47,17 +46,16 @@
                             <label>@T("Vendors.ApplyAccount.Picture"):</label>
                             <input name="uploadedFile" type="file"/>
                         </div>
+                        @await Html.PartialAsync("_VendorAttributes", Model.VendorAttributes)
                         @if (Model.DisplayCaptcha)
                         {
-                            <div class="captcha-box">
-                                <nop-captcha />
-                            </div>
+                            <nop-captcha />
                         }
                         @if (Model.TermsOfServiceEnabled)
                         {
-                            <script type="text/javascript" asp-location="Footer">
+                            <script asp-location="Footer">
                                 $(document).ready(function() {
-                                    $('#apply-vendor').click(function() {
+                                    $('#apply-vendor').on('click', function() {
                                         if ($('#termsofservice').is(':checked')) {
                                             //do some stuff
                                             return true;
@@ -75,7 +73,7 @@
                                 @if (Model.TermsOfServicePopup)
                                 {
                                     <span class="read" id="read-acceptterms">@T("Vendors.ApplyAccount.AcceptTermsOfService.Read")</span>
-                                    <script type="text/javascript" asp-location="Footer">
+                                    <script asp-location="Footer">
                                         $(document).ready(function() {
                                             $('#read-acceptterms').on('click',
                                                 function (e) {
@@ -99,6 +97,6 @@
                 </div>
             </form>
         }
-        @await Component.InvokeAsync("Widget", new { widgetZone = "applyvendor_bottom" })
+        @await Component.InvokeAsync("Widget", new { widgetZone = PublicWidgetZones.ApplyVendorBottom })
     </div>
 </div>

@@ -1,8 +1,9 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Nop.Core.Data;
 using Nop.Core.Domain.Tasks;
+using Nop.Data;
+using Nop.Services.Caching.Extensions;
 
 namespace Nop.Services.Tasks
 {
@@ -19,13 +20,9 @@ namespace Nop.Services.Tasks
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="taskRepository">Task repository</param>
         public ScheduleTaskService(IRepository<ScheduleTask> taskRepository)
         {
-            this._taskRepository = taskRepository;
+            _taskRepository = taskRepository;
         }
 
         #endregion
@@ -54,7 +51,7 @@ namespace Nop.Services.Tasks
             if (taskId == 0)
                 return null;
 
-            return _taskRepository.GetById(taskId);
+            return _taskRepository.ToCachedGetById(taskId);
         }
 
         /// <summary>
@@ -87,6 +84,7 @@ namespace Nop.Services.Tasks
             {
                 query = query.Where(t => t.Enabled);
             }
+
             query = query.OrderByDescending(t => t.Seconds);
 
             var tasks = query.ToList();

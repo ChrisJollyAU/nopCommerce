@@ -1,5 +1,4 @@
-using System;
-using Nop.Core.Domain.Customers;
+﻿using System;
 
 namespace Nop.Core.Domain.Orders
 {
@@ -78,19 +77,8 @@ namespace Nop.Core.Domain.Orders
         /// </summary>
         public ReturnRequestStatus ReturnRequestStatus
         {
-            get
-            {
-                return (ReturnRequestStatus)this.ReturnRequestStatusId;
-            }
-            set
-            {
-                this.ReturnRequestStatusId = (int)value;
-            }
+            get => (ReturnRequestStatus)ReturnRequestStatusId;
+            set => ReturnRequestStatusId = (int)value;
         }
-
-        /// <summary>
-        /// Gets or sets the customer
-        /// </summary>
-        public virtual Customer Customer { get; set; }
     }
 }

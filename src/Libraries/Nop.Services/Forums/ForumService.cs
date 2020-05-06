@@ -2,14 +2,18 @@
 using System.Collections.Generic;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Caching;
-using Nop.Core.Data;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Forums;
+using Nop.Core.Domain.Seo;
+using Nop.Core.Html;
+using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Common;
 using Nop.Services.Customers;
 using Nop.Services.Events;
 using Nop.Services.Messages;
+using Nop.Services.Seo;
 
 namespace Nop.Services.Forums
 {
@@ -18,102 +22,65 @@ namespace Nop.Services.Forums
     /// </summary>
     public partial class ForumService : IForumService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        private const string FORUMGROUP_ALL_KEY = "Nop.forumgroup.all";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : forum group ID
-        /// </remarks>
-        private const string FORUM_ALLBYFORUMGROUPID_KEY = "Nop.forum.allbyforumgroupid-{0}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string FORUMGROUP_PATTERN_KEY = "Nop.forumgroup.";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string FORUM_PATTERN_KEY = "Nop.forum.";
-
-        #endregion
-
         #region Fields
 
-        private readonly IRepository<ForumGroup> _forumGroupRepository;
+        private readonly ForumSettings _forumSettings;
+        private readonly ICacheKeyService _cacheKeyService;
+        private readonly ICustomerService _customerService;
+        private readonly IEventPublisher _eventPublisher;
+        private readonly IGenericAttributeService _genericAttributeService;
+        private readonly IRepository<Customer> _customerRepository;
         private readonly IRepository<Forum> _forumRepository;
-        private readonly IRepository<ForumTopic> _forumTopicRepository;
+        private readonly IRepository<ForumGroup> _forumGroupRepository;
         private readonly IRepository<ForumPost> _forumPostRepository;
         private readonly IRepository<ForumPostVote> _forumPostVoteRepository;
-        private readonly IRepository<PrivateMessage> _forumPrivateMessageRepository;
         private readonly IRepository<ForumSubscription> _forumSubscriptionRepository;
-        private readonly ForumSettings _forumSettings;
-        private readonly IRepository<Customer> _customerRepository;
-        private readonly ICacheManager _cacheManager;
-        private readonly IGenericAttributeService _genericAttributeService;
-        private readonly ICustomerService _customerService;
+        private readonly IRepository<ForumTopic> _forumTopicRepository;
+        private readonly IRepository<PrivateMessage> _forumPrivateMessageRepository;
+        private readonly IUrlRecordService _urlRecordService;
         private readonly IWorkContext _workContext;
         private readonly IWorkflowMessageService _workflowMessageService;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly SeoSettings _seoSettings;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="cacheManager">Cache manager</param>
-        /// <param name="forumGroupRepository">Forum group repository</param>
-        /// <param name="forumRepository">Forum repository</param>
-        /// <param name="forumTopicRepository">Forum topic repository</param>
-        /// <param name="forumPostRepository">Forum post repository</param>
-        /// <param name="forumPostVoteRepository">Forum post vote repository</param>
-        /// <param name="forumPrivateMessageRepository">Private message repository</param>
-        /// <param name="forumSubscriptionRepository">Forum subscription repository</param>
-        /// <param name="forumSettings">Forum settings</param>
-        /// <param name="customerRepository">Customer repository</param>
-        /// <param name="genericAttributeService">Generic attribute service</param>
-        /// <param name="customerService">Customer service</param>
-        /// <param name="workContext">Work context</param>
-        /// <param name="workflowMessageService">Workflow message service</param>
-        /// <param name="eventPublisher">Event published</param>
-        public ForumService(ICacheManager cacheManager,
-            IRepository<ForumGroup> forumGroupRepository,
+        public ForumService(ForumSettings forumSettings,
+            ICacheKeyService cacheKeyService,
+            ICustomerService customerService,
+            IEventPublisher eventPublisher,
+            IGenericAttributeService genericAttributeService,
+            IRepository<Customer> customerRepository,
             IRepository<Forum> forumRepository,
-            IRepository<ForumTopic> forumTopicRepository,
+            IRepository<ForumGroup> forumGroupRepository,
             IRepository<ForumPost> forumPostRepository,
             IRepository<ForumPostVote> forumPostVoteRepository,
-            IRepository<PrivateMessage> forumPrivateMessageRepository,
             IRepository<ForumSubscription> forumSubscriptionRepository,
-            ForumSettings forumSettings,
-            IRepository<Customer> customerRepository,
-            IGenericAttributeService genericAttributeService,
-            ICustomerService customerService,
+            IRepository<ForumTopic> forumTopicRepository,
+            IRepository<PrivateMessage> forumPrivateMessageRepository,
+            IUrlRecordService urlRecordService,
             IWorkContext workContext,
             IWorkflowMessageService workflowMessageService,
-            IEventPublisher eventPublisher
-            )
+            SeoSettings seoSettings)
         {
-            this._cacheManager = cacheManager;
-            this._forumGroupRepository = forumGroupRepository;
-            this._forumRepository = forumRepository;
-            this._forumTopicRepository = forumTopicRepository;
-            this._forumPostRepository = forumPostRepository;
-            this._forumPostVoteRepository = forumPostVoteRepository;
-            this._forumPrivateMessageRepository = forumPrivateMessageRepository;
-            this._forumSubscriptionRepository = forumSubscriptionRepository;
-            this._forumSettings = forumSettings;
-            this._customerRepository = customerRepository;
-            this._genericAttributeService = genericAttributeService;
-            this._customerService = customerService;
-            this._workContext = workContext;
-            this._workflowMessageService = workflowMessageService;
+            _forumSettings = forumSettings;
+            _cacheKeyService = cacheKeyService;
+            _customerService = customerService;
             _eventPublisher = eventPublisher;
+            _genericAttributeService = genericAttributeService;
+            _customerRepository = customerRepository;
+            _forumRepository = forumRepository;
+            _forumGroupRepository = forumGroupRepository;
+            _forumPostRepository = forumPostRepository;
+            _forumPostVoteRepository = forumPostVoteRepository;
+            _forumSubscriptionRepository = forumSubscriptionRepository;
+            _forumTopicRepository = forumTopicRepository;
+            _forumPrivateMessageRepository = forumPrivateMessageRepository;
+            _urlRecordService = urlRecordService;
+            _workContext = workContext;
+            _workflowMessageService = workflowMessageService;
+            _seoSettings = seoSettings;
         }
 
         #endregion
@@ -130,6 +97,7 @@ namespace Nop.Services.Forums
             {
                 return;
             }
+
             var forum = GetForumById(forumId);
             if (forum == null)
             {
@@ -194,6 +162,7 @@ namespace Nop.Services.Forums
             {
                 return;
             }
+
             var forumTopic = GetTopicById(forumTopicId);
             if (forumTopic == null)
             {
@@ -258,16 +227,7 @@ namespace Nop.Services.Forums
                         select fp.Id;
             var numPosts = query.Count();
 
-            _genericAttributeService.SaveAttribute(customer, SystemCustomerAttributeNames.ForumPostCount, numPosts);
-        }
-
-        private bool IsForumModerator(Customer customer)
-        {
-            if (customer.IsForumModerator())
-            {
-                return true;
-            }
-            return false;
+            _genericAttributeService.SaveAttribute(customer, NopCustomerDefaults.ForumPostCountAttribute, numPosts);
         }
 
         #endregion
@@ -287,9 +247,6 @@ namespace Nop.Services.Forums
 
             _forumGroupRepository.Delete(forumGroup);
 
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityDeleted(forumGroup);
         }
@@ -306,7 +263,7 @@ namespace Nop.Services.Forums
                 return null;
             }
 
-            return _forumGroupRepository.GetById(forumGroupId);
+            return _forumGroupRepository.ToCachedGetById(forumGroupId);
         }
 
         /// <summary>
@@ -315,14 +272,11 @@ namespace Nop.Services.Forums
         /// <returns>Forum groups</returns>
         public virtual IList<ForumGroup> GetAllForumGroups()
         {
-            var key = string.Format(FORUMGROUP_ALL_KEY);
-            return _cacheManager.Get(key, () =>
-            {
-                var query = from fg in _forumGroupRepository.Table
-                            orderby fg.DisplayOrder, fg.Id
-                            select fg;
-                return query.ToList();
-            });
+            var query = from fg in _forumGroupRepository.Table
+                orderby fg.DisplayOrder, fg.Id
+                select fg;
+
+            return query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopForumDefaults.ForumGroupAllCacheKey));
         }
 
         /// <summary>
@@ -337,11 +291,7 @@ namespace Nop.Services.Forums
             }
 
             _forumGroupRepository.Insert(forumGroup);
-
-            //cache
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
-
+            
             //event notification
             _eventPublisher.EntityInserted(forumGroup);
         }
@@ -359,10 +309,6 @@ namespace Nop.Services.Forums
 
             _forumGroupRepository.Update(forumGroup);
 
-            //cache
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityUpdated(forumGroup);
         }
@@ -372,7 +318,7 @@ namespace Nop.Services.Forums
         /// </summary>
         /// <param name="forum">Forum</param>
         public virtual void DeleteForum(Forum forum)
-        {            
+        {
             if (forum == null)
             {
                 throw new ArgumentNullException(nameof(forum));
@@ -380,8 +326,8 @@ namespace Nop.Services.Forums
 
             //delete forum subscriptions (topics)
             var queryTopicIds = from ft in _forumTopicRepository.Table
-                           where ft.ForumId == forum.Id
-                           select ft.Id;
+                                where ft.ForumId == forum.Id
+                                select ft.Id;
             var queryFs1 = from fs in _forumSubscriptionRepository.Table
                            where queryTopicIds.Contains(fs.TopicId)
                            select fs;
@@ -405,10 +351,7 @@ namespace Nop.Services.Forums
 
             //delete forum
             _forumRepository.Delete(forum);
-
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
-
+            
             //event notification
             _eventPublisher.EntityDeleted(forum);
         }
@@ -423,7 +366,7 @@ namespace Nop.Services.Forums
             if (forumId == 0)
                 return null;
 
-            return _forumRepository.GetById(forumId);
+            return _forumRepository.ToCachedGetById(forumId);
         }
 
         /// <summary>
@@ -433,16 +376,16 @@ namespace Nop.Services.Forums
         /// <returns>Forums</returns>
         public virtual IList<Forum> GetAllForumsByGroupId(int forumGroupId)
         {
-            var key = string.Format(FORUM_ALLBYFORUMGROUPID_KEY, forumGroupId);
-            return _cacheManager.Get(key, () =>
-            {
-                var query = from f in _forumRepository.Table
-                            orderby f.DisplayOrder, f.Id
-                            where f.ForumGroupId == forumGroupId
-                            select f;
-                var forums = query.ToList();
-                return forums;
-            });
+            var key = _cacheKeyService.PrepareKeyForDefaultCache(NopForumDefaults.ForumAllByForumGroupIdCacheKey, forumGroupId);
+
+            var query = from f in _forumRepository.Table
+                orderby f.DisplayOrder, f.Id
+                where f.ForumGroupId == forumGroupId
+                select f;
+
+            var forums = query.ToCachedList(key);
+
+            return forums;
         }
 
         /// <summary>
@@ -457,9 +400,6 @@ namespace Nop.Services.Forums
             }
 
             _forumRepository.Insert(forum);
-
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityInserted(forum);
@@ -477,9 +417,6 @@ namespace Nop.Services.Forums
             }
 
             _forumRepository.Update(forum);
-            
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityUpdated(forum);
@@ -490,11 +427,11 @@ namespace Nop.Services.Forums
         /// </summary>
         /// <param name="forumTopic">Forum topic</param>
         public virtual void DeleteTopic(ForumTopic forumTopic)
-        {            
+        {
             if (forumTopic == null)
-            {                
+            {
                 throw new ArgumentNullException(nameof(forumTopic));
-            }                
+            }
 
             var customerId = forumTopic.CustomerId;
             var forumId = forumTopic.ForumId;
@@ -517,9 +454,6 @@ namespace Nop.Services.Forums
             //update stats
             UpdateForumStats(forumId);
             UpdateCustomerStats(customerId);
-
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityDeleted(forumTopic);
@@ -546,15 +480,15 @@ namespace Nop.Services.Forums
             if (forumTopicId == 0)
                 return null;
 
-            var forumTopic = _forumTopicRepository.GetById(forumTopicId);
+            var forumTopic = _forumTopicRepository.ToCachedGetById(forumTopicId);
             if (forumTopic == null)
                 return null;
 
-            if (increaseViews)
-            {
-                forumTopic.Views = ++forumTopic.Views;
-                UpdateTopic(forumTopic);
-            }
+            if (!increaseViews) 
+                return forumTopic;
+
+            forumTopic.Views = ++forumTopic.Views;
+            UpdateTopic(forumTopic);
 
             return forumTopic;
         }
@@ -579,8 +513,7 @@ namespace Nop.Services.Forums
             {
                 limitDate = DateTime.UtcNow.AddDays(-limitDays);
             }
-            //we need to cast it to int, otherwise it won't work in SQLCE4
-            //we cannot use string.IsNullOrEmpty in query because it causes SqlCeException on SQLCE4
+
             var searchKeywords = !string.IsNullOrEmpty(keywords);
             var searchTopicTitles = searchType == ForumSearchType.All || searchType == ForumSearchType.TopicTitlesOnly;
             var searchPostText = searchType == ForumSearchType.All || searchType == ForumSearchType.PostTextOnly;
@@ -589,10 +522,9 @@ namespace Nop.Services.Forums
                          where
                          (forumId == 0 || ft.ForumId == forumId) &&
                          (customerId == 0 || ft.CustomerId == customerId) &&
-                         (
-                            !searchKeywords ||
+                         (!searchKeywords ||
                             (searchTopicTitles && ft.Subject.Contains(keywords)) ||
-                            (searchPostText && fp.Text.Contains(keywords))) && 
+                            (searchPostText && fp.Text.Contains(keywords))) &&
                          (!limitDate.HasValue || limitDate.Value <= ft.LastPostTime)
                          select ft.Id;
 
@@ -602,6 +534,7 @@ namespace Nop.Services.Forums
                          select ft;
 
             var topics = new PagedList<ForumTopic>(query2, pageIndex, pageSize);
+
             return topics;
         }
 
@@ -612,13 +545,13 @@ namespace Nop.Services.Forums
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
         /// <returns>Forum Topics</returns>
-        public virtual IPagedList<ForumTopic> GetActiveTopics(int forumId = 0, 
+        public virtual IPagedList<ForumTopic> GetActiveTopics(int forumId = 0,
             int pageIndex = 0, int pageSize = int.MaxValue)
         {
             var query1 = from ft in _forumTopicRepository.Table
                          where
                          (forumId == 0 || ft.ForumId == forumId) &&
-                         (ft.LastPostTime.HasValue)
+                         ft.LastPostTime.HasValue
                          select ft.Id;
 
             var query2 = from ft in _forumTopicRepository.Table
@@ -627,6 +560,7 @@ namespace Nop.Services.Forums
                          select ft;
 
             var topics = new PagedList<ForumTopic>(query2, pageIndex, pageSize);
+
             return topics;
         }
 
@@ -647,32 +581,29 @@ namespace Nop.Services.Forums
             //update stats
             UpdateForumStats(forumTopic.ForumId);
 
-            //cache            
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityInserted(forumTopic);
+            
+            if (!sendNotifications) 
+                return;
 
             //send notifications
-            if (sendNotifications)
+            var forum = GetForumById(forumTopic.ForumId);
+            var subscriptions = GetAllSubscriptions(forumId: forum.Id);
+            var languageId = _workContext.WorkingLanguage.Id;
+
+            foreach (var subscription in subscriptions)
             {
-                var forum = forumTopic.Forum;
-                var subscriptions = GetAllSubscriptions(forumId: forum.Id);
-                var languageId = _workContext.WorkingLanguage.Id;
-
-                foreach (var subscription in subscriptions)
+                if (subscription.CustomerId == forumTopic.CustomerId)
                 {
-                    if (subscription.CustomerId == forumTopic.CustomerId)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    if (!string.IsNullOrEmpty(subscription.Customer.Email))
-                    {
-                        _workflowMessageService.SendNewForumTopicMessage(subscription.Customer, forumTopic,
-                            forum, languageId);
-                    }
+                var customer = _customerService.GetCustomerById(subscription.CustomerId);
+
+                if (!string.IsNullOrEmpty(customer?.Email))
+                {
+                    _workflowMessageService.SendNewForumTopicMessage(customer, forumTopic, forum, languageId);
                 }
             }
         }
@@ -689,9 +620,6 @@ namespace Nop.Services.Forums
             }
 
             _forumTopicRepository.Update(forumTopic);
-
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityUpdated(forumTopic);
@@ -736,7 +664,7 @@ namespace Nop.Services.Forums
         /// </summary>
         /// <param name="forumPost">Forum post</param>
         public virtual void DeletePost(ForumPost forumPost)
-        {            
+        {
             if (forumPost == null)
             {
                 throw new ArgumentNullException(nameof(forumPost));
@@ -749,7 +677,7 @@ namespace Nop.Services.Forums
 
             //delete topic if it was the first post
             var deleteTopic = false;
-            var firstPost = forumTopic.GetFirstPost(this);
+            var firstPost = GetFirstPost(forumTopic);
             if (firstPost != null && firstPost.Id == forumPost.Id)
             {
                 deleteTopic = true;
@@ -769,16 +697,12 @@ namespace Nop.Services.Forums
             {
                 UpdateForumTopicStats(forumTopicId);
             }
+
             UpdateForumStats(forumId);
             UpdateCustomerStats(customerId);
 
-            //clear cache            
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityDeleted(forumPost);
-
         }
 
         /// <summary>
@@ -791,7 +715,7 @@ namespace Nop.Services.Forums
             if (forumPostId == 0)
                 return null;
 
-            return _forumPostRepository.GetById(forumPostId);
+            return _forumPostRepository.ToCachedGetById(forumPostId);
         }
 
         /// <summary>
@@ -804,7 +728,7 @@ namespace Nop.Services.Forums
         /// <param name="pageSize">Page size</param>
         /// <returns>Posts</returns>
         public virtual IPagedList<ForumPost> GetAllPosts(int forumTopicId = 0,
-            int customerId = 0, string keywords = "", 
+            int customerId = 0, string keywords = "",
             int pageIndex = 0, int pageSize = int.MaxValue)
         {
             return GetAllPosts(forumTopicId, customerId, keywords, true,
@@ -822,7 +746,7 @@ namespace Nop.Services.Forums
         /// <param name="pageSize">Page size</param>
         /// <returns>Forum Posts</returns>
         public virtual IPagedList<ForumPost> GetAllPosts(int forumTopicId = 0, int customerId = 0,
-            string keywords = "", bool ascSort = false, 
+            string keywords = "", bool ascSort = false,
             int pageIndex = 0, int pageSize = int.MaxValue)
         {
             var query = _forumPostRepository.Table;
@@ -830,10 +754,12 @@ namespace Nop.Services.Forums
             {
                 query = query.Where(fp => forumTopicId == fp.TopicId);
             }
+
             if (customerId > 0)
             {
                 query = query.Where(fp => customerId == fp.CustomerId);
             }
+
             if (!string.IsNullOrEmpty(keywords))
             {
                 query = query.Where(fp => fp.Text.Contains(keywords));
@@ -844,6 +770,7 @@ namespace Nop.Services.Forums
                 query.OrderByDescending(fp => fp.CreatedOnUtc).ThenBy(fp => fp.Id);
 
             var forumPosts = new PagedList<ForumPost>(query, pageIndex, pageSize);
+
             return forumPosts;
         }
 
@@ -869,37 +796,34 @@ namespace Nop.Services.Forums
             UpdateForumStats(forumId);
             UpdateCustomerStats(customerId);
 
-            //clear cache            
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityInserted(forumPost);
 
             //notifications
-            if (sendNotifications)
+            if (!sendNotifications) 
+                return;
+
+            var forum = GetForumById(forumTopic.ForumId);
+            var subscriptions = GetAllSubscriptions(topicId: forumTopic.Id);
+
+            var languageId = _workContext.WorkingLanguage.Id;
+
+            var friendlyTopicPageIndex = CalculateTopicPageIndex(forumPost.TopicId,
+                                             _forumSettings.PostsPageSize > 0 ? _forumSettings.PostsPageSize : 10,
+                                             forumPost.Id) + 1;
+
+            foreach (var subscription in subscriptions)
             {
-                var forum = forumTopic.Forum;
-                var subscriptions = GetAllSubscriptions(topicId: forumTopic.Id);
-
-                var languageId = _workContext.WorkingLanguage.Id;
-
-                var friendlyTopicPageIndex = CalculateTopicPageIndex(forumPost.TopicId,
-                    _forumSettings.PostsPageSize > 0 ? _forumSettings.PostsPageSize : 10, 
-                    forumPost.Id) + 1;
-
-                foreach (var subscription in subscriptions)
+                if (subscription.CustomerId == forumPost.CustomerId)
                 {
-                    if (subscription.CustomerId == forumPost.CustomerId)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    if (!string.IsNullOrEmpty(subscription.Customer.Email))
-                    {
-                        _workflowMessageService.SendNewForumPostMessage(subscription.Customer, forumPost,
-                            forumTopic, forum, friendlyTopicPageIndex, languageId);
-                    }
+                var customer = _customerService.GetCustomerById(subscription.CustomerId);
+
+                if (!string.IsNullOrEmpty(customer?.Email))
+                {
+                    _workflowMessageService.SendNewForumPostMessage(customer, forumPost, forumTopic, forum, friendlyTopicPageIndex, languageId);
                 }
             }
         }
@@ -917,9 +841,6 @@ namespace Nop.Services.Forums
             }
 
             _forumPostRepository.Update(forumPost);
-
-            _cacheManager.RemoveByPattern(FORUMGROUP_PATTERN_KEY);
-            _cacheManager.RemoveByPattern(FORUM_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityUpdated(forumPost);
@@ -952,7 +873,7 @@ namespace Nop.Services.Forums
             if (privateMessageId == 0)
                 return null;
 
-            return _forumPrivateMessageRepository.GetById(privateMessageId);
+            return _forumPrivateMessageRepository.ToCachedGetById(privateMessageId);
         }
 
         /// <summary>
@@ -990,6 +911,7 @@ namespace Nop.Services.Forums
                 query = query.Where(pm => pm.Subject.Contains(keywords));
                 query = query.Where(pm => pm.Text.Contains(keywords));
             }
+
             query = query.OrderByDescending(pm => pm.CreatedOnUtc);
 
             var privateMessages = new PagedList<PrivateMessage>(query, pageIndex, pageSize);
@@ -1020,12 +942,12 @@ namespace Nop.Services.Forums
             }
 
             //UI notification
-            _genericAttributeService.SaveAttribute(customerTo, SystemCustomerAttributeNames.NotifiedAboutNewPrivateMessages, false, privateMessage.StoreId);
+            _genericAttributeService.SaveAttribute(customerTo, NopCustomerDefaults.NotifiedAboutNewPrivateMessagesAttribute, false, privateMessage.StoreId);
 
             //Email notification
             if (_forumSettings.NotifyAboutPrivateMessages)
             {
-                _workflowMessageService.SendPrivateMessageNotification(privateMessage, _workContext.WorkingLanguage.Id);                
+                _workflowMessageService.SendPrivateMessageNotification(privateMessage, _workContext.WorkingLanguage.Id);
             }
         }
 
@@ -1079,7 +1001,7 @@ namespace Nop.Services.Forums
             if (forumSubscriptionId == 0)
                 return null;
 
-            return _forumSubscriptionRepository.GetById(forumSubscriptionId);
+            return _forumSubscriptionRepository.ToCachedGetById(forumSubscriptionId);
         }
 
         /// <summary>
@@ -1099,8 +1021,9 @@ namespace Nop.Services.Forums
                           where
                           (customerId == 0 || fs.CustomerId == customerId) &&
                           (forumId == 0 || fs.ForumId == forumId) &&
-                          (topicId == 0 || fs.TopicId == topicId) &&
-                          (c.Active && !c.Deleted)
+                          (topicId == 0 || fs.TopicId == topicId) && 
+                          c.Active && 
+                          !c.Deleted
                           select fs.SubscriptionGuid;
 
             var query = from fs in _forumSubscriptionRepository.Table
@@ -1109,6 +1032,7 @@ namespace Nop.Services.Forums
                         select fs;
 
             var forumSubscriptions = new PagedList<ForumSubscription>(query, pageIndex, pageSize);
+
             return forumSubscriptions;
         }
 
@@ -1139,7 +1063,7 @@ namespace Nop.Services.Forums
             {
                 throw new ArgumentNullException(nameof(forumSubscription));
             }
-            
+
             _forumSubscriptionRepository.Update(forumSubscription);
 
             //event notification
@@ -1164,14 +1088,9 @@ namespace Nop.Services.Forums
                 return false;
             }
 
-            if (customer.IsGuest() && !_forumSettings.AllowGuestsToCreateTopics)
+            if (_customerService.IsGuest(customer) && !_forumSettings.AllowGuestsToCreateTopics)
             {
                 return false;
-            }
-
-            if (IsForumModerator(customer))
-            {
-                return true;
             }
 
             return true;
@@ -1195,23 +1114,22 @@ namespace Nop.Services.Forums
                 return false;
             }
 
-            if (customer.IsGuest())
+            if (_customerService.IsGuest(customer))
             {
                 return false;
             }
 
-            if (IsForumModerator(customer))
+            if (_customerService.IsForumModerator(customer))
             {
                 return true;
             }
 
-            if (_forumSettings.AllowCustomersToEditPosts)
-            {
-                var ownTopic = customer.Id == topic.CustomerId;
-                return ownTopic;
-            }
+            if (!_forumSettings.AllowCustomersToEditPosts) 
+                return false;
 
-            return false;
+            var ownTopic = customer.Id == topic.CustomerId;
+
+            return ownTopic;
         }
 
         /// <summary>
@@ -1232,17 +1150,12 @@ namespace Nop.Services.Forums
                 return false;
             }
 
-            if (customer.IsGuest())
+            if (_customerService.IsGuest(customer))
             {
                 return false;
             }
 
-            if (IsForumModerator(customer))
-            {
-                return true;
-            }
-
-            return false;
+            return _customerService.IsForumModerator(customer);
         }
 
         /// <summary>
@@ -1263,23 +1176,22 @@ namespace Nop.Services.Forums
                 return false;
             }
 
-            if (customer.IsGuest())
+            if (_customerService.IsGuest(customer))
             {
                 return false;
             }
 
-            if (IsForumModerator(customer))
+            if (_customerService.IsForumModerator(customer))
             {
                 return true;
             }
 
-            if (_forumSettings.AllowCustomersToDeletePosts)
-            {
-                var ownTopic = customer.Id == topic.CustomerId;
-                return ownTopic;
-            }
+            if (!_forumSettings.AllowCustomersToDeletePosts) 
+                return false;
 
-            return false;
+            var ownTopic = customer.Id == topic.CustomerId;
+
+            return ownTopic;
         }
 
         /// <summary>
@@ -1300,7 +1212,7 @@ namespace Nop.Services.Forums
                 return false;
             }
 
-            if (customer.IsGuest() && !_forumSettings.AllowGuestsToCreatePosts)
+            if (_customerService.IsGuest(customer) && !_forumSettings.AllowGuestsToCreatePosts)
             {
                 return false;
             }
@@ -1326,25 +1238,24 @@ namespace Nop.Services.Forums
                 return false;
             }
 
-            if (customer.IsGuest())
+            if (_customerService.IsGuest(customer))
             {
                 return false;
             }
 
-            if (IsForumModerator(customer))
+            if (_customerService.IsForumModerator(customer))
             {
                 return true;
             }
 
-            if (_forumSettings.AllowCustomersToEditPosts)
-            {
-                var ownPost = customer.Id == post.CustomerId;
-                return ownPost;
-            }
+            if (!_forumSettings.AllowCustomersToEditPosts) 
+                return false;
 
-            return false;
+            var ownPost = customer.Id == post.CustomerId;
+
+            return ownPost;
         }
-        
+
         /// <summary>
         /// Check whether customer is allowed to delete post
         /// </summary>
@@ -1363,23 +1274,21 @@ namespace Nop.Services.Forums
                 return false;
             }
 
-            if (customer.IsGuest())
+            if (_customerService.IsGuest(customer))
             {
                 return false;
             }
 
-            if (IsForumModerator(customer))
+            if (_customerService.IsForumModerator(customer))
             {
                 return true;
             }
 
-            if (_forumSettings.AllowCustomersToDeletePosts)
-            {
-                var ownPost = customer.Id == post.CustomerId;
-                return ownPost;
-            }
+            if (!_forumSettings.AllowCustomersToDeletePosts)
+                return false;
+            var ownPost = customer.Id == post.CustomerId;
 
-            return false;
+            return ownPost;
         }
 
         /// <summary>
@@ -1394,17 +1303,12 @@ namespace Nop.Services.Forums
                 return false;
             }
 
-            if (customer.IsGuest())
+            if (_customerService.IsGuest(customer))
             {
                 return false;
             }
 
-            if (IsForumModerator(customer))
-            {
-                return true;
-            }            
-
-            return false;
+            return _customerService.IsForumModerator(customer);
         }
 
         /// <summary>
@@ -1419,7 +1323,7 @@ namespace Nop.Services.Forums
                 return false;
             }
 
-            if (customer.IsGuest())
+            if (_customerService.IsGuest(customer))
             {
                 return false;
             }
@@ -1437,16 +1341,16 @@ namespace Nop.Services.Forums
         public virtual int CalculateTopicPageIndex(int forumTopicId, int pageSize, int postId)
         {
             var pageIndex = 0;
-            var forumPosts = GetAllPosts(forumTopicId: forumTopicId, ascSort: true);
+            var forumPosts = GetAllPosts(forumTopicId, ascSort: true);
 
             for (var i = 0; i < forumPosts.TotalCount; i++)
             {
-                if (forumPosts[i].Id == postId)
+                if (forumPosts[i].Id != postId) 
+                    continue;
+
+                if (pageSize > 0)
                 {
-                    if (pageSize > 0)
-                    {
-                        pageIndex = i / pageSize;
-                    }
+                    pageIndex = i / pageSize;
                 }
             }
 
@@ -1535,6 +1439,206 @@ namespace Nop.Services.Forums
             //event notification
             _eventPublisher.EntityDeleted(postVote);
         }
+
+        /// <summary>
+        /// Formats the forum post text
+        /// </summary>
+        /// <param name="forumPost">Forum post</param>
+        /// <returns>Formatted text</returns>
+        public virtual string FormatPostText(ForumPost forumPost)
+        {
+            var text = forumPost.Text;
+
+            if (string.IsNullOrEmpty(text))
+                return string.Empty;
+
+            switch (_forumSettings.ForumEditor)
+            {
+                case EditorType.SimpleTextBox:
+                    {
+                        text = HtmlHelper.FormatText(text, false, true, false, false, false, false);
+                    }
+
+                    break;
+                case EditorType.BBCodeEditor:
+                    {
+                        text = HtmlHelper.FormatText(text, false, true, false, true, false, false);
+                    }
+
+                    break;
+                default:
+                    break;
+            }
+
+            return text;
+        }
+
+        /// <summary>
+        /// Strips the topic subject
+        /// </summary>
+        /// <param name="forumTopic">Forum topic</param>
+        /// <returns>Formatted subject</returns>
+        public virtual string StripTopicSubject(ForumTopic forumTopic)
+        {
+            var subject = forumTopic.Subject;
+            if (string.IsNullOrEmpty(subject))
+            {
+                return subject;
+            }
+
+            var strippedTopicMaxLength = _forumSettings.StrippedTopicMaxLength;
+            if (strippedTopicMaxLength <= 0)
+                return subject;
+
+            if (subject.Length <= strippedTopicMaxLength)
+                return subject;
+
+            var index = subject.IndexOf(" ", strippedTopicMaxLength, StringComparison.Ordinal);
+            
+            if (index <= 0) 
+                return subject;
+
+            subject = subject.Substring(0, index);
+            subject += "...";
+
+            return subject;
+        }
+
+        /// <summary>
+        /// Formats the forum signature text
+        /// </summary>
+        /// <param name="text">Text</param>
+        /// <returns>Formatted text</returns>
+        public virtual string FormatForumSignatureText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return string.Empty;
+
+            text = HtmlHelper.FormatText(text, false, true, false, false, false, false);
+            return text;
+        }
+
+        /// <summary>
+        /// Formats the private message text
+        /// </summary>
+        /// <param name="pm">Private message</param>
+        /// <returns>Formatted text</returns>
+        public virtual string FormatPrivateMessageText(PrivateMessage pm)
+        {
+            var text = pm.Text;
+
+            if (string.IsNullOrEmpty(text))
+                return string.Empty;
+
+            text = HtmlHelper.FormatText(text, false, true, false, true, false, false);
+
+            return text;
+        }
+
+        /// <summary>
+        /// Get forum last topic
+        /// </summary>
+        /// <param name="forum">Forum</param>
+        /// <returns>Forum topic</returns>
+        public virtual ForumTopic GetLastTopic(Forum forum)
+        {
+            if (forum == null)
+                throw new ArgumentNullException(nameof(forum));
+
+            return GetTopicById(forum.LastTopicId);
+        }
+
+        /// <summary>
+        /// Get forum last post
+        /// </summary>
+        /// <param name="forum">Forum</param>
+        /// <returns>Forum topic</returns>
+        public virtual ForumPost GetLastPost(Forum forum)
+        {
+            if (forum == null)
+                throw new ArgumentNullException(nameof(forum));
+
+            return GetPostById(forum.LastPostId);
+        }
+
+        /// <summary>
+        /// Get first post
+        /// </summary>
+        /// <param name="forumTopic">Forum topic</param>
+        /// <returns>Forum post</returns>
+        public virtual ForumPost GetFirstPost(ForumTopic forumTopic)
+        {
+            if (forumTopic == null)
+                throw new ArgumentNullException(nameof(forumTopic));
+
+            var forumPosts = GetAllPosts(forumTopic.Id, 0, string.Empty, 0, 1);
+            if (forumPosts.Any())
+                return forumPosts[0];
+
+            return null;
+        }
+
+        /// <summary>
+        /// Get last post
+        /// </summary>
+        /// <param name="forumTopic">Forum topic</param>
+        /// <returns>Forum post</returns>
+        public virtual ForumPost GetLastPost(ForumTopic forumTopic)
+        {
+            if (forumTopic == null)
+                throw new ArgumentNullException(nameof(forumTopic));
+
+            return GetPostById(forumTopic.LastPostId);
+        }
+
+        /// <summary>
+        /// Gets ForumGroup SE (search engine) name
+        /// </summary>
+        /// <param name="forumGroup">ForumGroup</param>
+        /// <returns>ForumGroup SE (search engine) name</returns>
+        public virtual string GetForumGroupSeName(ForumGroup forumGroup)
+        {
+            if (forumGroup == null)
+                throw new ArgumentNullException(nameof(forumGroup));
+
+            var seName = _urlRecordService.GetSeName(forumGroup.Name, _seoSettings.ConvertNonWesternChars, _seoSettings.AllowUnicodeCharsInUrls);
+            return seName;
+        }
+
+        /// <summary>
+        /// Gets Forum SE (search engine) name
+        /// </summary>
+        /// <param name="forum">Forum</param>
+        /// <returns>Forum SE (search engine) name</returns>
+        public virtual string GetForumSeName(Forum forum)
+        {
+            if (forum == null)
+                throw new ArgumentNullException(nameof(forum));
+
+            var seName = _urlRecordService.GetSeName(forum.Name, _seoSettings.ConvertNonWesternChars, _seoSettings.AllowUnicodeCharsInUrls);
+            return seName;
+        }
+
+        /// <summary>
+        /// Gets ForumTopic SE (search engine) name
+        /// </summary>
+        /// <param name="forumTopic">ForumTopic</param>
+        /// <returns>ForumTopic SE (search engine) name</returns>
+        public virtual string GetTopicSeName(ForumTopic forumTopic)
+        {
+            if (forumTopic == null)
+                throw new ArgumentNullException(nameof(forumTopic));
+
+            var seName = _urlRecordService.GetSeName(forumTopic.Subject, _seoSettings.ConvertNonWesternChars, _seoSettings.AllowUnicodeCharsInUrls);
+
+            // Trim SE name to avoid URLs that are too long
+            var maxLength = NopSeoDefaults.ForumTopicLength;
+            if (seName.Length > maxLength)
+                seName = seName.Substring(0, maxLength);
+
+            return seName;
+        }
+
         #endregion
     }
 }

@@ -1,12 +1,9 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using FluentValidation.Attributes;
 using Nop.Web.Framework.Mvc.ModelBinding;
-using Nop.Web.Framework.Mvc.Models;
-using Nop.Web.Validators.Common;
+using Nop.Web.Framework.Models;
 
 namespace Nop.Web.Models.Common
 {
-    [Validator(typeof(ContactVendorValidator))]
     public partial class ContactVendorModel : BaseNopModel
     {
         public int VendorId { get; set; }

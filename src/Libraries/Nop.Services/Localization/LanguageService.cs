@@ -1,9 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Nop.Core.Caching;
-using Nop.Core.Data;
 using Nop.Core.Domain.Localization;
+using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Configuration;
 using Nop.Services.Events;
 using Nop.Services.Stores;
@@ -15,68 +18,39 @@ namespace Nop.Services.Localization
     /// </summary>
     public partial class LanguageService : ILanguageService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : language ID
-        /// </remarks>
-        private const string LANGUAGES_BY_ID_KEY = "Nop.language.id-{0}";
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : show hidden records?
-        /// </remarks>
-        private const string LANGUAGES_ALL_KEY = "Nop.language.all-{0}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string LANGUAGES_PATTERN_KEY = "Nop.language.";
-
-        #endregion
-
         #region Fields
 
-        private readonly IRepository<Language> _languageRepository;
-        private readonly IStoreMappingService _storeMappingService;
-        private readonly IStaticCacheManager _cacheManager;
-        private readonly ISettingService _settingService;
-        private readonly LocalizationSettings _localizationSettings;
+        private readonly ICacheKeyService _cacheKeyService;
         private readonly IEventPublisher _eventPublisher;
+        private readonly IRepository<Language> _languageRepository;
+        private readonly ISettingService _settingService;
+        private readonly IStaticCacheManager _staticCacheManager;
+        private readonly IStoreMappingService _storeMappingService;
+        private readonly LocalizationSettings _localizationSettings;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="cacheManager">Cache manager</param>
-        /// <param name="languageRepository">Language repository</param>
-        /// <param name="storeMappingService">Store mapping service</param>
-        /// <param name="settingService">Setting service</param>
-        /// <param name="localizationSettings">Localization settings</param>
-        /// <param name="eventPublisher">Event published</param>
-        public LanguageService(IStaticCacheManager cacheManager,
+        public LanguageService(ICacheKeyService cacheKeyService,
+            IEventPublisher eventPublisher,
             IRepository<Language> languageRepository,
-            IStoreMappingService storeMappingService,
             ISettingService settingService,
-            LocalizationSettings localizationSettings,
-            IEventPublisher eventPublisher)
+            IStaticCacheManager staticCacheManager,
+            IStoreMappingService storeMappingService,
+            LocalizationSettings localizationSettings)
         {
-            this._cacheManager = cacheManager;
-            this._languageRepository = languageRepository;
-            this._storeMappingService = storeMappingService;
-            this._settingService = settingService;
-            this._localizationSettings = localizationSettings;
-            this._eventPublisher = eventPublisher;
+            _cacheKeyService = cacheKeyService;
+            _eventPublisher = eventPublisher;
+            _languageRepository = languageRepository;
+            _settingService = settingService;
+            _staticCacheManager = staticCacheManager;
+            _storeMappingService = storeMappingService;
+            _localizationSettings = localizationSettings;
         }
 
         #endregion
-        
+
         #region Methods
 
         /// <summary>
@@ -87,29 +61,23 @@ namespace Nop.Services.Localization
         {
             if (language == null)
                 throw new ArgumentNullException(nameof(language));
-
-            if (language is IEntityForCaching)
-                throw new ArgumentException("Cacheable entities are not supported by Entity Framework");
-
+            
             //update default admin area language (if required)
             if (_localizationSettings.DefaultAdminLanguageId == language.Id)
             {
                 foreach (var activeLanguage in GetAllLanguages())
                 {
-                    if (activeLanguage.Id != language.Id)
-                    {
-                        _localizationSettings.DefaultAdminLanguageId = activeLanguage.Id;
-                        _settingService.SaveSetting(_localizationSettings);
-                        break;
-                    }
+                    if (activeLanguage.Id == language.Id) 
+                        continue;
+
+                    _localizationSettings.DefaultAdminLanguageId = activeLanguage.Id;
+                    _settingService.SaveSetting(_localizationSettings);
+                    break;
                 }
             }
-            
+
             _languageRepository.Delete(language);
-
-            //cache
-            _cacheManager.RemoveByPattern(LANGUAGES_PATTERN_KEY);
-
+            
             //event notification
             _eventPublisher.EntityDeleted(language);
         }
@@ -119,44 +87,31 @@ namespace Nop.Services.Localization
         /// </summary>
         /// <param name="storeId">Load records allowed only in a specified store; pass 0 to load all records</param>
         /// <param name="showHidden">A value indicating whether to show hidden records</param>
-        /// <param name="loadCacheableCopy">A value indicating whether to load a copy that could be cached (workaround until Entity Framework supports 2-level caching)</param>
         /// <returns>Languages</returns>
-        public virtual IList<Language> GetAllLanguages(bool showHidden = false, int storeId = 0, bool loadCacheableCopy = true)
+        public virtual IList<Language> GetAllLanguages(bool showHidden = false, int storeId = 0)
         {
-            Func<IList<Language>> loadLanguagesFunc = () =>
-            {
-                var query = _languageRepository.Table;
-                if (!showHidden)
-                    query = query.Where(l => l.Published);
-                query = query.OrderBy(l => l.DisplayOrder).ThenBy(l => l.Id);
-                return query.ToList();
-            };
+            var query = _languageRepository.Table;
+            if (!showHidden) query = query.Where(l => l.Published);
+            query = query.OrderBy(l => l.DisplayOrder).ThenBy(l => l.Id);
 
-            IList<Language> languages;
-            if (loadCacheableCopy)
+            //cacheable copy
+            var key = _cacheKeyService.PrepareKeyForDefaultCache(NopLocalizationDefaults.LanguagesAllCacheKey, storeId, showHidden);
+            
+            var languages = _staticCacheManager.Get(key, () =>
             {
-                //cacheable copy
-                var key = string.Format(LANGUAGES_ALL_KEY, showHidden);
-                languages = _cacheManager.Get(key, () =>
+                var allLanguages = query.ToList();
+
+                //store mapping
+                if (storeId > 0)
                 {
-                    var result = new List<Language>();
-                    foreach (var language in loadLanguagesFunc())
-                        result.Add(new LanguageForCaching(language));
-                    return result;
-                });
-            }
-            else
-            {
-                languages = loadLanguagesFunc();
-            }
+                    allLanguages = allLanguages
+                        .Where(l => _storeMappingService.Authorize(l, storeId))
+                        .ToList();
+                }
 
-            //store mapping
-            if (storeId > 0)
-            {
-                languages = languages
-                    .Where(l => _storeMappingService.Authorize(l, storeId))
-                    .ToList();
-            }
+                return allLanguages;
+            });
+
             return languages;
         }
 
@@ -164,32 +119,13 @@ namespace Nop.Services.Localization
         /// Gets a language
         /// </summary>
         /// <param name="languageId">Language identifier</param>
-        /// <param name="loadCacheableCopy">A value indicating whether to load a copy that could be cached (workaround until Entity Framework supports 2-level caching)</param>
         /// <returns>Language</returns>
-        public virtual Language GetLanguageById(int languageId, bool loadCacheableCopy = true)
+        public virtual Language GetLanguageById(int languageId)
         {
             if (languageId == 0)
                 return null;
 
-            Func<Language> loadLanguageFunc = () =>
-            {
-                return _languageRepository.GetById(languageId);
-            };
-
-            if (loadCacheableCopy)
-            {
-                //cacheable copy
-                var key = string.Format(LANGUAGES_BY_ID_KEY, languageId);
-                return _cacheManager.Get(key, () =>
-                {
-                    var language = loadLanguageFunc();
-                    if (language == null)
-                        return null;
-                    return new LanguageForCaching(language);
-                });
-            }
-
-            return loadLanguageFunc();
+            return _languageRepository.ToCachedGetById(languageId);
         }
 
         /// <summary>
@@ -201,13 +137,7 @@ namespace Nop.Services.Localization
             if (language == null)
                 throw new ArgumentNullException(nameof(language));
 
-            if (language is IEntityForCaching)
-                throw new ArgumentException("Cacheable entities are not supported by Entity Framework");
-
             _languageRepository.Insert(language);
-
-            //cache
-            _cacheManager.RemoveByPattern(LANGUAGES_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityInserted(language);
@@ -222,17 +152,30 @@ namespace Nop.Services.Localization
             if (language == null)
                 throw new ArgumentNullException(nameof(language));
 
-            if (language is IEntityForCaching)
-                throw new ArgumentException("Cacheable entities are not supported by Entity Framework");
-
             //update language
             _languageRepository.Update(language);
 
-            //cache
-            _cacheManager.RemoveByPattern(LANGUAGES_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityUpdated(language);
+        }
+
+        /// <summary>
+        /// Get 2 letter ISO language code
+        /// </summary>
+        /// <param name="language">Language</param>
+        /// <returns>ISO language code</returns>
+        public virtual string GetTwoLetterIsoLanguageName(Language language)
+        {
+            if (language == null)
+                throw new ArgumentNullException(nameof(language));
+
+            if (string.IsNullOrEmpty(language.LanguageCulture))
+                return "en";
+
+            var culture = new CultureInfo(language.LanguageCulture);
+            var code = culture.TwoLetterISOLanguageName;
+
+            return string.IsNullOrEmpty(code) ? "en" : code;
         }
 
         #endregion

@@ -13,7 +13,7 @@ namespace Nop.Core.Domain.Customers
         public bool UsernamesEnabled { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether users can check the availability of usernames (when registering or changing in 'My Account')
+        /// Gets or sets a value indicating whether users can check the availability of usernames (when registering or changing on the 'My Account' page)
         /// </summary>
         public bool CheckUsernameAvailabilityEnabled { get; set; }
 
@@ -21,6 +21,36 @@ namespace Nop.Core.Domain.Customers
         /// Gets or sets a value indicating whether users are allowed to change their usernames
         /// </summary>
         public bool AllowUsersToChangeUsernames { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether username will be validated (when registering or changing on the 'My Account' page)
+        /// </summary>
+        public bool UsernameValidationEnabled { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether username will be validated using regex (when registering or changing on the 'My Account' page)
+        /// </summary>
+        public bool UsernameValidationUseRegex { get; set; }
+
+        /// <summary>
+        /// Gets or sets a username validation rule
+        /// </summary>
+        public string UsernameValidationRule { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether phone number will be validated (when registering or changing on the 'My Account' page)
+        /// </summary>
+        public bool PhoneNumberValidationEnabled { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether phone number will be validated using regex (when registering or changing on the 'My Account' page)
+        /// </summary>
+        public bool PhoneNumberValidationUseRegex { get; set; }
+
+        /// <summary>
+        /// Gets or sets a phone number validation rule
+        /// </summary>
+        public string PhoneNumberValidationRule { get; set; }
 
         /// <summary>
         /// Default password format for customers
@@ -36,6 +66,26 @@ namespace Nop.Core.Domain.Customers
         /// Gets or sets a minimum password length
         /// </summary>
         public int PasswordMinLength { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether password are have least one lowercase
+        /// </summary>
+        public bool PasswordRequireLowercase { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether password are have least one uppercase
+        /// </summary>
+        public bool PasswordRequireUppercase { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether password are have least one non alphanumeric character
+        /// </summary>
+        public bool PasswordRequireNonAlphanumeric { get; set; }
+        
+        /// <summary>
+        /// Gets or sets a value indicating whether password are have least one digit
+        /// </summary>
+        public bool PasswordRequireDigit { get; set; }
 
         /// <summary>
         /// Gets or sets a number of passwords that should not be the same as the previous one; 0 if the customer can use the same password time after time
@@ -158,6 +208,11 @@ namespace Nop.Core.Domain.Customers
         public bool StoreIpAddresses { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating the number of minutes for 'last activity' module
+        /// </summary>
+        public int LastActivityMinutes { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether deleted customer records should be prefixed suffixed with "-DELETED"
         /// </summary>
         public bool SuffixDeletedCustomers { get; set; }
@@ -173,11 +228,36 @@ namespace Nop.Core.Domain.Customers
         public bool RequireRegistrationForDownloadableProducts { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether to check gift card balance
+        /// </summary>
+        public bool AllowCustomersToCheckGiftCardBalance { get; set; }
+
+        /// <summary>
         /// Gets or sets interval (in minutes) with which the Delete Guest Task runs
         /// </summary>
         public int DeleteGuestTaskOlderThanMinutes { get; set; }
 
         #region Form fields
+
+        /// <summary>
+        /// Gets or sets a value indicating whether 'First Name' is enabled
+        /// </summary>
+        public bool FirstNameEnabled { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether 'First Name' is required
+        /// </summary>
+        public bool FirstNameRequired { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether 'Last Name' is enabled
+        /// </summary>
+        public bool LastNameEnabled { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether 'Last Name' is required
+        /// </summary>
+        public bool LastNameRequired { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether 'Gender' is enabled
@@ -250,6 +330,16 @@ namespace Nop.Core.Domain.Customers
         public bool CityRequired { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether 'County' is enabled
+        /// </summary>
+        public bool CountyEnabled { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether 'County' is required
+        /// </summary>
+        public bool CountyRequired { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether 'Country' is enabled
         /// </summary>
         public bool CountryEnabled { get; set; }
@@ -283,6 +373,7 @@ namespace Nop.Core.Domain.Customers
         /// Gets or sets a value indicating whether 'Fax number' is enabled
         /// </summary>
         public bool FaxEnabled { get; set; }
+
         /// <summary>
         /// Gets or sets a value indicating whether 'Fax number' is required
         /// </summary>
@@ -292,7 +383,7 @@ namespace Nop.Core.Domain.Customers
         /// Gets or sets a value indicating whether privacy policy should accepted during registration
         /// </summary>
         public bool AcceptPrivacyPolicyEnabled { get; set; }
-
+        
         #endregion
     }
 }

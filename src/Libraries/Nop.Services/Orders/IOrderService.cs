@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Nop.Core;
+using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Orders;
 
 namespace Nop.Services.Orders
@@ -25,6 +26,13 @@ namespace Nop.Services.Orders
         /// <param name="customOrderNumber">The custom order number</param>
         /// <returns>Order</returns>
         Order GetOrderByCustomOrderNumber(string customOrderNumber);
+
+        /// <summary>
+        /// Gets an order by order item identifier
+        /// </summary>
+        /// <param name="orderItemId">The order item identifier</param>
+        /// <returns>Order</returns>
+        Order GetOrderByOrderItem(int orderItemId);
 
         /// <summary>
         /// Get orders by identifiers
@@ -62,11 +70,13 @@ namespace Nop.Services.Orders
         /// <param name="osIds">Order status identifiers; null to load all orders</param>
         /// <param name="psIds">Payment status identifiers; null to load all orders</param>
         /// <param name="ssIds">Shipping status identifiers; null to load all orders</param>
+        /// <param name="billingPhone">Billing phone. Leave empty to load all records.</param>
         /// <param name="billingEmail">Billing email. Leave empty to load all records.</param>
         /// <param name="billingLastName">Billing last name. Leave empty to load all records.</param>
         /// <param name="orderNotes">Search in order notes. Leave empty to load all records.</param>
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
+        /// <param name="getOnlyTotalCount">A value in indicating whether you want to load only total number of records. Set to "true" if you don't want to load data from database</param>
         /// <returns>Orders</returns>
         IPagedList<Order> SearchOrders(int storeId = 0,
             int vendorId = 0, int customerId = 0,
@@ -74,9 +84,9 @@ namespace Nop.Services.Orders
             int billingCountryId = 0, string paymentMethodSystemName = null,
             DateTime? createdFromUtc = null, DateTime? createdToUtc = null,
             List<int> osIds = null, List<int> psIds = null, List<int> ssIds = null,
-            string billingEmail = null, string billingLastName = "", 
-            string orderNotes = null, int pageIndex = 0, int pageSize = int.MaxValue);
-        
+            string billingPhone = null, string billingEmail = null, string billingLastName = "",
+            string orderNotes = null, int pageIndex = 0, int pageSize = int.MaxValue, bool getOnlyTotalCount = false);
+
         /// <summary>
         /// Inserts an order
         /// </summary>
@@ -97,6 +107,35 @@ namespace Nop.Services.Orders
         /// <returns>Order</returns>
         Order GetOrderByAuthorizationTransactionIdAndPaymentMethod(string authorizationTransactionId, string paymentMethodSystemName);
 
+        /// <summary>
+        /// Parse tax rates
+        /// </summary>
+        /// <param name="order">Order</param>
+        /// <param name="taxRatesStr"></param>
+        /// <returns>Rates</returns>
+        SortedDictionary<decimal, decimal> ParseTaxRates(Order order, string taxRatesStr);
+
+        /// <summary>
+        /// Gets a value indicating whether an order has items to be added to a shipment
+        /// </summary>
+        /// <param name="order">Order</param>
+        /// <returns>A value indicating whether an order has items to be added to a shipment</returns>
+        bool HasItemsToAddToShipment(Order order);
+
+        /// <summary>
+        /// Gets a value indicating whether an order has items to ship
+        /// </summary>
+        /// <param name="order">Order</param>
+        /// <returns>A value indicating whether an order has items to ship</returns>
+        bool HasItemsToShip(Order order);
+
+        /// <summary>
+        /// Gets a value indicating whether an order has items to deliver
+        /// </summary>
+        /// <param name="order">Order</param>
+        /// <returns>A value indicating whether an order has items to deliver</returns>
+        bool HasItemsToDeliver(Order order);
+
         #endregion
 
         #region Orders items
@@ -107,6 +146,23 @@ namespace Nop.Services.Orders
         /// <param name="orderItemId">Order item identifier</param>
         /// <returns>Order item</returns>
         OrderItem GetOrderItemById(int orderItemId);
+
+        /// <summary>
+        /// Gets a product of specify order item
+        /// </summary>
+        /// <param name="orderItemId">Order item identifier</param>
+        /// <returns>Product</returns>
+        Product GetProductByOrderItemId(int orderItemId);
+
+        /// <summary>
+        /// Gets a list items of order
+        /// </summary>
+        /// <param name="orderId">Order identifier</param>
+        /// <param name="isNotReturnable">Value indicating whether this product is returnable; pass null to ignore</param>
+        /// <param name="isShipEnabled">Value indicating whether the entity is ship enabled; pass null to ignore</param>
+        /// <param name="vendorId">Vendor identifier; pass 0 to ignore</param>
+        /// <returns>Result</returns>
+        IList<OrderItem> GetOrderItems(int orderId, bool? isNotReturnable = null, bool? isShipEnabled = null, int vendorId = 0);
 
         /// <summary>
         /// Gets an order item
@@ -128,6 +184,67 @@ namespace Nop.Services.Orders
         /// <param name="orderItem">The order item</param>
         void DeleteOrderItem(OrderItem orderItem);
 
+        /// <summary>
+        /// Gets a total number of items in all shipments
+        /// </summary>
+        /// <param name="orderItem">Order item</param>
+        /// <returns>Total number of items in all shipments</returns>
+        int GetTotalNumberOfItemsInAllShipment(OrderItem orderItem);
+
+        /// <summary>
+        /// Gets a total number of already items which can be added to new shipments
+        /// </summary>
+        /// <param name="orderItem">Order item</param>
+        /// <returns>Total number of already delivered items which can be added to new shipments</returns>
+        int GetTotalNumberOfItemsCanBeAddedToShipment(OrderItem orderItem);
+
+        /// <summary>
+        /// Gets a total number of not yet shipped items (but added to shipments)
+        /// </summary>
+        /// <param name="orderItem">Order item</param>
+        /// <returns>Total number of not yet shipped items (but added to shipments)</returns>
+        int GetTotalNumberOfNotYetShippedItems(OrderItem orderItem);
+
+        /// <summary>
+        /// Gets a total number of already shipped items
+        /// </summary>
+        /// <param name="orderItem">Order item</param>
+        /// <returns>Total number of already shipped items</returns>
+        int GetTotalNumberOfShippedItems(OrderItem orderItem);
+
+        /// <summary>
+        /// Gets a total number of already delivered items
+        /// </summary>
+        /// <param name="orderItem">Order  item</param>
+        /// <returns>Total number of already delivered items</returns>
+        int GetTotalNumberOfDeliveredItems(OrderItem orderItem);
+
+        /// <summary>
+        /// Gets a value indicating whether download is allowed
+        /// </summary>
+        /// <param name="orderItem">Order item to check</param>
+        /// <returns>True if download is allowed; otherwise, false.</returns>
+        bool IsDownloadAllowed(OrderItem orderItem);
+
+        /// <summary>
+        /// Gets a value indicating whether license download is allowed
+        /// </summary>
+        /// <param name="orderItem">Order item to check</param>
+        /// <returns>True if license download is allowed; otherwise, false.</returns>
+        bool IsLicenseDownloadAllowed(OrderItem orderItem);
+
+        /// <summary>
+        /// Inserts a order item
+        /// </summary>
+        /// <param name="orderItem">Order item</param>
+        void InsertOrderItem(OrderItem orderItem);
+
+        /// <summary>
+        /// Updates a order item
+        /// </summary>
+        /// <param name="orderItem">Order item</param>
+        void UpdateOrderItem(OrderItem orderItem);
+
         #endregion
 
         #region Order notes
@@ -140,10 +257,31 @@ namespace Nop.Services.Orders
         OrderNote GetOrderNoteById(int orderNoteId);
 
         /// <summary>
+        /// Gets a list notes of order
+        /// </summary>
+        /// <param name="orderId">Order identifier</param>
+        /// <param name="displayToCustomer">Value indicating whether a customer can see a note; pass null to ignore</param>
+        /// <returns>Result</returns>
+        IList<OrderNote> GetOrderNotesByOrderId(int orderId, bool? displayToCustomer = null);
+
+        /// <summary>
         /// Deletes an order note
         /// </summary>
         /// <param name="orderNote">The order note</param>
         void DeleteOrderNote(OrderNote orderNote);
+
+        /// <summary>
+        /// Formats the order note text
+        /// </summary>
+        /// <param name="orderNote">Order note</param>
+        /// <returns>Formatted text</returns>
+        string FormatOrderNoteText(OrderNote orderNote);
+
+        /// <summary>
+        /// Inserts an order note
+        /// </summary>
+        /// <param name="orderNote">The order note</param>
+        void InsertOrderNote(OrderNote orderNote);
 
         #endregion
 
@@ -188,6 +326,23 @@ namespace Nop.Services.Orders
         IPagedList<RecurringPayment> SearchRecurringPayments(int storeId = 0,
             int customerId = 0, int initialOrderId = 0, OrderStatus? initialOrderStatus = null,
             int pageIndex = 0, int pageSize = int.MaxValue, bool showHidden = false);
+
+        #endregion
+
+        #region Recurring payment history
+
+        /// <summary>
+        /// Inserts a recurring payment history entry
+        /// </summary>
+        /// <param name="recurringPaymentHistory">Recurring payment history entry</param>
+        void InsertRecurringPaymentHistory(RecurringPaymentHistory recurringPaymentHistory);
+
+        /// <summary>
+        /// Gets a recurring payment history
+        /// </summary>
+        /// <param name="recurringPayment">The recurring payment</param>
+        /// <returns>Result</returns>
+        IList<RecurringPaymentHistory> GetRecurringPaymentHistory(RecurringPayment recurringPayment);
 
         #endregion
     }

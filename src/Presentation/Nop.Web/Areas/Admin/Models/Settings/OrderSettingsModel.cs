@@ -1,10 +1,26 @@
 ﻿using Nop.Web.Framework.Mvc.ModelBinding;
-using Nop.Web.Framework.Mvc.Models;
+using Nop.Web.Framework.Models;
+using Nop.Web.Areas.Admin.Models.Orders;
 
 namespace Nop.Web.Areas.Admin.Models.Settings
 {
-    public partial class OrderSettingsModel : BaseNopModel
+    /// <summary>
+    /// Represents an order settings model
+    /// </summary>
+    public partial class OrderSettingsModel : BaseNopModel, ISettingsModel
     {
+        #region Ctor
+
+        public OrderSettingsModel()
+        {
+            ReturnRequestReasonSearchModel = new ReturnRequestReasonSearchModel();
+            ReturnRequestActionSearchModel = new ReturnRequestActionSearchModel();
+        }
+
+        #endregion
+
+        #region Properties
+
         public int ActiveStoreScopeConfiguration { get; set; }
 
         [NopResourceDisplayName("Admin.Configuration.Settings.Order.IsReOrderAllowed")]
@@ -31,6 +47,10 @@ namespace Nop.Web.Areas.Admin.Models.Settings
         public bool AnonymousCheckoutAllowed { get; set; }
         public bool AnonymousCheckoutAllowed_OverrideForStore { get; set; }
 
+        [NopResourceDisplayName("Admin.Configuration.Settings.Order.CheckoutDisabled")]
+        public bool CheckoutDisabled { get; set; }
+        public bool CheckoutDisabled_OverrideForStore { get; set; }
+
         [NopResourceDisplayName("Admin.Configuration.Settings.Order.TermsOfServiceOnShoppingCartPage")]
         public bool TermsOfServiceOnShoppingCartPage { get; set; }
         public bool TermsOfServiceOnShoppingCartPage_OverrideForStore { get; set; }
@@ -54,6 +74,10 @@ namespace Nop.Web.Areas.Admin.Models.Settings
         [NopResourceDisplayName("Admin.Configuration.Settings.Order.DisableOrderCompletedPage")]
         public bool DisableOrderCompletedPage { get; set; }
         public bool DisableOrderCompletedPage_OverrideForStore { get; set; }
+
+        [NopResourceDisplayName("Admin.Configuration.Settings.Order.DisplayPickupInStoreOnShippingMethodPage")]
+        public bool DisplayPickupInStoreOnShippingMethodPage { get; set; }
+        public bool DisplayPickupInStoreOnShippingMethodPage_OverrideForStore { get; set; }
 
         [NopResourceDisplayName("Admin.Configuration.Settings.Order.AttachPdfInvoiceToOrderPlacedEmail")]
         public bool AttachPdfInvoiceToOrderPlacedEmail { get; set; }
@@ -85,8 +109,10 @@ namespace Nop.Web.Areas.Admin.Models.Settings
 
         [NopResourceDisplayName("Admin.Configuration.Settings.Order.ActivateGiftCardsAfterCompletingOrder")]
         public bool ActivateGiftCardsAfterCompletingOrder { get; set; }
+
         [NopResourceDisplayName("Admin.Configuration.Settings.Order.DeactivateGiftCardsAfterCancellingOrder")]
         public bool DeactivateGiftCardsAfterCancellingOrder { get; set; }
+
         [NopResourceDisplayName("Admin.Configuration.Settings.Order.DeactivateGiftCardsAfterDeletingOrder")]
         public bool DeactivateGiftCardsAfterDeletingOrder { get; set; }
 
@@ -109,5 +135,15 @@ namespace Nop.Web.Areas.Admin.Models.Settings
         [NopResourceDisplayName("Admin.Configuration.Settings.Order.AllowAdminsToBuyCallForPriceProducts")]
         public bool AllowAdminsToBuyCallForPriceProducts { get; set; }
         public bool AllowAdminsToBuyCallForPriceProducts_OverrideForStore { get; set; }
+
+        [NopResourceDisplayName("Admin.Configuration.Settings.Order.DeleteGiftCardUsageHistory")]
+        public bool DeleteGiftCardUsageHistory { get; set; }
+        public bool DeleteGiftCardUsageHistory_OverrideForStore { get; set; }
+
+        public ReturnRequestReasonSearchModel ReturnRequestReasonSearchModel { get; set; }
+
+        public ReturnRequestActionSearchModel ReturnRequestActionSearchModel { get; set; }
+
+        #endregion
     }
 }

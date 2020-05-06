@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using Nop.Web.Framework.Mvc.Models;
+using Nop.Web.Framework.Models;
 using Nop.Web.Models.Common;
 
 namespace Nop.Web.Models.Catalog
@@ -8,7 +8,7 @@ namespace Nop.Web.Models.Catalog
     {
         public CustomerBackInStockSubscriptionsModel()
         {
-            this.Subscriptions = new List<BackInStockSubscriptionModel>();
+            Subscriptions = new List<BackInStockSubscriptionModel>();
         }
 
         public IList<BackInStockSubscriptionModel> Subscriptions { get; set; }

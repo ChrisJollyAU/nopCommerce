@@ -1,6 +1,4 @@
-using System.Collections.Generic;
-using Nop.Core.Domain.Localization;
-using Nop.Core.Domain.Shipping;
+﻿using Nop.Core.Domain.Localization;
 using Nop.Core.Domain.Stores;
 
 namespace Nop.Core.Domain.Directory
@@ -10,9 +8,6 @@ namespace Nop.Core.Domain.Directory
     /// </summary>
     public partial class Country : BaseEntity, ILocalizedEntity, IStoreMappingSupported
     {
-        private ICollection<StateProvince> _stateProvinces;
-        private ICollection<ShippingMethod> _restrictedShippingMethods;
-
         /// <summary>
         /// Gets or sets the name
         /// </summary>
@@ -62,24 +57,5 @@ namespace Nop.Core.Domain.Directory
         /// Gets or sets a value indicating whether the entity is limited/restricted to certain stores
         /// </summary>
         public bool LimitedToStores { get; set; }
-
-        /// <summary>
-        /// Gets or sets the state/provinces
-        /// </summary>
-        public virtual ICollection<StateProvince> StateProvinces
-        {
-            get { return _stateProvinces ?? (_stateProvinces = new List<StateProvince>()); }
-            protected set { _stateProvinces = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the restricted shipping methods
-        /// </summary>
-        public virtual ICollection<ShippingMethod> RestrictedShippingMethods
-        {
-            get { return _restrictedShippingMethods ?? (_restrictedShippingMethods = new List<ShippingMethod>()); }
-            protected set { _restrictedShippingMethods = value; }
-        }
     }
-
 }

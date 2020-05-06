@@ -2,7 +2,7 @@
 @using Nop.Core.Domain.Orders
 @if (Model.UpdatedShoppingCartItemId > 0)
 {
-    <input asp-for="UpdatedShoppingCartItemId" type="hidden"/>
+    <input asp-for="UpdatedShoppingCartItemId" type="hidden" />
 }
 @if (!Model.DisableBuyButton || Model.CustomerEntersPrice)
 {
@@ -13,7 +13,7 @@
                 <div class="price-input">
                     <label asp-for="CustomerEnteredPrice" asp-postfix=":" class="enter-price-label"></label>
                     @*round price*@
-                    <input asp-for="CustomerEnteredPrice" value="@Convert.ToInt32(Math.Ceiling(Model.CustomerEnteredPrice))" class="enter-price-input"/>
+                    <input asp-for="CustomerEnteredPrice" value="@Convert.ToInt32(Math.Ceiling(Model.CustomerEnteredPrice))" class="enter-price-input" />
                 </div>
                 <div class="price-range">
                     @Model.CustomerEnteredPriceRange
@@ -30,19 +30,30 @@
                 <label asp-for="EnteredQuantity" asp-postfix=":" class="qty-label"></label>
                 @if (Model.AllowedQuantities.Count > 0)
                 {
-                    <select asp-for="EnteredQuantity" asp-items="Model.AllowedQuantities" class="qty-dropdown"></select>
+                    <select asp-for="EnteredQuantity" asp-items="Model.AllowedQuantities" id="product_enteredQuantity_@Model.ProductId" class="qty-dropdown" aria-label=@T("Products.Qty.AriaLabel")></select>
+                    <script asp-location="Footer">
+                        $(document).ready(function () {
+                            $("#product_enteredQuantity_@Model.ProductId").on("change", function () {
+                                $(document).trigger({ type: "product_quantity_changed", quantity: $('#product_enteredQuantity_@Model.ProductId').find(":selected").text() });
+                            });
+                        });
+                    </script>
                 }
                 else
                 {
-                    <input asp-for="EnteredQuantity" class="qty-input" type="text"/>
-                    <script type="text/javascript" asp-location="Footer">
+                    <input asp-for="EnteredQuantity" id="product_enteredQuantity_@Model.ProductId" class="qty-input" type="text" aria-label=@T("Products.Qty.AriaLabel")/>
+                    <script asp-location="Footer">
                         //when a customer clicks 'Enter' button we submit the "add to cart" button (if visible)
                         $(document).ready(function() {
-                            $("#@Html.IdFor(model => model.EnteredQuantity)").keydown(function(event) {
+                            $("#@Html.IdFor(model => model.EnteredQuantity)").on("keydown", function(event) {
                                 if (event.keyCode == 13) {
-                                    $("#add-to-cart-button-@Model.ProductId").click();
+                                    $("#add-to-cart-button-@Model.ProductId").trigger("click");
                                     return false;
                                 }
+                            });
+
+                            $("#product_enteredQuantity_@Model.ProductId").on("input propertychange paste", function () {
+                                $(document).trigger({ type: "product_quantity_changed", quantity: $('#product_enteredQuantity_@Model.ProductId').val() });
                             });
                         });
                     </script>
@@ -65,10 +76,17 @@
                             addToCartText = T("ShoppingCart.PreOrder").Text;
                         }
                     }
-                    <input type="button" id="add-to-cart-button-@Model.ProductId" class="button-1 add-to-cart-button" value="@addToCartText" data-productid="@Model.ProductId" onclick="AjaxCart.addproducttocart_details('@Url.RouteUrl("AddProductToCart-Details", new {productId = Model.ProductId, shoppingCartTypeId = (int) ShoppingCartType.ShoppingCart})', '#product-details-form');return false;"/>
+                    <input type="button" id="add-to-cart-button-@Model.ProductId" class="button-1 add-to-cart-button" value="@addToCartText" data-productid="@Model.ProductId" onclick="AjaxCart.addproducttocart_details('@Url.RouteUrl("AddProductToCart-Details", new {productId = Model.ProductId, shoppingCartTypeId = (int) ShoppingCartType.ShoppingCart})', '#product-details-form');return false;" />
                 }
             </div>
+            if (!string.IsNullOrEmpty(Model.PreOrderAvailabilityStartDateTimeUserTime))
+            {
+                <div class="pre-order-availability-date">
+                    <label>@T("ShoppingCart.PreOrderAvailability"):</label>
+                    @Html.Raw(Model.PreOrderAvailabilityStartDateTimeUserTime)
+                </div>
+            }
         }
-        @await Component.InvokeAsync("Widget", new { widgetZone = "productdetails_add_info", additionalData = Model.ProductId })
+        @await Component.InvokeAsync("Widget", new { widgetZone = PublicWidgetZones.ProductDetailsAddInfo, additionalData = Model })
     </div>
 }

@@ -8,9 +8,6 @@ namespace Nop.Core.Domain.Catalog
     /// </summary>
     public class CatalogSettings : ISettings
     {
-        /// <summary>
-        /// Ctor
-        /// </summary>
         public CatalogSettings()
         {
             ProductSortingEnumDisabled = new List<int>();
@@ -69,7 +66,7 @@ namespace Nop.Core.Domain.Catalog
         public bool AllowProductViewModeChanging { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether customers are allowed to change product view mode
+        /// Gets or sets a default view mode
         /// </summary>
         public string DefaultViewMode { get; set; }
 
@@ -129,6 +126,11 @@ namespace Nop.Core.Domain.Catalog
         public bool NotifyStoreOwnerAboutNewProductReviews { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether customer notification about product review reply is enabled
+        /// </summary>
+        public bool NotifyCustomerAboutProductReviewReply { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether the product reviews will be filtered per store
         /// </summary>
         public bool ShowProductReviewsPerStore { get; set; }
@@ -142,6 +144,11 @@ namespace Nop.Core.Domain.Catalog
         /// Gets or sets the page size for product reviews in account page
         /// </summary>
         public int ProductReviewsPageSizeOnAccountPage { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the product reviews should be sorted by creation date as ascending
+        /// </summary>
+        public bool ProductReviewsSortByCreatedDateAscending { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether product 'Email a friend' feature is enabled
@@ -189,6 +196,11 @@ namespace Nop.Core.Domain.Catalog
         public bool ProductSearchAutoCompleteEnabled { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether the search box is displayed
+        /// </summary>
+        public bool ProductSearchEnabled { get; set; }
+
+        /// <summary>
         /// Gets or sets a number of products to return when using "autocomplete" feature
         /// </summary>
         public int ProductSearchAutoCompleteNumberOfProducts { get; set; }
@@ -197,6 +209,11 @@ namespace Nop.Core.Domain.Catalog
         /// Gets or sets a value indicating whether to show product images in the auto complete search
         /// </summary>
         public bool ShowProductImagesInSearchAutoComplete { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to show link to all result in the auto complete search
+        /// </summary>
+        public bool ShowLinkToAllResultInSearchAutoComplete { get; set; }
 
         /// <summary>
         /// Gets or sets a minimum search term length
@@ -277,6 +294,11 @@ namespace Nop.Core.Domain.Catalog
         /// An option indicating whether products on category and manufacturer pages should include featured products as well
         /// </summary>
         public bool IncludeFeaturedProductsInNormalLists { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to render link to required products in "Require other products added to the cart" warning
+        /// </summary>
+        public bool UseLinksInRequiredProductWarnings { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether tier prices should be displayed with applied discounts (if available)
@@ -384,6 +406,11 @@ namespace Nop.Core.Domain.Catalog
         public bool ExportImportProductAttributes { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether need to use "limited to stores" property for exported/imported products
+        /// </summary>
+        public bool ExportImportProductUseLimitedToStores { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether the products need to be exported/imported with their specification attributes
         /// </summary>
         public bool ExportImportProductSpecificationAttributes { get; set; }
@@ -402,5 +429,45 @@ namespace Nop.Core.Domain.Catalog
         /// Gets or sets a value indicating whether the categories need to be exported/imported using name of category
         /// </summary>
         public bool ExportImportCategoriesUsingCategoryName { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the images can be downloaded from remote server
+        /// </summary>
+        public bool ExportImportAllowDownloadImages { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether products must be importing by separated files
+        /// </summary>
+        public bool ExportImportSplitProductsFile { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value of max products count in one file 
+        /// </summary>
+        public int ExportImportProductsCountInOneFile { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to remove required products from the cart if the main one is removed
+        /// </summary>
+        public bool RemoveRequiredProducts { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the related entities need to be exported/imported using name
+        /// </summary>
+        public bool ExportImportRelatedEntitiesByName { get; set; }
+
+        /// <summary>
+        /// Gets or sets count of displayed years for datepicker
+        /// </summary>
+        public int CountDisplayedYearsDatePicker { get; set; }
+
+        /// <summary>
+        /// Get or set a value indicating whether it's necessary to show the date for pre-order availability in a public store
+        /// </summary>
+        public bool DisplayDatePreOrderAvailability { get; set; }
+
+        /// <summary>
+        /// Get or set a value indicating whether use standart menu in public store or use Ajax to load menu
+        /// </summary>
+        public bool UseAjaxLoadMenu { get; set; }
     }
 }

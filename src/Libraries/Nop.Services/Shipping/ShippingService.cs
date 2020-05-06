@@ -1,17 +1,19 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Caching;
-using Nop.Core.Data;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Shipping;
-using Nop.Core.Plugins;
+using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Catalog;
 using Nop.Services.Common;
+using Nop.Services.Customers;
+using Nop.Services.Directory;
 using Nop.Services.Events;
 using Nop.Services.Localization;
 using Nop.Services.Logging;
@@ -25,93 +27,77 @@ namespace Nop.Services.Shipping
     /// </summary>
     public partial class ShippingService : IShippingService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : warehouse ID
-        /// </remarks>
-        private const string WAREHOUSES_BY_ID_KEY = "Nop.warehouse.id-{0}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string WAREHOUSES_PATTERN_KEY = "Nop.warehouse.";
-
-        #endregion
-
         #region Fields
 
-        private readonly IRepository<ShippingMethod> _shippingMethodRepository;
-        private readonly IRepository<Warehouse> _warehouseRepository;
-        private readonly ILogger _logger;
-        private readonly IProductService _productService;
-        private readonly IProductAttributeParser _productAttributeParser;
+        private readonly IAddressService _addressService;
+        private readonly ICacheKeyService _cacheKeyService;
         private readonly ICheckoutAttributeParser _checkoutAttributeParser;
+        private readonly ICountryService _countryService;
+        private readonly ICustomerService _customerService;
+        private readonly IEventPublisher _eventPublisher;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly ILocalizationService _localizationService;
-        private readonly IAddressService _addressService;
-        private readonly ShippingSettings _shippingSettings;
-        private readonly IPluginFinder _pluginFinder;
+        private readonly ILogger _logger;
+        private readonly IPickupPluginManager _pickupPluginManager;
+        private readonly IPriceCalculationService _priceCalculationService;
+        private readonly IProductAttributeParser _productAttributeParser;
+        private readonly IProductService _productService;
+        private readonly IRepository<ShippingMethod> _shippingMethodRepository;
+        private readonly IRepository<ShippingMethodCountryMapping> _shippingMethodCountryMappingRepository;
+        private readonly IRepository<Warehouse> _warehouseRepository;
+        private readonly IShippingPluginManager _shippingPluginManager;
+        private readonly IStateProvinceService _stateProvinceService;
         private readonly IStoreContext _storeContext;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly ShippingSettings _shippingSettings;
         private readonly ShoppingCartSettings _shoppingCartSettings;
-        private readonly ICacheManager _cacheManager;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="shippingMethodRepository">Shipping method repository</param>
-        /// <param name="warehouseRepository">Warehouse repository</param>
-        /// <param name="logger">Logger</param>
-        /// <param name="productService">Product service</param>
-        /// <param name="productAttributeParser">Product attribute parser</param>
-        /// <param name="checkoutAttributeParser">Checkout attribute parser</param>
-        /// <param name="genericAttributeService">Generic attribute service</param>
-        /// <param name="localizationService">Localization service</param>
-        /// <param name="addressService">Address service</param>
-        /// <param name="shippingSettings">Shipping settings</param>
-        /// <param name="pluginFinder">Plugin finder</param>
-        /// <param name="storeContext">Store context</param>
-        /// <param name="eventPublisher">Event published</param>
-        /// <param name="shoppingCartSettings">Shopping cart settings</param>
-        /// <param name="cacheManager">Cache manager</param>
-        public ShippingService(IRepository<ShippingMethod> shippingMethodRepository,
-            IRepository<Warehouse> warehouseRepository,
-            ILogger logger,
-            IProductService productService,
-            IProductAttributeParser productAttributeParser,
+        public ShippingService(IAddressService addressService,
+            ICacheKeyService cacheKeyService,
             ICheckoutAttributeParser checkoutAttributeParser,
+            ICountryService countryService,
+            ICustomerService customerService,
+            IEventPublisher eventPublisher,
             IGenericAttributeService genericAttributeService,
             ILocalizationService localizationService,
-            IAddressService addressService,
-            ShippingSettings shippingSettings,
-            IPluginFinder pluginFinder,
+            ILogger logger,
+            IPickupPluginManager pickupPluginManager,
+            IPriceCalculationService priceCalculationService,
+            IProductAttributeParser productAttributeParser,
+            IProductService productService,
+            IRepository<ShippingMethod> shippingMethodRepository,
+            IRepository<ShippingMethodCountryMapping> shippingMethodCountryMappingRepository,
+            IRepository<Warehouse> warehouseRepository,
+            IShippingPluginManager shippingPluginManager,
+            IStateProvinceService stateProvinceService,
             IStoreContext storeContext,
-            IEventPublisher eventPublisher,
-            ShoppingCartSettings shoppingCartSettings,
-            ICacheManager cacheManager)
+            ShippingSettings shippingSettings,
+            ShoppingCartSettings shoppingCartSettings)
         {
-            this._shippingMethodRepository = shippingMethodRepository;
-            this._warehouseRepository = warehouseRepository;
-            this._logger = logger;
-            this._productService = productService;
-            this._productAttributeParser = productAttributeParser;
-            this._checkoutAttributeParser = checkoutAttributeParser;
-            this._genericAttributeService = genericAttributeService;
-            this._localizationService = localizationService;
-            this._addressService = addressService;
-            this._shippingSettings = shippingSettings;
-            this._pluginFinder = pluginFinder;
-            this._storeContext = storeContext;
-            this._eventPublisher = eventPublisher;
-            this._shoppingCartSettings = shoppingCartSettings;
-            this._cacheManager = cacheManager;
+            _addressService = addressService;
+            _cacheKeyService = cacheKeyService;
+            _checkoutAttributeParser = checkoutAttributeParser;
+            _countryService = countryService;
+            _customerService = customerService;
+            _eventPublisher = eventPublisher;
+            _genericAttributeService = genericAttributeService;
+            _localizationService = localizationService;
+            _logger = logger;
+            _pickupPluginManager = pickupPluginManager;
+            _priceCalculationService = priceCalculationService;
+            _productAttributeParser = productAttributeParser;
+            _productService = productService;
+            _shippingMethodRepository = shippingMethodRepository;
+            _shippingMethodCountryMappingRepository = shippingMethodCountryMappingRepository;
+            _warehouseRepository = warehouseRepository;
+            _shippingPluginManager = shippingPluginManager;
+            _stateProvinceService = stateProvinceService;
+            _storeContext = storeContext;
+            _shippingSettings = shippingSettings;
+            _shoppingCartSettings = shoppingCartSettings;
         }
 
         #endregion
@@ -151,54 +137,11 @@ namespace Nop.Services.Shipping
             //whether to ship associated products
             return associatedAttributeValues.Any(attributeValue =>
                 _productService.GetProductById(attributeValue.AssociatedProductId)?.IsShipEnabled ?? false);
-
         }
 
         #endregion
 
         #region Methods
-
-        #region Shipping rate computation methods
-
-        /// <summary>
-        /// Load active shipping rate computation methods
-        /// </summary>
-        /// <param name="customer">Load records allowed only to a specified customer; pass null to ignore ACL permissions</param>
-        /// <param name="storeId">Load records allowed only in a specified store; pass 0 to load all records</param>
-        /// <returns>Shipping rate computation methods</returns>
-        public virtual IList<IShippingRateComputationMethod> LoadActiveShippingRateComputationMethods(Customer customer = null, int storeId = 0)
-        {
-            return LoadAllShippingRateComputationMethods(customer, storeId)
-                .Where(provider => _shippingSettings.ActiveShippingRateComputationMethodSystemNames
-                    .Contains(provider.PluginDescriptor.SystemName, StringComparer.InvariantCultureIgnoreCase)).ToList();
-        }
-
-        /// <summary>
-        /// Load shipping rate computation method by system name
-        /// </summary>
-        /// <param name="systemName">System name</param>
-        /// <returns>Found Shipping rate computation method</returns>
-        public virtual IShippingRateComputationMethod LoadShippingRateComputationMethodBySystemName(string systemName)
-        {
-            var descriptor = _pluginFinder.GetPluginDescriptorBySystemName<IShippingRateComputationMethod>(systemName);
-            if (descriptor != null)
-                return descriptor.Instance<IShippingRateComputationMethod>();
-
-            return null;
-        }
-
-        /// <summary>
-        /// Load all shipping rate computation methods
-        /// </summary>
-        /// <param name="customer">Load records allowed only to a specified customer; pass null to ignore ACL permissions</param>
-        /// <param name="storeId">Load records allowed only in a specified store; pass 0 to load all records</param>
-        /// <returns>Shipping rate computation methods</returns>
-        public virtual IList<IShippingRateComputationMethod> LoadAllShippingRateComputationMethods(Customer customer = null, int storeId = 0)
-        {
-            return _pluginFinder.GetPlugins<IShippingRateComputationMethod>(customer: customer, storeId: storeId).ToList();
-        }
-
-        #endregion
 
         #region Shipping methods
 
@@ -212,7 +155,7 @@ namespace Nop.Services.Shipping
                 throw new ArgumentNullException(nameof(shippingMethod));
 
             _shippingMethodRepository.Delete(shippingMethod);
-
+            
             //event notification
             _eventPublisher.EntityDeleted(shippingMethod);
         }
@@ -227,7 +170,7 @@ namespace Nop.Services.Shipping
             if (shippingMethodId == 0)
                 return null;
 
-            return _shippingMethodRepository.GetById(shippingMethodId);
+            return _shippingMethodRepository.ToCachedGetById(shippingMethodId);
         }
 
         /// <summary>
@@ -237,29 +180,30 @@ namespace Nop.Services.Shipping
         /// <returns>Shipping methods</returns>
         public virtual IList<ShippingMethod> GetAllShippingMethods(int? filterByCountryId = null)
         {
+            var key = _cacheKeyService.PrepareKeyForDefaultCache(NopShippingDefaults.ShippingMethodsAllCacheKey, filterByCountryId);
+            
             if (filterByCountryId.HasValue && filterByCountryId.Value > 0)
             {
                 var query1 = from sm in _shippingMethodRepository.Table
-                             where
-                             sm.RestrictedCountries.Select(c => c.Id).Contains(filterByCountryId.Value)
-                             select sm.Id;
+                    join smcm in _shippingMethodCountryMappingRepository.Table on sm.Id equals smcm.ShippingMethodId
+                    where smcm.CountryId == filterByCountryId.Value
+                    select sm.Id;
+
+                query1 = query1.Distinct();
 
                 var query2 = from sm in _shippingMethodRepository.Table
-                             where !query1.Contains(sm.Id)
-                             orderby sm.DisplayOrder, sm.Id
-                             select sm;
+                    where !query1.Contains(sm.Id)
+                    orderby sm.DisplayOrder, sm.Id
+                    select sm;
 
-                var shippingMethods = query2.ToList();
-                return shippingMethods;
+                return query2.ToCachedList(key);
             }
-            else
-            {
-                var query = from sm in _shippingMethodRepository.Table
-                            orderby sm.DisplayOrder, sm.Id
-                            select sm;
-                var shippingMethods = query.ToList();
-                return shippingMethods;
-            }
+
+            var query = from sm in _shippingMethodRepository.Table
+                orderby sm.DisplayOrder, sm.Id
+                select sm;
+
+            return query.ToCachedList(key);
         }
 
         /// <summary>
@@ -292,6 +236,68 @@ namespace Nop.Services.Shipping
             _eventPublisher.EntityUpdated(shippingMethod);
         }
 
+        /// <summary>
+        /// Does country restriction exist
+        /// </summary>
+        /// <param name="shippingMethod">Shipping method</param>
+        /// <param name="countryId">Country identifier</param>
+        /// <returns>Result</returns>
+        public virtual bool CountryRestrictionExists(ShippingMethod shippingMethod, int countryId)
+        {
+            if (shippingMethod == null)
+                throw new ArgumentNullException(nameof(shippingMethod));
+
+            var result = _shippingMethodCountryMappingRepository.Table.Any(smcm =>
+                smcm.ShippingMethodId == shippingMethod.Id && smcm.CountryId == countryId);
+            
+            return result;
+        }
+
+        /// <summary>
+        /// Gets shipping country mappings
+        /// </summary>
+        /// <param name="shippingMethodId">The shipping method identifier</param>
+        /// <param name="countryId">Country identifier</param>
+        /// <returns>Shipping country mappings</returns>
+        public virtual IList<ShippingMethodCountryMapping> GetShippingMethodCountryMapping(int shippingMethodId,
+            int countryId)
+        {
+            var query = _shippingMethodCountryMappingRepository.Table.Where(smcm =>
+                smcm.ShippingMethodId == shippingMethodId && smcm.CountryId == countryId);
+
+            return query.ToList();
+        }
+
+        /// <summary>
+        /// Inserts a shipping country mapping
+        /// </summary>
+        /// <param name="shippingMethodCountryMapping">Shipping country mapping</param>
+        public virtual void InsertShippingMethodCountryMapping(ShippingMethodCountryMapping shippingMethodCountryMapping)
+        {
+            if (shippingMethodCountryMapping == null)
+                throw new ArgumentNullException(nameof(shippingMethodCountryMapping));
+
+            _shippingMethodCountryMappingRepository.Insert(shippingMethodCountryMapping);
+
+            //event notification
+            _eventPublisher.EntityInserted(shippingMethodCountryMapping);
+        }
+
+        /// <summary>
+        /// Delete the shipping country mapping
+        /// </summary>
+        /// <param name="shippingMethodCountryMapping">Shipping country mapping</param>
+        public virtual void DeleteShippingMethodCountryMapping(ShippingMethodCountryMapping shippingMethodCountryMapping)
+        {
+            if (shippingMethodCountryMapping == null)
+                throw new ArgumentNullException(nameof(shippingMethodCountryMapping));
+
+            _shippingMethodCountryMappingRepository.Delete(shippingMethodCountryMapping);
+
+            //event notification
+            _eventPublisher.EntityDeleted(shippingMethodCountryMapping);
+        }
+
         #endregion
 
         #region Warehouses
@@ -307,9 +313,6 @@ namespace Nop.Services.Shipping
 
             _warehouseRepository.Delete(warehouse);
 
-            //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityDeleted(warehouse);
         }
@@ -324,20 +327,27 @@ namespace Nop.Services.Shipping
             if (warehouseId == 0)
                 return null;
 
-            var key = string.Format(WAREHOUSES_BY_ID_KEY, warehouseId);
-            return _cacheManager.Get(key, () => _warehouseRepository.GetById(warehouseId));
+            return _warehouseRepository.ToCachedGetById(warehouseId);
         }
 
         /// <summary>
         /// Gets all warehouses
         /// </summary>
+        /// <param name="name">Warehouse name</param>
         /// <returns>Warehouses</returns>
-        public virtual IList<Warehouse> GetAllWarehouses()
+        public virtual IList<Warehouse> GetAllWarehouses(string name = null)
         {
             var query = from wh in _warehouseRepository.Table
                         orderby wh.Name
                         select wh;
-            var warehouses = query.ToList();
+
+            var warehouses = query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopShippingDefaults.WarehousesAllCacheKey));
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                warehouses = warehouses.Where(wh => wh.Name.Contains(name)).ToList();
+            }
+
             return warehouses;
         }
 
@@ -351,9 +361,6 @@ namespace Nop.Services.Shipping
                 throw new ArgumentNullException(nameof(warehouse));
 
             _warehouseRepository.Insert(warehouse);
-
-            //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
 
             //event notification
             _eventPublisher.EntityInserted(warehouse);
@@ -370,52 +377,8 @@ namespace Nop.Services.Shipping
 
             _warehouseRepository.Update(warehouse);
 
-            //clear cache
-            _cacheManager.RemoveByPattern(WAREHOUSES_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityUpdated(warehouse);
-        }
-
-        #endregion
-
-        #region Pickup points
-
-        /// <summary>
-        /// Load active pickup point providers
-        /// </summary>
-        /// <param name="customer">Load records allowed only to a specified customer; pass null to ignore ACL permissions</param>
-        /// <param name="storeId">Load records allowed only in a specified store; pass 0 to load all records</param>
-        /// <returns>Pickup point providers</returns>
-        public virtual IList<IPickupPointProvider> LoadActivePickupPointProviders(Customer customer = null, int storeId = 0)
-        {
-            return LoadAllPickupPointProviders(customer, storeId).Where(provider => _shippingSettings.ActivePickupPointProviderSystemNames
-                .Contains(provider.PluginDescriptor.SystemName, StringComparer.InvariantCultureIgnoreCase)).ToList();
-        }
-
-        /// <summary>
-        /// Load pickup point provider by system name
-        /// </summary>
-        /// <param name="systemName">System name</param>
-        /// <returns>Found pickup point provider</returns>
-        public virtual IPickupPointProvider LoadPickupPointProviderBySystemName(string systemName)
-        {
-            var descriptor = _pluginFinder.GetPluginDescriptorBySystemName<IPickupPointProvider>(systemName);
-            if (descriptor != null)
-                return descriptor.Instance<IPickupPointProvider>();
-
-            return null;
-        }
-
-        /// <summary>
-        /// Load all pickup point providers
-        /// </summary>
-        /// <param name="customer">Load records allowed only to a specified customer; pass null to ignore ACL permissions</param>
-        /// <param name="storeId">Load records allowed only in a specified store; pass 0 to load all records</param>
-        /// <returns>Pickup point providers</returns>
-        public virtual IList<IPickupPointProvider> LoadAllPickupPointProviders(Customer customer = null, int storeId = 0)
-        {
-            return _pluginFinder.GetPlugins<IPickupPointProvider>(customer: customer, storeId: storeId).ToList();
         }
 
         #endregion
@@ -433,7 +396,9 @@ namespace Nop.Services.Shipping
             if (shoppingCartItem == null)
                 throw new ArgumentNullException(nameof(shoppingCartItem));
 
-            return GetShoppingCartItemWeight(shoppingCartItem.Product, shoppingCartItem.AttributesXml, ignoreFreeShippedItems);
+            var product = _productService.GetProductById(shoppingCartItem.ProductId);
+
+            return GetShoppingCartItemWeight(product, shoppingCartItem.AttributesXml, ignoreFreeShippedItems);
         }
 
         /// <summary>
@@ -454,24 +419,24 @@ namespace Nop.Services.Shipping
             //attribute weight
             var attributesTotalWeight = decimal.Zero;
 
-            if (_shippingSettings.ConsiderAssociatedProductsDimensions && !string.IsNullOrEmpty(attributesXml))
+            if (!_shippingSettings.ConsiderAssociatedProductsDimensions || string.IsNullOrEmpty(attributesXml))
+                return productWeight + attributesTotalWeight;
+
+            var attributeValues = _productAttributeParser.ParseProductAttributeValues(attributesXml);
+            foreach (var attributeValue in attributeValues)
             {
-                var attributeValues = _productAttributeParser.ParseProductAttributeValues(attributesXml);
-                foreach (var attributeValue in attributeValues)
+                switch (attributeValue.AttributeValueType)
                 {
-                    switch (attributeValue.AttributeValueType)
-                    {
-                        case AttributeValueType.Simple:
-                            //simple attribute
-                            attributesTotalWeight += attributeValue.WeightAdjustment;
-                            break;
-                        case AttributeValueType.AssociatedToProduct:
-                            //bundled product
-                            var associatedProduct = _productService.GetProductById(attributeValue.AssociatedProductId);
-                            if (associatedProduct != null && associatedProduct.IsShipEnabled && (!associatedProduct.IsFreeShipping || !ignoreFreeShippedItems))
-                                attributesTotalWeight += associatedProduct.Weight * attributeValue.Quantity;
-                            break;
-                    }
+                    case AttributeValueType.Simple:
+                        //simple attribute
+                        attributesTotalWeight += attributeValue.WeightAdjustment;
+                        break;
+                    case AttributeValueType.AssociatedToProduct:
+                        //bundled product
+                        var associatedProduct = _productService.GetProductById(attributeValue.AssociatedProductId);
+                        if (associatedProduct != null && associatedProduct.IsShipEnabled && (!associatedProduct.IsFreeShipping || !ignoreFreeShippedItems))
+                            attributesTotalWeight += associatedProduct.Weight * attributeValue.Quantity;
+                        break;
                 }
             }
 
@@ -485,12 +450,12 @@ namespace Nop.Services.Shipping
         /// <param name="includeCheckoutAttributes">A value indicating whether we should calculate weights of selected checkotu attributes</param>
         /// <param name="ignoreFreeShippedItems">Whether to ignore the weight of the products marked as "Free shipping"</param>
         /// <returns>Total weight</returns>
-        public virtual decimal GetTotalWeight(GetShippingOptionRequest request, 
+        public virtual decimal GetTotalWeight(GetShippingOptionRequest request,
             bool includeCheckoutAttributes = true, bool ignoreFreeShippedItems = false)
         {
             if (request == null)
                 throw new ArgumentNullException(nameof(request));
-            
+
             var totalWeight = decimal.Zero;
 
             //shopping cart items
@@ -498,16 +463,14 @@ namespace Nop.Services.Shipping
                 totalWeight += GetShoppingCartItemWeight(packageItem.ShoppingCartItem, ignoreFreeShippedItems) * packageItem.GetQuantity();
 
             //checkout attributes
-            if (request.Customer != null && includeCheckoutAttributes)
-            {
-                var checkoutAttributesXml = request.Customer.GetAttribute<string>(SystemCustomerAttributeNames.CheckoutAttributes, _genericAttributeService, _storeContext.CurrentStore.Id);
-                if (!string.IsNullOrEmpty(checkoutAttributesXml))
-                {
-                    var attributeValues = _checkoutAttributeParser.ParseCheckoutAttributeValues(checkoutAttributesXml);
-                    foreach (var attributeValue in attributeValues)
-                        totalWeight += attributeValue.WeightAdjustment;
-                }
-            }
+            if (request.Customer is null || !includeCheckoutAttributes)
+                return totalWeight;
+            var checkoutAttributesXml = _genericAttributeService.GetAttribute<string>(request.Customer, NopCustomerDefaults.CheckoutAttributes, _storeContext.CurrentStore.Id);
+            if (string.IsNullOrEmpty(checkoutAttributesXml))
+                return totalWeight;
+            var attributeValues = _checkoutAttributeParser.ParseCheckoutAttributeValues(checkoutAttributesXml);
+            foreach (var attributeValue in attributeValues.SelectMany(x => x.values))
+                totalWeight += attributeValue.WeightAdjustment;
 
             return totalWeight;
         }
@@ -542,12 +505,12 @@ namespace Nop.Services.Shipping
             foreach (var attributeValue in attributeValues)
             {
                 var associatedProduct = _productService.GetProductById(attributeValue.AssociatedProductId);
-                if (associatedProduct != null && associatedProduct.IsShipEnabled && (!associatedProduct.IsFreeShipping || !ignoreFreeShippedItems))
-                {
-                    width += associatedProduct.Width * attributeValue.Quantity;
-                    length += associatedProduct.Length * attributeValue.Quantity;
-                    height += associatedProduct.Height * attributeValue.Quantity;
-                }
+                if (associatedProduct == null || !associatedProduct.IsShipEnabled || (associatedProduct.IsFreeShipping && ignoreFreeShippedItems))
+                    continue;
+
+                width += associatedProduct.Width * attributeValue.Quantity;
+                length += associatedProduct.Length * attributeValue.Quantity;
+                height += associatedProduct.Height * attributeValue.Quantity;
             }
         }
 
@@ -569,19 +532,19 @@ namespace Nop.Services.Shipping
             if (_shippingSettings.UseCubeRootMethod && AreMultipleItems(packageItems))
             {
                 //find max dimensions of the shipped items
-                var maxWidth = packageItems.Max(item => !item.ShoppingCartItem.Product.IsFreeShipping || !ignoreFreeShippedItems
-                    ? item.ShoppingCartItem.Product.Width : decimal.Zero);
-                var maxLength = packageItems.Max(item => !item.ShoppingCartItem.Product.IsFreeShipping || !ignoreFreeShippedItems
-                    ? item.ShoppingCartItem.Product.Length : decimal.Zero);
-                var maxHeight = packageItems.Max(item => !item.ShoppingCartItem.Product.IsFreeShipping || !ignoreFreeShippedItems
-                    ? item.ShoppingCartItem.Product.Height : decimal.Zero);
+                var maxWidth = packageItems.Max(item => !item.Product.IsFreeShipping || !ignoreFreeShippedItems
+                    ? item.Product.Width : decimal.Zero);
+                var maxLength = packageItems.Max(item => !item.Product.IsFreeShipping || !ignoreFreeShippedItems
+                    ? item.Product.Length : decimal.Zero);
+                var maxHeight = packageItems.Max(item => !item.Product.IsFreeShipping || !ignoreFreeShippedItems
+                    ? item.Product.Height : decimal.Zero);
 
                 //get total volume of the shipped items
                 var totalVolume = packageItems.Sum(packageItem =>
                 {
                     //product volume
-                    var productVolume = !packageItem.ShoppingCartItem.Product.IsFreeShipping || !ignoreFreeShippedItems ?
-                        packageItem.ShoppingCartItem.Product.Width * packageItem.ShoppingCartItem.Product.Length * packageItem.ShoppingCartItem.Product.Height : decimal.Zero;
+                    var productVolume = !packageItem.Product.IsFreeShipping || !ignoreFreeShippedItems ?
+                        packageItem.Product.Width * packageItem.Product.Length * packageItem.Product.Height : decimal.Zero;
 
                     //associated products volume
                     if (_shippingSettings.ConsiderAssociatedProductsDimensions && !string.IsNullOrEmpty(packageItem.ShoppingCartItem.AttributesXml))
@@ -607,7 +570,7 @@ namespace Nop.Services.Shipping
                 });
 
                 //set dimensions as cube root of volume
-                width = length = height = Convert.ToDecimal(Math.Pow(Convert.ToDouble(totalVolume), (1.0 / 3.0)));
+                width = length = height = Convert.ToDecimal(Math.Pow(Convert.ToDouble(totalVolume), 1.0 / 3.0));
 
                 //sometimes we have products with sizes like 1x1x20
                 //that's why let's ensure that a maximum dimension is always preserved
@@ -625,15 +588,15 @@ namespace Nop.Services.Shipping
                     var productWidth = decimal.Zero;
                     var productLength = decimal.Zero;
                     var productHeight = decimal.Zero;
-                    if (!packageItem.ShoppingCartItem.Product.IsFreeShipping || !ignoreFreeShippedItems)
+                    if (!packageItem.Product.IsFreeShipping || !ignoreFreeShippedItems)
                     {
-                        productWidth = packageItem.ShoppingCartItem.Product.Width;
-                        productLength = packageItem.ShoppingCartItem.Product.Length;
-                        productHeight = packageItem.ShoppingCartItem.Product.Height;
+                        productWidth = packageItem.Product.Width;
+                        productLength = packageItem.Product.Length;
+                        productHeight = packageItem.Product.Height;
                     }
 
                     //associated products
-                    GetAssociatedProductDimensions(packageItem.ShoppingCartItem, out decimal associatedProductsWidth, out decimal associatedProductsLength, out decimal associatedProductsHeight);
+                    GetAssociatedProductDimensions(packageItem.ShoppingCartItem, out var associatedProductsWidth, out var associatedProductsLength, out var associatedProductsHeight);
 
                     var quantity = packageItem.GetQuantity();
                     width += (productWidth + associatedProductsWidth) * quantity;
@@ -651,7 +614,7 @@ namespace Nop.Services.Shipping
         /// <returns></returns>
         public virtual Warehouse GetNearestWarehouse(Address address, IList<Warehouse> warehouses = null)
         {
-            warehouses = warehouses ?? GetAllWarehouses();
+            warehouses ??= GetAllWarehouses();
 
             //no address specified. return any
             if (address == null)
@@ -666,24 +629,28 @@ namespace Nop.Services.Shipping
             foreach (var warehouse in warehouses)
             {
                 var warehouseAddress = _addressService.GetAddressById(warehouse.AddressId);
-                if (warehouseAddress != null)
-                    if (warehouseAddress.CountryId == address.CountryId)
-                        matchedByCountry.Add(warehouse);
+                if (warehouseAddress == null)
+                    continue;
+
+                if (warehouseAddress.CountryId == address.CountryId)
+                    matchedByCountry.Add(warehouse);
             }
             //no country matches. return any
             if (!matchedByCountry.Any())
                 return warehouses.FirstOrDefault();
-
 
             //find by state
             var matchedByState = new List<Warehouse>();
             foreach (var warehouse in matchedByCountry)
             {
                 var warehouseAddress = _addressService.GetAddressById(warehouse.AddressId);
-                if (warehouseAddress != null)
-                    if (warehouseAddress.StateProvinceId == address.StateProvinceId)
-                        matchedByState.Add(warehouse);
+                if (warehouseAddress == null)
+                    continue;
+
+                if (warehouseAddress.StateProvinceId == address.StateProvinceId)
+                    matchedByState.Add(warehouse);
             }
+
             if (matchedByState.Any())
                 return matchedByState.FirstOrDefault();
 
@@ -706,7 +673,6 @@ namespace Nop.Services.Shipping
             //if we ship from warehouses ("ShippingSettings.UseWarehouseLocation" enabled),
             //then there could be several requests
 
-
             //key - warehouse identifier (0 - default shipping origin)
             //value - request
             var requests = new Dictionary<int, GetShippingOptionRequest>();
@@ -716,12 +682,11 @@ namespace Nop.Services.Shipping
 
             foreach (var sci in cart)
             {
-                if (!sci.IsShipEnabled(_productService, _productAttributeParser))
+                if (!IsShipEnabled(sci))
                     continue;
 
-                var product = sci.Product;
+                var product = _productService.GetProductById(sci.ProductId);
 
-                //TODO properly create requests for the assocated products
                 if (product == null || !product.IsShipEnabled)
                 {
                     var associatedProducts = _productAttributeParser.ParseProductAttributeValues(sci.AttributesXml)
@@ -729,6 +694,7 @@ namespace Nop.Services.Shipping
                         .Select(attributeValue => _productService.GetProductById(attributeValue.AssociatedProductId));
                     product = associatedProducts.FirstOrDefault(associatedProduct => associatedProduct != null && associatedProduct.IsShipEnabled);
                 }
+
                 if (product == null)
                     continue;
 
@@ -741,13 +707,13 @@ namespace Nop.Services.Shipping
                     {
                         var allWarehouses = new List<Warehouse>();
                         //multiple warehouses supported
-                        foreach (var pwi in product.ProductWarehouseInventory)
+                        foreach (var pwi in _productService.GetAllProductWarehouseInventoryRecords(product.Id))
                         {
-                            //TODO validate stock quantity when backorder is not allowed?
                             var tmpWarehouse = GetWarehouseById(pwi.WarehouseId);
                             if (tmpWarehouse != null)
                                 allWarehouses.Add(tmpWarehouse);
                         }
+
                         warehouse = GetNearestWarehouse(shippingAddress, allWarehouses);
                     }
                     else
@@ -756,12 +722,13 @@ namespace Nop.Services.Shipping
                         warehouse = GetWarehouseById(product.WarehouseId);
                     }
                 }
-                var warehouseId = warehouse != null ? warehouse.Id : 0;
+
+                var warehouseId = warehouse?.Id ?? 0;
 
                 if (requests.ContainsKey(warehouseId) && !product.ShipSeparately)
                 {
                     //add item to existing request
-                    requests[warehouseId].Items.Add(new GetShippingOptionRequest.PackageItem(sci));
+                    requests[warehouseId].Items.Add(new GetShippingOptionRequest.PackageItem(sci, product));
                 }
                 else
                 {
@@ -771,10 +738,9 @@ namespace Nop.Services.Shipping
                         //store
                         StoreId = storeId
                     };
-                    //add item
-                    request.Items.Add(new GetShippingOptionRequest.PackageItem(sci));
                     //customer
-                    request.Customer = cart.GetCustomer();
+                    request.Customer = _customerService.GetShoppingCartCustomer(cart);
+
                     //ship to
                     request.ShippingAddress = shippingAddress;
                     //ship from
@@ -785,28 +751,49 @@ namespace Nop.Services.Shipping
                         originAddress = _addressService.GetAddressById(warehouse.AddressId);
                         request.WarehouseFrom = warehouse;
                     }
+
                     if (originAddress == null)
                     {
                         //no warehouse address. in this case use the default shipping origin
                         originAddress = _addressService.GetAddressById(_shippingSettings.ShippingOriginAddressId);
                     }
+
                     if (originAddress != null)
                     {
-                        request.CountryFrom = originAddress.Country;
-                        request.StateProvinceFrom = originAddress.StateProvince;
+                        request.CountryFrom = _countryService.GetCountryByAddress(originAddress);
+                        request.StateProvinceFrom = _stateProvinceService.GetStateProvinceByAddress(originAddress);
                         request.ZipPostalCodeFrom = originAddress.ZipPostalCode;
+                        request.CountyFrom = originAddress.County;
                         request.CityFrom = originAddress.City;
                         request.AddressFrom = originAddress.Address1;
                     }
 
+                    //whether this product should be shipped separately from other ones
                     if (product.ShipSeparately)
                     {
-                        //ship separately
-                        separateRequests.Add(request);
+                        //whether product items should be shipped separately
+                        if (_shippingSettings.ShipSeparatelyOneItemEach)
+                        {
+                            //add item with overridden quantity 1
+                            request.Items.Add(new GetShippingOptionRequest.PackageItem(sci, product, 1));
+
+                            //create separate requests for all product quantity
+                            for (var i = 0; i < sci.Quantity; i++)
+                            {
+                                separateRequests.Add(request);
+                            }
+                        }
+                        else
+                        {
+                            //all of product items should be shipped in a single box, so create the single separate request 
+                            request.Items.Add(new GetShippingOptionRequest.PackageItem(sci, product));
+                            separateRequests.Add(request);
+                        }
                     }
                     else
                     {
                         //usual request
+                        request.Items.Add(new GetShippingOptionRequest.PackageItem(sci, product));
                         requests.Add(warehouseId, request);
                     }
                 }
@@ -816,7 +803,6 @@ namespace Nop.Services.Shipping
             //currently we just compare warehouses
             //but we should also consider cases when several warehouses are located in the same address
             shippingFromMultipleLocations = requests.Select(x => x.Key).Distinct().Count() > 1;
-
 
             var result = requests.Values.ToList();
             result.AddRange(separateRequests);
@@ -834,7 +820,7 @@ namespace Nop.Services.Shipping
         /// <param name="storeId">Load records allowed only in a specified store; pass 0 to load all records</param>
         /// <returns>Shipping options</returns>
         public virtual GetShippingOptionResponse GetShippingOptions(IList<ShoppingCartItem> cart,
-            Address shippingAddress, Customer customer = null, string allowedShippingRateComputationMethodSystemName = "", 
+            Address shippingAddress, Customer customer = null, string allowedShippingRateComputationMethodSystemName = "",
             int storeId = 0)
         {
             if (cart == null)
@@ -843,22 +829,13 @@ namespace Nop.Services.Shipping
             var result = new GetShippingOptionResponse();
 
             //create a package
-            var shippingOptionRequests = CreateShippingOptionRequests(cart, shippingAddress, storeId, out bool shippingFromMultipleLocations);
+            var shippingOptionRequests = CreateShippingOptionRequests(cart, shippingAddress, storeId, out var shippingFromMultipleLocations);
             result.ShippingFromMultipleLocations = shippingFromMultipleLocations;
 
-            var shippingRateComputationMethods = LoadActiveShippingRateComputationMethods(customer, storeId);
-            //filter by system name
-            if (!string.IsNullOrWhiteSpace(allowedShippingRateComputationMethodSystemName))
-            {
-                shippingRateComputationMethods = shippingRateComputationMethods
-                    .Where(srcm => allowedShippingRateComputationMethodSystemName.Equals(srcm.PluginDescriptor.SystemName, StringComparison.InvariantCultureIgnoreCase))
-                    .ToList();
-            }
+            var shippingRateComputationMethods = _shippingPluginManager
+                .LoadActivePlugins(customer, storeId, allowedShippingRateComputationMethodSystemName);
             if (!shippingRateComputationMethods.Any())
-                //throw new NopException("Shipping rate computation method could not be loaded");
                 return result;
-
-
 
             //request shipping options from each shipping rate computation methods
             foreach (var srcm in shippingRateComputationMethods)
@@ -909,17 +886,17 @@ namespace Nop.Services.Shipping
                 }
 
                 //add this scrm's options to the result
-                if (srcmShippingOptions != null)
+                if (srcmShippingOptions == null)
+                    continue;
+
+                foreach (var so in srcmShippingOptions)
                 {
-                    foreach (var so in srcmShippingOptions)
-                    {
-                        //set system name if not set yet
-                        if (string.IsNullOrEmpty(so.ShippingRateComputationMethodSystemName))
-                            so.ShippingRateComputationMethodSystemName = srcm.PluginDescriptor.SystemName;
-                        if (_shoppingCartSettings.RoundPricesDuringCalculation)
-                            so.Rate = RoundingHelper.RoundPrice(so.Rate);
-                        result.ShippingOptions.Add(so);
-                    }
+                    //set system name if not set yet
+                    if (string.IsNullOrEmpty(so.ShippingRateComputationMethodSystemName))
+                        so.ShippingRateComputationMethodSystemName = srcm.PluginDescriptor.SystemName;
+                    if (_shoppingCartSettings.RoundPricesDuringCalculation)
+                        so.Rate = _priceCalculationService.RoundPrice(so.Rate);
+                    result.ShippingOptions.Add(so);
                 }
             }
 
@@ -929,40 +906,35 @@ namespace Nop.Services.Shipping
                 if (result.ShippingOptions.Any() && result.Errors.Any())
                     result.Errors.Clear();
             }
-            
+
             //no shipping options loaded
             if (!result.ShippingOptions.Any() && !result.Errors.Any())
                 result.Errors.Add(_localizationService.GetResource("Checkout.ShippingOptionCouldNotBeLoaded"));
-            
+
             return result;
         }
 
         /// <summary>
         /// Gets available pickup points
         /// </summary>
-        /// <param name="address">Address</param>
+        /// <param name="addressId">Address identifier</param>
         /// <param name="customer">Load records allowed only to a specified customer; pass null to ignore ACL permissions</param>
         /// <param name="providerSystemName">Filter by provider identifier; null to load pickup points of all providers</param>
         /// <param name="storeId">Load records allowed only in a specified store; pass 0 to load all records</param>
         /// <returns>Pickup points</returns>
-        public virtual GetPickupPointsResponse GetPickupPoints(Address address, Customer customer = null, string providerSystemName = null, int storeId = 0)
+        public virtual GetPickupPointsResponse GetPickupPoints(int addressId, Customer customer = null,
+            string providerSystemName = null, int storeId = 0)
         {
             var result = new GetPickupPointsResponse();
-            var pickupPointsProviders = LoadActivePickupPointProviders(customer, storeId);
 
-            if (!string.IsNullOrEmpty(providerSystemName))
-            {
-                pickupPointsProviders = pickupPointsProviders
-                    .Where(x => x.PluginDescriptor.SystemName.Equals(providerSystemName, StringComparison.InvariantCultureIgnoreCase)).ToList();
-            }
-
-            if (pickupPointsProviders.Count == 0)
+            var pickupPointsProviders = _pickupPluginManager.LoadActivePlugins(customer, storeId, providerSystemName);
+            if (!pickupPointsProviders.Any())
                 return result;
 
             var allPickupPoints = new List<PickupPoint>();
             foreach (var provider in pickupPointsProviders)
             {
-                var pickPointsResponse = provider.GetPickupPoints(address);
+                var pickPointsResponse = provider.GetPickupPoints(_addressService.GetAddressById(addressId));
                 if (pickPointsResponse.Success)
                     allPickupPoints.AddRange(pickPointsResponse.PickupPoints);
                 else
@@ -976,13 +948,82 @@ namespace Nop.Services.Shipping
             }
 
             //any pickup points is enough
-            if (allPickupPoints.Count > 0)
-            {
-                result.Errors.Clear();
-                result.PickupPoints = allPickupPoints.OrderBy(point => point.DisplayOrder).ThenBy(point => point.Name).ToList();
-            }
+            if (allPickupPoints.Count <= 0)
+                return result;
+
+            result.Errors.Clear();
+            result.PickupPoints = allPickupPoints.OrderBy(point => point.DisplayOrder).ThenBy(point => point.Name).ToList();
 
             return result;
+        }
+
+        /// <summary>
+        /// Whether the shopping cart item is ship enabled
+        /// </summary>
+        /// <param name="shoppingCartItem">Shopping cart item</param>
+        /// <returns>True if the shopping cart item requires shipping; otherwise false</returns>
+        public virtual bool IsShipEnabled(ShoppingCartItem shoppingCartItem)
+        {
+            //whether the product requires shipping
+            if (shoppingCartItem.ProductId != 0 && _productService.GetProductById(shoppingCartItem.ProductId)?.IsShipEnabled == true)
+                return true;
+
+            if (string.IsNullOrEmpty(shoppingCartItem.AttributesXml))
+                return false;
+
+            //or whether associated products of the shopping cart item require shipping
+            return _productAttributeParser.ParseProductAttributeValues(shoppingCartItem.AttributesXml)
+                .Where(attributeValue => attributeValue.AttributeValueType == AttributeValueType.AssociatedToProduct)
+                .Any(attributeValue => _productService.GetProductById(attributeValue.AssociatedProductId)?.IsShipEnabled ?? false);
+        }
+
+        /// <summary>
+        /// Whether the shopping cart item is free shipping
+        /// </summary>
+        /// <param name="shoppingCartItem">Shopping cart item</param>
+        /// <returns>True if the shopping cart item is free shipping; otherwise false</returns>
+        public virtual bool IsFreeShipping(ShoppingCartItem shoppingCartItem)
+        {
+            //first, check whether shipping is required
+            if (!IsShipEnabled(shoppingCartItem))
+                return true;
+
+            //then whether the product is free shipping
+            if (shoppingCartItem.ProductId != 0 && !_productService.GetProductById(shoppingCartItem.ProductId).IsFreeShipping)
+                return false;
+
+            if (string.IsNullOrEmpty(shoppingCartItem.AttributesXml))
+                return true;
+
+            //and whether associated products of the shopping cart item is free shipping
+            return _productAttributeParser.ParseProductAttributeValues(shoppingCartItem.AttributesXml)
+                .Where(attributeValue => attributeValue.AttributeValueType == AttributeValueType.AssociatedToProduct)
+                .All(attributeValue => _productService.GetProductById(attributeValue.AssociatedProductId)?.IsFreeShipping ?? true);
+        }
+
+        /// <summary>
+        /// Get the additional shipping charge
+        /// </summary> 
+        /// <param name="shoppingCartItem">Shopping cart item</param>
+        /// <returns>The additional shipping charge of the shopping cart item</returns>
+        public virtual decimal GetAdditionalShippingCharge(ShoppingCartItem shoppingCartItem)
+        {
+            //first, check whether shipping is free
+            if (IsFreeShipping(shoppingCartItem))
+                return decimal.Zero;
+
+            //get additional shipping charge of the product
+            var additionalShippingCharge = (_productService.GetProductById(shoppingCartItem.ProductId)?.AdditionalShippingCharge ?? decimal.Zero) * shoppingCartItem.Quantity;
+
+            if (string.IsNullOrEmpty(shoppingCartItem.AttributesXml))
+                return additionalShippingCharge;
+
+            //and sum with associated products additional shipping charges
+            additionalShippingCharge += _productAttributeParser.ParseProductAttributeValues(shoppingCartItem.AttributesXml)
+                .Where(attributeValue => attributeValue.AttributeValueType == AttributeValueType.AssociatedToProduct)
+                .Sum(attributeValue => _productService.GetProductById(attributeValue.AssociatedProductId)?.AdditionalShippingCharge ?? decimal.Zero);
+
+            return additionalShippingCharge;
         }
 
         #endregion

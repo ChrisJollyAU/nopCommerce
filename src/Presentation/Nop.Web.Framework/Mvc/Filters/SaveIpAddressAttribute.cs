@@ -3,8 +3,8 @@ using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Nop.Core;
-using Nop.Core.Data;
 using Nop.Core.Domain.Customers;
+using Nop.Data;
 using Nop.Services.Customers;
 
 namespace Nop.Web.Framework.Mvc.Filters
@@ -12,7 +12,7 @@ namespace Nop.Web.Framework.Mvc.Filters
     /// <summary>
     /// Represents filter attribute that saves last IP address of customer
     /// </summary>
-    public class SaveIpAddressAttribute : TypeFilterAttribute
+    public sealed class SaveIpAddressAttribute : TypeFilterAttribute
     {
         #region Ctor
 
@@ -48,10 +48,10 @@ namespace Nop.Web.Framework.Mvc.Filters
                 IWorkContext workContext,
                 CustomerSettings customerSettings)
             {
-                this._customerService = customerService;
-                this._webHelper = webHelper;
-                this._workContext = workContext;
-                this._customerSettings = customerSettings;
+                _customerService = customerService;
+                _webHelper = webHelper;
+                _workContext = workContext;
+                _customerSettings = customerSettings;
             }
 
             #endregion
@@ -74,7 +74,7 @@ namespace Nop.Web.Framework.Mvc.Filters
                 if (!context.HttpContext.Request.Method.Equals(WebRequestMethods.Http.Get, StringComparison.InvariantCultureIgnoreCase))
                     return;
 
-                if (!DataSettingsHelper.DatabaseIsInstalled())
+                if (!DataSettingsManager.DatabaseIsInstalled)
                     return;
 
                 //check whether we store IP addresses
@@ -85,9 +85,10 @@ namespace Nop.Web.Framework.Mvc.Filters
                 var currentIpAddress = _webHelper.GetCurrentIpAddress();
                 if (string.IsNullOrEmpty(currentIpAddress))
                     return;
-                
+
                 //update customer's IP address
-                if (!currentIpAddress.Equals(_workContext.CurrentCustomer.LastIpAddress, StringComparison.InvariantCultureIgnoreCase))
+                if (_workContext.OriginalCustomerIfImpersonated == null &&
+                     !currentIpAddress.Equals(_workContext.CurrentCustomer.LastIpAddress, StringComparison.InvariantCultureIgnoreCase))
                 {
                     _workContext.CurrentCustomer.LastIpAddress = currentIpAddress;
                     _customerService.UpdateCustomer(_workContext.CurrentCustomer);

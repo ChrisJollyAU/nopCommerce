@@ -1,6 +1,4 @@
-using System;
-using Nop.Core.Domain.Catalog;
-using Nop.Core.Domain.Customers;
+﻿using System;
 
 namespace Nop.Core.Domain.Orders
 {
@@ -69,18 +67,8 @@ namespace Nop.Core.Domain.Orders
         /// </summary>
         public ShoppingCartType ShoppingCartType
         {
-            get { return (ShoppingCartType)ShoppingCartTypeId; }
-            set { ShoppingCartTypeId = (int)value; }
+            get => (ShoppingCartType)ShoppingCartTypeId;
+            set => ShoppingCartTypeId = (int)value;
         }
-
-        /// <summary>
-        /// Gets or sets the product
-        /// </summary>
-        public virtual Product Product { get; set; }
-
-        /// <summary>
-        /// Gets or sets the customer
-        /// </summary>
-        public virtual Customer Customer { get; set; }
     }
 }

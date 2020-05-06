@@ -1,8 +1,7 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Data;
 using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Logging;
@@ -17,35 +16,22 @@ namespace Nop.Services.Logging
     {
         #region Fields
 
-        private readonly IRepository<Log> _logRepository;
-        private readonly IWebHelper _webHelper;
-        private readonly IDbContext _dbContext;
-        private readonly IDataProvider _dataProvider;
         private readonly CommonSettings _commonSettings;
         
+        private readonly IRepository<Log> _logRepository;
+        private readonly IWebHelper _webHelper;
+
         #endregion
-        
+
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="logRepository">Log repository</param>
-        /// <param name="webHelper">Web helper</param>
-        /// <param name="dbContext">DB context</param>
-        /// <param name="dataProvider">WeData provider</param>
-        /// <param name="commonSettings">Common settings</param>
-        public DefaultLogger(IRepository<Log> logRepository, 
-            IWebHelper webHelper,
-            IDbContext dbContext, 
-            IDataProvider dataProvider, 
-            CommonSettings commonSettings)
+        public DefaultLogger(CommonSettings commonSettings,
+            IRepository<Log> logRepository,
+            IWebHelper webHelper)
         {
-            this._logRepository = logRepository;
-            this._webHelper = webHelper;
-            this._dbContext = dbContext;
-            this._dataProvider = dataProvider;
-            this._commonSettings = commonSettings;
+            _commonSettings = commonSettings;
+            _logRepository = logRepository;
+            _webHelper = webHelper;
         }
 
         #endregion
@@ -81,13 +67,11 @@ namespace Nop.Services.Logging
         /// <returns>Result</returns>
         public virtual bool IsEnabled(LogLevel level)
         {
-            switch(level)
+            return level switch
             {
-                case LogLevel.Debug:
-                    return false;
-                default:
-                    return true;
-            }
+                LogLevel.Debug => false,
+                _ => true,
+            };
         }
 
         /// <summary>
@@ -119,22 +103,7 @@ namespace Nop.Services.Logging
         /// </summary>
         public virtual void ClearLog()
         {
-            if (_commonSettings.UseStoredProceduresIfSupported && _dataProvider.StoredProceduredSupported)
-            {
-                //although it's not a stored procedure we use it to ensure that a database supports them
-                //we cannot wait until EF team has it implemented - http://data.uservoice.com/forums/72025-entity-framework-feature-suggestions/suggestions/1015357-batch-cud-support
-
-
-                //do all databases support "Truncate command"?
-                var logTableName = _dbContext.GetTableName<Log>();
-                _dbContext.ExecuteSqlCommand($"TRUNCATE TABLE [{logTableName}]");
-            }
-            else
-            {
-                var log = _logRepository.Table.ToList();
-                foreach (var logItem in log)
-                    _logRepository.Delete(logItem);
-            }
+            _logRepository.Truncate();
         }
 
         /// <summary>
@@ -148,7 +117,7 @@ namespace Nop.Services.Logging
         /// <param name="pageSize">Page size</param>
         /// <returns>Log item items</returns>
         public virtual IPagedList<Log> GetAllLogs(DateTime? fromUtc = null, DateTime? toUtc = null,
-            string message = "", LogLevel? logLevel = null, 
+            string message = "", LogLevel? logLevel = null,
             int pageIndex = 0, int pageSize = int.MaxValue)
         {
             var query = _logRepository.Table;
@@ -161,7 +130,8 @@ namespace Nop.Services.Logging
                 var logLevelId = (int)logLevel.Value;
                 query = query.Where(l => logLevelId == l.LogLevelId);
             }
-             if (!string.IsNullOrEmpty(message))
+
+            if (!string.IsNullOrEmpty(message))
                 query = query.Where(l => l.ShortMessage.Contains(message) || l.FullMessage.Contains(message));
             query = query.OrderByDescending(l => l.CreatedOnUtc);
 
@@ -204,6 +174,7 @@ namespace Nop.Services.Logging
                 if (log != null)
                     sortedLogItems.Add(log);
             }
+
             return sortedLogItems;
         }
 
@@ -227,7 +198,7 @@ namespace Nop.Services.Logging
                 ShortMessage = shortMessage,
                 FullMessage = fullMessage,
                 IpAddress = _webHelper.GetCurrentIpAddress(),
-                Customer = customer,
+                CustomerId = customer?.Id,
                 PageUrl = _webHelper.GetThisPageUrl(true),
                 ReferrerUrl = _webHelper.GetUrlReferrer(),
                 CreatedOnUtc = DateTime.UtcNow
@@ -236,6 +207,54 @@ namespace Nop.Services.Logging
             _logRepository.Insert(log);
 
             return log;
+        }
+
+        /// <summary>
+        /// Information
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="exception">Exception</param>
+        /// <param name="customer">Customer</param>
+        public virtual void Information(string message, Exception exception = null, Customer customer = null)
+        {
+            //don't log thread abort exception
+            if (exception is System.Threading.ThreadAbortException)
+                return;
+
+            if (IsEnabled(LogLevel.Information))
+                InsertLog(LogLevel.Information, message, exception?.ToString() ?? string.Empty, customer);
+        }
+
+        /// <summary>
+        /// Warning
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="exception">Exception</param>
+        /// <param name="customer">Customer</param>
+        public virtual void Warning(string message, Exception exception = null, Customer customer = null)
+        {
+            //don't log thread abort exception
+            if (exception is System.Threading.ThreadAbortException)
+                return;
+
+            if (IsEnabled(LogLevel.Warning))
+                InsertLog(LogLevel.Warning, message, exception?.ToString() ?? string.Empty, customer);
+        }
+
+        /// <summary>
+        /// Error
+        /// </summary>
+        /// <param name="message">Message</param>
+        /// <param name="exception">Exception</param>
+        /// <param name="customer">Customer</param>
+        public virtual void Error(string message, Exception exception = null, Customer customer = null)
+        {
+            //don't log thread abort exception
+            if (exception is System.Threading.ThreadAbortException)
+                return;
+
+            if (IsEnabled(LogLevel.Error))
+                InsertLog(LogLevel.Error, message, exception?.ToString() ?? string.Empty, customer);
         }
 
         #endregion

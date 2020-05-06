@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
+using System.Text;
 using Newtonsoft.Json;
-using Nop.Core;
+using Nop.Core.Infrastructure;
+using Nop.Services.Plugins;
 
 namespace Nop.Services.Themes
 {
@@ -14,7 +15,18 @@ namespace Nop.Services.Themes
     {
         #region Fields
 
+        private readonly INopFileProvider _fileProvider;
+
         private IList<ThemeDescriptor> _themeDescriptors;
+
+        #endregion
+
+        #region Ctor
+
+        public ThemeProvider(INopFileProvider fileProvider)
+        {
+            _fileProvider = fileProvider;
+        }
 
         #endregion
 
@@ -42,26 +54,27 @@ namespace Nop.Services.Themes
         /// <returns>List of the theme descriptor</returns>
         public IList<ThemeDescriptor> GetThemes()
         {
-            if (_themeDescriptors == null)
+            if (_themeDescriptors != null)
+                return _themeDescriptors;
+
+            //load all theme descriptors
+            _themeDescriptors = new List<ThemeDescriptor>();
+
+            var themeDirectoryPath = _fileProvider.MapPath(NopPluginDefaults.ThemesPath);
+            foreach (var descriptionFile in _fileProvider.GetFiles(themeDirectoryPath, NopPluginDefaults.ThemeDescriptionFileName, false))
             {
-                //load all theme descriptors
-                var themeFolder = new DirectoryInfo(CommonHelper.MapPath(ThemesPath));
-                _themeDescriptors = new List<ThemeDescriptor>();
-                foreach (var descriptionFile in themeFolder.GetFiles(ThemeDescriptionFileName, SearchOption.AllDirectories))
-                {
-                    var text = File.ReadAllText(descriptionFile.FullName);
-                    if (string.IsNullOrEmpty(text))
-                        continue;
+                var text = _fileProvider.ReadAllText(descriptionFile, Encoding.UTF8);
+                if (string.IsNullOrEmpty(text))
+                    continue;
 
-                    //get theme descriptor
-                    var themeDescriptor = GetThemeDescriptorFromText(text);
+                //get theme descriptor
+                var themeDescriptor = GetThemeDescriptorFromText(text);
 
-                    //some validation
-                    if (string.IsNullOrEmpty(themeDescriptor?.SystemName))
-                        throw new Exception($"A theme descriptor '{descriptionFile.FullName}' has no system name");
+                //some validation
+                if (string.IsNullOrEmpty(themeDescriptor?.SystemName))
+                    throw new Exception($"A theme descriptor '{descriptionFile}' has no system name");
 
-                    _themeDescriptors.Add(themeDescriptor);
-                }
+                _themeDescriptors.Add(themeDescriptor);
             }
 
             return _themeDescriptors;
@@ -92,20 +105,6 @@ namespace Nop.Services.Themes
 
             return GetThemes().Any(descriptor => descriptor.SystemName.Equals(systemName, StringComparison.InvariantCultureIgnoreCase));
         }
-
-        #endregion
-
-        #region Properties
-
-        /// <summary>
-        /// Gets the path to themes folder
-        /// </summary>
-        public string ThemesPath => "~/Themes";
-
-        /// <summary>
-        /// Gets the name of the theme description file
-        /// </summary>
-        public string ThemeDescriptionFileName => "theme.json";
 
         #endregion
     }

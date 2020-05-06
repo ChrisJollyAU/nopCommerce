@@ -1,4 +1,4 @@
-using Nop.Core.Domain.Localization;
+﻿using Nop.Core.Domain.Localization;
 
 namespace Nop.Core.Domain.Catalog
 {
@@ -43,6 +43,11 @@ namespace Nop.Core.Domain.Catalog
         public decimal PriceAdjustment { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether "price adjustment" is specified as percentage (used only with AttributeValueType.Simple)
+        /// </summary>
+        public bool PriceAdjustmentUsePercentage { get; set; }
+
+        /// <summary>
         /// Gets or sets the weight adjustment (used only with AttributeValueType.Simple)
         /// </summary>
         public decimal WeightAdjustment { get; set; }
@@ -78,23 +83,12 @@ namespace Nop.Core.Domain.Catalog
         public int PictureId { get; set; }
 
         /// <summary>
-        /// Gets the product attribute mapping
-        /// </summary>
-        public virtual ProductAttributeMapping ProductAttributeMapping { get; set; }
-
-        /// <summary>
         /// Gets or sets the attribute value type
         /// </summary>
         public AttributeValueType AttributeValueType
         {
-            get
-            {
-                return (AttributeValueType)this.AttributeValueTypeId;
-            }
-            set
-            {
-                this.AttributeValueTypeId = (int)value;
-            }
+            get => (AttributeValueType)AttributeValueTypeId;
+            set => AttributeValueTypeId = (int)value;
         }
     }
 }

@@ -1,9 +1,10 @@
-using System;
+﻿using System;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Data;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Customers;
+using Nop.Data;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Common;
 using Nop.Services.Events;
 using Nop.Services.Messages;
@@ -17,27 +18,30 @@ namespace Nop.Services.Catalog
     {
         #region Fields
 
-        private readonly IRepository<BackInStockSubscription> _backInStockSubscriptionRepository;
-        private readonly IWorkflowMessageService _workflowMessageService;
         private readonly IEventPublisher _eventPublisher;
+        private readonly IGenericAttributeService _genericAttributeService;
+        private readonly IRepository<BackInStockSubscription> _backInStockSubscriptionRepository;
+        private readonly IRepository<Customer> _customerRepository;
+        private readonly IRepository<Product> _productRepository;
+        private readonly IWorkflowMessageService _workflowMessageService;
 
         #endregion
-        
+
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="backInStockSubscriptionRepository">Back in stock subscription repository</param>
-        /// <param name="workflowMessageService">Workflow message service</param>
-        /// <param name="eventPublisher">Event publisher</param>
-        public BackInStockSubscriptionService(IRepository<BackInStockSubscription> backInStockSubscriptionRepository,
-            IWorkflowMessageService workflowMessageService,
-            IEventPublisher eventPublisher)
+        public BackInStockSubscriptionService(IEventPublisher eventPublisher,
+            IGenericAttributeService genericAttributeService,
+            IRepository<BackInStockSubscription> backInStockSubscriptionRepository,
+            IRepository<Customer> customerRepository,
+            IRepository<Product> productRepository,
+            IWorkflowMessageService workflowMessageService)
         {
-            this._backInStockSubscriptionRepository = backInStockSubscriptionRepository;
-            this._workflowMessageService = workflowMessageService;
-            this._eventPublisher = eventPublisher;
+            _eventPublisher = eventPublisher;
+            _genericAttributeService = genericAttributeService;
+            _backInStockSubscriptionRepository = backInStockSubscriptionRepository;
+            _customerRepository = customerRepository;
+            _productRepository = productRepository;
+            _workflowMessageService = workflowMessageService;
         }
 
         #endregion
@@ -71,13 +75,20 @@ namespace Nop.Services.Catalog
             int storeId = 0, int pageIndex = 0, int pageSize = int.MaxValue)
         {
             var query = _backInStockSubscriptionRepository.Table;
+
             //customer
             query = query.Where(biss => biss.CustomerId == customerId);
+
             //store
             if (storeId > 0)
                 query = query.Where(biss => biss.StoreId == storeId);
+
             //product
-            query = query.Where(biss => !biss.Product.Deleted);
+            query = from q in query
+                join p in _productRepository.Table on q.ProductId equals p.Id
+                where !p.Deleted
+                select q;
+
             query = query.OrderByDescending(biss => biss.CreatedOnUtc);
 
             return new PagedList<BackInStockSubscription>(query, pageIndex, pageSize);
@@ -101,7 +112,11 @@ namespace Nop.Services.Catalog
             if (storeId > 0)
                 query = query.Where(biss => biss.StoreId == storeId);
             //customer
-            query = query.Where(biss => !biss.Customer.Deleted && biss.Customer.Active);
+            query = from biss in query
+                join c in _customerRepository.Table on biss.CustomerId equals c.Id
+                where c.Active && !c.Deleted
+                select biss;
+
             query = query.OrderByDescending(biss => biss.CreatedOnUtc);
             return new PagedList<BackInStockSubscription>(query, pageIndex, pageSize);
         }
@@ -136,7 +151,7 @@ namespace Nop.Services.Catalog
             if (subscriptionId == 0)
                 return null;
 
-            var subscription = _backInStockSubscriptionRepository.GetById(subscriptionId);
+            var subscription = _backInStockSubscriptionRepository.ToCachedGetById(subscriptionId);
             return subscription;
         }
 
@@ -184,20 +199,17 @@ namespace Nop.Services.Catalog
             var subscriptions = GetAllSubscriptionsByProductId(product.Id);
             foreach (var subscription in subscriptions)
             {
-                //ensure that customer is registered (simple and fast way)
-                if (CommonHelper.IsValidEmail(subscription.Customer.Email))
-                {
-                    var customer = subscription.Customer;
-                    var customerLanguageId = customer.GetAttribute<int>(SystemCustomerAttributeNames.LanguageId, subscription.StoreId);
-                    _workflowMessageService.SendBackInStockNotification(subscription, customerLanguageId);
-                    result++;
-                }
+                var customerLanguageId = _genericAttributeService.GetAttribute<Customer, int>(subscription.CustomerId, NopCustomerDefaults.LanguageIdAttribute, subscription.StoreId);
+
+                result += _workflowMessageService.SendBackInStockNotification(subscription, customerLanguageId).Count;
             }
+
             for (var i = 0; i <= subscriptions.Count - 1; i++)
                 DeleteSubscription(subscriptions[i]);
+
             return result;
         }
-        
+
         #endregion
     }
 }

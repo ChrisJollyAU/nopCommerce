@@ -1,11 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Caching;
-using Nop.Core.Data;
 using Nop.Core.Domain.Common;
+using Nop.Core.Infrastructure;
 using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Events;
 
 namespace Nop.Services.Common
@@ -15,50 +16,24 @@ namespace Nop.Services.Common
     /// </summary>
     public partial class GenericAttributeService : IGenericAttributeService
     {
-        #region Constants
-
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        /// <remarks>
-        /// {0} : entity ID
-        /// {1} : key group
-        /// </remarks>
-        private const string GENERICATTRIBUTE_KEY = "Nop.genericattribute.{0}-{1}";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string GENERICATTRIBUTE_PATTERN_KEY = "Nop.genericattribute.";
-
-        #endregion
-
         #region Fields
 
-        private readonly IRepository<GenericAttribute> _genericAttributeRepository;
-        private readonly ICacheManager _cacheManager;
         private readonly IEventPublisher _eventPublisher;
+        private readonly IRepository<GenericAttribute> _genericAttributeRepository;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="cacheManager">Cache manager</param>
-        /// <param name="genericAttributeRepository">Generic attribute repository</param>
-        /// <param name="eventPublisher">Event published</param>
-        public GenericAttributeService(ICacheManager cacheManager,
-            IRepository<GenericAttribute> genericAttributeRepository,
-            IEventPublisher eventPublisher)
+        public GenericAttributeService(IEventPublisher eventPublisher,
+            IRepository<GenericAttribute> genericAttributeRepository)
         {
-            this._cacheManager = cacheManager;
-            this._genericAttributeRepository = genericAttributeRepository;
-            this._eventPublisher = eventPublisher;
+            _eventPublisher = eventPublisher;
+            _genericAttributeRepository = genericAttributeRepository;
         }
 
         #endregion
-        
+
         #region Methods
 
         /// <summary>
@@ -71,10 +46,7 @@ namespace Nop.Services.Common
                 throw new ArgumentNullException(nameof(attribute));
 
             _genericAttributeRepository.Delete(attribute);
-
-            //cache
-            _cacheManager.RemoveByPattern(GENERICATTRIBUTE_PATTERN_KEY);
-
+            
             //event notification
             _eventPublisher.EntityDeleted(attribute);
         }
@@ -89,10 +61,7 @@ namespace Nop.Services.Common
                 throw new ArgumentNullException(nameof(attributes));
 
             _genericAttributeRepository.Delete(attributes);
-
-            //cache
-            _cacheManager.RemoveByPattern(GENERICATTRIBUTE_PATTERN_KEY);
-
+            
             //event notification
             foreach (var attribute in attributes)
             {
@@ -122,11 +91,9 @@ namespace Nop.Services.Common
             if (attribute == null)
                 throw new ArgumentNullException(nameof(attribute));
 
+            attribute.CreatedOrUpdatedDateUTC = DateTime.UtcNow;
             _genericAttributeRepository.Insert(attribute);
             
-            //cache
-            _cacheManager.RemoveByPattern(GENERICATTRIBUTE_PATTERN_KEY);
-
             //event notification
             _eventPublisher.EntityInserted(attribute);
         }
@@ -140,11 +107,9 @@ namespace Nop.Services.Common
             if (attribute == null)
                 throw new ArgumentNullException(nameof(attribute));
 
+            attribute.CreatedOrUpdatedDateUTC = DateTime.UtcNow;
             _genericAttributeRepository.Update(attribute);
-
-            //cache
-            _cacheManager.RemoveByPattern(GENERICATTRIBUTE_PATTERN_KEY);
-
+            
             //event notification
             _eventPublisher.EntityUpdated(attribute);
         }
@@ -157,16 +122,18 @@ namespace Nop.Services.Common
         /// <returns>Get attributes</returns>
         public virtual IList<GenericAttribute> GetAttributesForEntity(int entityId, string keyGroup)
         {
-            var key = string.Format(GENERICATTRIBUTE_KEY, entityId, keyGroup);
-            return _cacheManager.Get(key, () =>
-            {
-                var query = from ga in _genericAttributeRepository.Table
-                            where ga.EntityId == entityId &&
-                            ga.KeyGroup == keyGroup
-                            select ga;
-                var attributes = query.ToList();
-                return attributes;
-            });
+            //we cannot inject ICacheKeyService into constructor because it'll cause circular references.
+            //that's why we resolve it here this way
+            var key = EngineContext.Current.Resolve<ICacheKeyService>()
+                .PrepareKeyForShortTermCache(NopCommonDefaults.GenericAttributeCacheKey, entityId, keyGroup);
+            
+            var query = from ga in _genericAttributeRepository.Table
+                where ga.EntityId == entityId &&
+                      ga.KeyGroup == keyGroup
+                select ga;
+            var attributes = query.ToCachedList(key);
+
+            return attributes;
         }
 
         /// <summary>
@@ -185,7 +152,7 @@ namespace Nop.Services.Common
             if (key == null)
                 throw new ArgumentNullException(nameof(key));
 
-            var keyGroup = entity.GetUnproxiedEntityType().Name;
+            var keyGroup = entity.GetType().Name;
 
             var props = GetAttributesForEntity(entity.Id, keyGroup)
                 .Where(x => x.StoreId == storeId)
@@ -211,21 +178,75 @@ namespace Nop.Services.Common
             }
             else
             {
-                if (!string.IsNullOrWhiteSpace(valueStr))
+                if (string.IsNullOrWhiteSpace(valueStr)) 
+                    return;
+
+                //insert
+                prop = new GenericAttribute
                 {
-                    //insert
-                    prop = new GenericAttribute
-                    {
-                        EntityId = entity.Id,
-                        Key = key,
-                        KeyGroup = keyGroup,
-                        Value = valueStr,
-                        StoreId = storeId,
-                        
-                    };
-                    InsertAttribute(prop);
-                }
+                    EntityId = entity.Id,
+                    Key = key,
+                    KeyGroup = keyGroup,
+                    Value = valueStr,
+                    StoreId = storeId
+                };
+
+                InsertAttribute(prop);
             }
+        }
+
+        /// <summary>
+        /// Get an attribute of an entity
+        /// </summary>
+        /// <typeparam name="TPropType">Property type</typeparam>
+        /// <param name="entity">Entity</param>
+        /// <param name="key">Key</param>
+        /// <param name="storeId">Load a value specific for a certain store; pass 0 to load a value shared for all stores</param>
+        /// <param name="defaultValue">Default value</param>
+        /// <returns>Attribute</returns>
+        public virtual TPropType GetAttribute<TPropType>(BaseEntity entity, string key, int storeId = 0, TPropType defaultValue = default)
+        {
+            if (entity == null)
+                throw new ArgumentNullException(nameof(entity));
+
+            var keyGroup = entity.GetType().Name;
+
+            var props = GetAttributesForEntity(entity.Id, keyGroup);
+
+            //little hack here (only for unit testing). we should write expect-return rules in unit tests for such cases
+            if (props == null)
+                return defaultValue;
+
+            props = props.Where(x => x.StoreId == storeId).ToList();
+            if (!props.Any())
+                return defaultValue;
+
+            var prop = props.FirstOrDefault(ga =>
+                ga.Key.Equals(key, StringComparison.InvariantCultureIgnoreCase)); //should be culture invariant
+
+            if (prop == null || string.IsNullOrEmpty(prop.Value))
+                return defaultValue;
+
+            return CommonHelper.To<TPropType>(prop.Value);
+        }
+
+        /// <summary>
+        /// Get an attribute of an entity
+        /// </summary>
+        /// <typeparam name="TPropType">Property type</typeparam>
+        /// <typeparam name="TEntity">Entity type</typeparam>
+        /// <param name="entityId">Entity identifier</param>
+        /// <param name="key">Key</param>
+        /// <param name="storeId">Load a value specific for a certain store; pass 0 to load a value shared for all stores</param>
+        /// <param name="defaultValue">Default value</param>
+        /// <returns>Attribute</returns>
+        public virtual TPropType GetAttribute<TEntity, TPropType>(int entityId, string key, int storeId = 0, TPropType defaultValue = default)
+            where TEntity : BaseEntity
+        {
+            var entity = (TEntity)Activator.CreateInstance(typeof(TEntity));
+            entity.Id = entityId;
+
+            return GetAttribute(entity, key, storeId, defaultValue);
         }
 
         #endregion

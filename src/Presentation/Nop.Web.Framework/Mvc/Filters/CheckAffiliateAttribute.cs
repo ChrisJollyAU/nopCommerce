@@ -3,8 +3,9 @@ using System.Linq;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Nop.Core;
-using Nop.Core.Data;
 using Nop.Core.Domain.Affiliates;
+using Nop.Core.Domain.Customers;
+using Nop.Data;
 using Nop.Services.Affiliates;
 using Nop.Services.Customers;
 
@@ -13,7 +14,7 @@ namespace Nop.Web.Framework.Mvc.Filters
     /// <summary>
     /// Represents filter attribute that checks and updates affiliate of customer
     /// </summary>
-    public class CheckAffiliateAttribute : TypeFilterAttribute
+    public sealed class CheckAffiliateAttribute : TypeFilterAttribute
     {
         #region Ctor
 
@@ -54,9 +55,9 @@ namespace Nop.Web.Framework.Mvc.Filters
                 ICustomerService customerService,
                 IWorkContext workContext)
             {
-                this._affiliateService = affiliateService;
-                this._customerService = customerService;
-                this._workContext = workContext;
+                _affiliateService = affiliateService;
+                _customerService = customerService;
+                _workContext = workContext;
             }
 
             #endregion
@@ -73,6 +74,10 @@ namespace Nop.Web.Framework.Mvc.Filters
                     return;
 
                 if (affiliate.Id == _workContext.CurrentCustomer.AffiliateId)
+                    return;
+
+                //ignore search engines
+                if (_workContext.CurrentCustomer.IsSearchEngineAccount())
                     return;
 
                 //update affiliate identifier
@@ -98,12 +103,13 @@ namespace Nop.Web.Framework.Mvc.Filters
                 if (request?.Query == null || !request.Query.Any())
                     return;
 
-                if (!DataSettingsHelper.DatabaseIsInstalled())
+                if (!DataSettingsManager.DatabaseIsInstalled)
                     return;
 
                 //try to find by ID
                 var affiliateIds = request.Query[AFFILIATE_ID_QUERY_PARAMETER_NAME];
-                if (affiliateIds.Any() && int.TryParse(affiliateIds.FirstOrDefault(), out int affiliateId) && affiliateId > 0)
+                if (affiliateIds.Any() && int.TryParse(affiliateIds.FirstOrDefault(), out int affiliateId)
+                    && affiliateId > 0 && affiliateId != _workContext.CurrentCustomer.AffiliateId)
                 {
                     SetCustomerAffiliateId(_affiliateService.GetAffiliateById(affiliateId));
                     return;

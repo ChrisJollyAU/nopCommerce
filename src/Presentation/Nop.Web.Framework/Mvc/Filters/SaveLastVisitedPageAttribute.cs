@@ -3,8 +3,8 @@ using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Nop.Core;
-using Nop.Core.Data;
 using Nop.Core.Domain.Customers;
+using Nop.Data;
 using Nop.Services.Common;
 
 namespace Nop.Web.Framework.Mvc.Filters
@@ -12,7 +12,7 @@ namespace Nop.Web.Framework.Mvc.Filters
     /// <summary>
     /// Represents filter attribute that saves last visited page by customer
     /// </summary>
-    public class SaveLastVisitedPageAttribute : TypeFilterAttribute
+    public sealed class SaveLastVisitedPageAttribute : TypeFilterAttribute
     {
         #region Ctor
 
@@ -45,13 +45,13 @@ namespace Nop.Web.Framework.Mvc.Filters
 
             public SaveLastVisitedPageFilter(CustomerSettings customerSettings,
                 IGenericAttributeService genericAttributeService,
-                IWebHelper webHelper, 
+                IWebHelper webHelper,
                 IWorkContext workContext)
             {
-                this._customerSettings = customerSettings;
-                this._genericAttributeService = genericAttributeService;
-                this._webHelper = webHelper;
-                this._workContext = workContext;
+                _customerSettings = customerSettings;
+                _genericAttributeService = genericAttributeService;
+                _webHelper = webHelper;
+                _workContext = workContext;
             }
 
             #endregion
@@ -74,7 +74,7 @@ namespace Nop.Web.Framework.Mvc.Filters
                 if (!context.HttpContext.Request.Method.Equals(WebRequestMethods.Http.Get, StringComparison.InvariantCultureIgnoreCase))
                     return;
 
-                if (!DataSettingsHelper.DatabaseIsInstalled())
+                if (!DataSettingsManager.DatabaseIsInstalled)
                     return;
 
                 //check whether we store last visited page URL
@@ -85,14 +85,14 @@ namespace Nop.Web.Framework.Mvc.Filters
                 var pageUrl = _webHelper.GetThisPageUrl(true);
                 if (string.IsNullOrEmpty(pageUrl))
                     return;
-                
+
                 //get previous last page
-                var previousPageUrl = _workContext.CurrentCustomer.GetAttribute<string>(SystemCustomerAttributeNames.LastVisitedPage);
+                var previousPageUrl = _genericAttributeService.GetAttribute<string>(_workContext.CurrentCustomer, NopCustomerDefaults.LastVisitedPageAttribute);
 
                 //save new one if don't match
                 if (!pageUrl.Equals(previousPageUrl, StringComparison.InvariantCultureIgnoreCase))
-                    _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, SystemCustomerAttributeNames.LastVisitedPage, pageUrl);
-                
+                    _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, NopCustomerDefaults.LastVisitedPageAttribute, pageUrl);
+
             }
 
             /// <summary>

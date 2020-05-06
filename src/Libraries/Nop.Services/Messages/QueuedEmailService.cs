@@ -2,10 +2,9 @@
 using System.Collections.Generic;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Data;
-using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Messages;
 using Nop.Data;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Events;
 
 namespace Nop.Services.Messages
@@ -15,32 +14,25 @@ namespace Nop.Services.Messages
     /// </summary>
     public partial class QueuedEmailService : IQueuedEmailService
     {
-        private readonly IRepository<QueuedEmail> _queuedEmailRepository;
-        private readonly IDbContext _dbContext;
-        private readonly IDataProvider _dataProvider;
-        private readonly CommonSettings _commonSettings;
-        private readonly IEventPublisher _eventPublisher;
+        #region Fields
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="queuedEmailRepository">Queued email repository</param>
-        /// <param name="eventPublisher">Event published</param>
-        /// <param name="dbContext">DB context</param>
-        /// <param name="dataProvider">WeData provider</param>
-        /// <param name="commonSettings">Common settings</param>
-        public QueuedEmailService(IRepository<QueuedEmail> queuedEmailRepository,
-            IEventPublisher eventPublisher,
-            IDbContext dbContext, 
-            IDataProvider dataProvider, 
-            CommonSettings commonSettings)
+        private readonly IEventPublisher _eventPublisher;
+        private readonly IRepository<QueuedEmail> _queuedEmailRepository;
+
+        #endregion
+
+        #region Ctor
+
+        public QueuedEmailService(IEventPublisher eventPublisher,
+            IRepository<QueuedEmail> queuedEmailRepository)
         {
-            _queuedEmailRepository = queuedEmailRepository;
             _eventPublisher = eventPublisher;
-            this._dbContext = dbContext;
-            this._dataProvider = dataProvider;
-            this._commonSettings = commonSettings;
+            _queuedEmailRepository = queuedEmailRepository;
         }
+
+        #endregion
+
+        #region Methods
 
         /// <summary>
         /// Inserts a queued email
@@ -115,8 +107,7 @@ namespace Nop.Services.Messages
             if (queuedEmailId == 0)
                 return null;
 
-            return _queuedEmailRepository.GetById(queuedEmailId);
-
+            return _queuedEmailRepository.ToCachedGetById(queuedEmailId);
         }
 
         /// <summary>
@@ -141,6 +132,7 @@ namespace Nop.Services.Messages
                 if (queuedEmail != null)
                     sortedQueuedEmails.Add(queuedEmail);
             }
+
             return sortedQueuedEmails;
         }
 
@@ -159,13 +151,13 @@ namespace Nop.Services.Messages
         /// <param name="pageSize">Page size</param>
         /// <returns>Email item list</returns>
         public virtual IPagedList<QueuedEmail> SearchEmails(string fromEmail,
-            string toEmail, DateTime? createdFromUtc, DateTime? createdToUtc, 
+            string toEmail, DateTime? createdFromUtc, DateTime? createdToUtc,
             bool loadNotSentItemsOnly, bool loadOnlyItemsToBeSent, int maxSendTries,
             bool loadNewest, int pageIndex = 0, int pageSize = int.MaxValue)
         {
             fromEmail = (fromEmail ?? string.Empty).Trim();
             toEmail = (toEmail ?? string.Empty).Trim();
-            
+
             var query = _queuedEmailRepository.Table;
             if (!string.IsNullOrEmpty(fromEmail))
                 query = query.Where(qe => qe.From.Contains(fromEmail));
@@ -182,6 +174,7 @@ namespace Nop.Services.Messages
                 var nowUtc = DateTime.UtcNow;
                 query = query.Where(qe => !qe.DontSendBeforeDateUtc.HasValue || qe.DontSendBeforeDateUtc.Value <= nowUtc);
             }
+
             query = query.Where(qe => qe.SentTries < maxSendTries);
             query = loadNewest ?
                 //load the newest records
@@ -194,26 +187,38 @@ namespace Nop.Services.Messages
         }
 
         /// <summary>
+        /// Deletes already sent emails
+        /// </summary>
+        /// <param name="createdFromUtc">Created date from (UTC); null to load all records</param>
+        /// <param name="createdToUtc">Created date to (UTC); null to load all records</param>
+        /// <returns>Number of deleted emails</returns>
+        public virtual int DeleteAlreadySentEmails(DateTime? createdFromUtc, DateTime? createdToUtc)
+        {
+            var query = _queuedEmailRepository.Table;
+
+            // only sent emails
+            query = query.Where(qe => qe.SentOnUtc.HasValue);
+
+            if (createdFromUtc.HasValue)
+                query = query.Where(qe => qe.CreatedOnUtc >= createdFromUtc);
+            if (createdToUtc.HasValue)
+                query = query.Where(qe => qe.CreatedOnUtc <= createdToUtc);
+
+            var emails = query.ToArray();
+
+            DeleteQueuedEmails(emails);
+
+            return emails.Length;
+        }
+
+        /// <summary>
         /// Delete all queued emails
         /// </summary>
         public virtual void DeleteAllEmails()
         {
-            if (_commonSettings.UseStoredProceduresIfSupported && _dataProvider.StoredProceduredSupported)
-            {
-                //although it's not a stored procedure we use it to ensure that a database supports them
-                //we cannot wait until EF team has it implemented - http://data.uservoice.com/forums/72025-entity-framework-feature-suggestions/suggestions/1015357-batch-cud-support
-
-
-                //do all databases support "Truncate command"?
-                var queuedEmailTableName = _dbContext.GetTableName<QueuedEmail>();
-                _dbContext.ExecuteSqlCommand($"TRUNCATE TABLE [{queuedEmailTableName}]");
-            }
-            else
-            {
-                var queuedEmails = _queuedEmailRepository.Table.ToList();
-                foreach (var qe in queuedEmails)
-                    _queuedEmailRepository.Delete(qe);
-            }
+            _queuedEmailRepository.Truncate();
         }
+
+        #endregion
     }
 }

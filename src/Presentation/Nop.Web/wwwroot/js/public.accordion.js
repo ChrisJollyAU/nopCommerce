@@ -15,7 +15,7 @@ var Accordion = {
         this.sections = $('#' + elem + ' .tab-section');
         this.currentSectionId = false;
         var headers = $('#' + elem + ' .tab-section ' + clickableEntity);
-        headers.click(function () {
+        headers.on('click', function () {
             Accordion.headerClicked($(this));
         });
     },
@@ -37,8 +37,9 @@ var Accordion = {
             $('#' + this.currentSectionId).addClass('active');
             var contents = section.children('.a-item');
             $(contents[0]).show();
+            location.hash = section.attr('id');
 
-            $.event.trigger({ type: "accordion_section_opened", previousSectionId: previousSectionId, currentSectionId: this.currentSectionId });
+            $(document).trigger({ type: "accordion_section_opened", previousSectionId: previousSectionId, currentSectionId: this.currentSectionId });
             
             if (this.disallowAccessToNextSections) {
                 var pastCurrentSection = false;
@@ -60,21 +61,22 @@ var Accordion = {
         var contents = section.children('.a-item');
         $(contents[0]).hide();
 
-        $.event.trigger({ type: "accordion_section_closed", sectionId: section.attr('id') });
+        $(document).trigger({ type: "accordion_section_closed", sectionId: section.attr('id') });
     },
 
     hideSection: function (section) {
         var section = $(section);
         section.hide();
 
-        $.event.trigger({ type: "accordion_section_hidden", sectionId: section.attr('id') });
+        $(document).trigger({ type: "accordion_section_hidden", sectionId: section.attr('id') });
     },
 
     showSection: function (section) {
         var section = $(section);
         section.show();
+        location.hash = section.attr('id');
 
-        $.event.trigger({ type: "accordion_section_shown", sectionId: section.attr('id') });  
+        $(document).trigger({ type: "accordion_section_shown", sectionId: section.attr('id') });  
     },
 
     openNextSection: function (setAllow) {

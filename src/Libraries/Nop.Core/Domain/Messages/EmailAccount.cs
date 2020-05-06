@@ -44,18 +44,5 @@
         /// Gets or sets a value that controls whether the default system credentials of the application are sent with requests.
         /// </summary>
         public bool UseDefaultCredentials { get; set; }
-
-        /// <summary>
-        /// Gets a friendly email account name
-        /// </summary>
-        public string FriendlyName
-        {
-            get
-            {
-                if (!string.IsNullOrWhiteSpace(this.DisplayName))
-                    return this.Email + " (" + this.DisplayName + ")";
-                return this.Email;
-            }
-        }
     }
 }

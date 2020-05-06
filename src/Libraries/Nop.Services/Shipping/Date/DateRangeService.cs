@@ -1,8 +1,10 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Nop.Core.Data;
 using Nop.Core.Domain.Shipping;
+using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Events;
 
 namespace Nop.Services.Shipping.Date
@@ -14,6 +16,7 @@ namespace Nop.Services.Shipping.Date
     {
         #region Fields
 
+        private readonly ICacheKeyService _cacheKeyService;
         private readonly IEventPublisher _eventPublisher;
         private readonly IRepository<DeliveryDate> _deliveryDateRepository;
         private readonly IRepository<ProductAvailabilityRange> _productAvailabilityRangeRepository;
@@ -22,23 +25,19 @@ namespace Nop.Services.Shipping.Date
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="eventPublisher">Event published</param>
-        /// <param name="deliveryDateRepository">Delivery date repository</param>
-        /// <param name="productAvailabilityRangeRepository">Product availability range repository</param>
-        public DateRangeService(IEventPublisher eventPublisher,
+        public DateRangeService(ICacheKeyService cacheKeyService,
+            IEventPublisher eventPublisher,
             IRepository<DeliveryDate> deliveryDateRepository,
             IRepository<ProductAvailabilityRange> productAvailabilityRangeRepository)
         {
-            this._eventPublisher = eventPublisher;
-            this._deliveryDateRepository = deliveryDateRepository;
-            this._productAvailabilityRangeRepository = productAvailabilityRangeRepository;
+            _cacheKeyService = cacheKeyService;
+            _eventPublisher = eventPublisher;
+            _deliveryDateRepository = deliveryDateRepository;
+            _productAvailabilityRangeRepository = productAvailabilityRangeRepository;
         }
 
         #endregion
-        
+
         #region Methods
 
         #region Delivery dates
@@ -53,7 +52,7 @@ namespace Nop.Services.Shipping.Date
             if (deliveryDateId == 0)
                 return null;
 
-            return _deliveryDateRepository.GetById(deliveryDateId);
+            return _deliveryDateRepository.ToCachedGetById(deliveryDateId);
         }
 
         /// <summary>
@@ -65,7 +64,8 @@ namespace Nop.Services.Shipping.Date
             var query = from dd in _deliveryDateRepository.Table
                         orderby dd.DisplayOrder, dd.Id
                         select dd;
-            var deliveryDates = query.ToList();
+            var deliveryDates = query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopShippingDefaults.DeliveryDatesAllCacheKey));
+
             return deliveryDates;
         }
 
@@ -125,7 +125,7 @@ namespace Nop.Services.Shipping.Date
         /// <returns>Product availability range</returns>
         public virtual ProductAvailabilityRange GetProductAvailabilityRangeById(int productAvailabilityRangeId)
         {
-            return productAvailabilityRangeId != 0 ? _productAvailabilityRangeRepository.GetById(productAvailabilityRangeId) : null;
+            return productAvailabilityRangeId != 0 ? _productAvailabilityRangeRepository.ToCachedGetById(productAvailabilityRangeId) : null;
         }
 
         /// <summary>
@@ -137,7 +137,8 @@ namespace Nop.Services.Shipping.Date
             var query = from par in _productAvailabilityRangeRepository.Table
                         orderby par.DisplayOrder, par.Id
                         select par;
-            return query.ToList();
+
+            return query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopShippingDefaults.ProductAvailabilityAllCacheKey));
         }
 
         /// <summary>

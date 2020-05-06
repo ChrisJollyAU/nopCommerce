@@ -1,31 +1,22 @@
 ﻿using FluentValidation.TestHelper;
+using Moq;
 using Nop.Core.Domain.Customers;
 using Nop.Services.Directory;
 using Nop.Web.Models.Customer;
 using Nop.Web.Validators.Customer;
 using NUnit.Framework;
-using Rhino.Mocks;
 
 namespace Nop.Web.MVC.Tests.Public.Validators.Customer
 {
     [TestFixture]
     public class RegisterValidatorTests : BaseValidatorTests
     {
-        private RegisterValidator _validator;
-        private IStateProvinceService _stateProvinceService;
-        private CustomerSettings _customerSettings;
-        
-        [SetUp]
-        public new void Setup()
-        {
-            _customerSettings = new CustomerSettings();
-            _stateProvinceService = MockRepository.GenerateMock<IStateProvinceService>();
-            _validator = new RegisterValidator(_localizationService, _stateProvinceService, _customerSettings);
-        }
-        
         [Test]
         public void Should_have_error_when_email_is_null_or_empty()
         {
+            var _customerSettings = new CustomerSettings();
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 Email = null
@@ -38,6 +29,9 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_have_error_when_email_is_wrong_format()
         {
+            var _customerSettings = new CustomerSettings();
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 Email = "adminexample.com"
@@ -48,6 +42,9 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_not_have_error_when_email_is_correct_format()
         {
+            var _customerSettings = new CustomerSettings();
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 Email = "admin@example.com"
@@ -58,6 +55,13 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_have_error_when_firstName_is_null_or_empty()
         {
+            var _customerSettings = new CustomerSettings
+            {
+                FirstNameEnabled = true,
+                FirstNameRequired = true
+            };
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 FirstName = null
@@ -70,6 +74,12 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_not_have_error_when_firstName_is_specified()
         {
+            var _customerSettings = new CustomerSettings
+            {
+                FirstNameEnabled = true
+            };
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 FirstName = "John"
@@ -80,6 +90,13 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_have_error_when_lastName_is_null_or_empty()
         {
+            var _customerSettings = new CustomerSettings
+            {
+                LastNameEnabled = true,
+                LastNameRequired = true
+            };
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 LastName = null
@@ -92,6 +109,12 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_not_have_error_when_lastName_is_specified()
         {
+            var _customerSettings = new CustomerSettings
+            {
+                LastNameEnabled = true
+            };
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 LastName = "Smith"
@@ -102,6 +125,9 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_have_error_when_password_is_null_or_empty()
         {
+            var _customerSettings = new CustomerSettings();
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 Password = null
@@ -118,6 +144,9 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_not_have_error_when_password_is_specified()
         {
+            var _customerSettings = new CustomerSettings();
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 Password = "password"
@@ -130,6 +159,9 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_have_error_when_confirmPassword_is_null_or_empty()
         {
+            var _customerSettings = new CustomerSettings();
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 ConfirmPassword = null
@@ -142,6 +174,9 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_not_have_error_when_confirmPassword_is_specified()
         {
+            var _customerSettings = new CustomerSettings();
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 ConfirmPassword = "some password"
@@ -154,6 +189,9 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_have_error_when_password_doesnot_equal_confirmationPassword()
         {
+            var _customerSettings = new CustomerSettings();
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 Password = "some password",
@@ -165,31 +203,15 @@ namespace Nop.Web.MVC.Tests.Public.Validators.Customer
         [Test]
         public void Should_not_have_error_when_password_equals_confirmationPassword()
         {
+            var _customerSettings = new CustomerSettings();
+            var _stateProvinceService = new Mock<IStateProvinceService>();
+            var _validator = new RegisterValidator(_localizationService, _stateProvinceService.Object, _customerSettings);
             var model = new RegisterModel
             {
                 Password = "some password",
                 ConfirmPassword = "some password"
             };
             _validator.ShouldNotHaveValidationErrorFor(x => x.Password, model);
-        }
-
-        [Test]
-        public void Should_validate_password_is_length()
-        {
-            _customerSettings.PasswordMinLength = 5;
-            _validator = new RegisterValidator(_localizationService, _stateProvinceService, _customerSettings);
-
-            var model = new RegisterModel
-            {
-                Password = "1234"
-            };
-            //we know that password should equal confirmation password
-            model.ConfirmPassword = model.Password;
-            _validator.ShouldHaveValidationErrorFor(x => x.Password, model);
-            model.Password = "12345";
-            //we know that password should equal confirmation password
-            model.ConfirmPassword = model.Password;
-            _validator.ShouldNotHaveValidationErrorFor(x => x.Password, model);
-        }
+        }        
     }
 }

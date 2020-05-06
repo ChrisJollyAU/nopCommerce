@@ -8,27 +8,21 @@ namespace Nop.Services.Payments
     /// </summary>
     public partial class CancelRecurringPaymentResult
     {
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        public CancelRecurringPaymentResult() 
+        public CancelRecurringPaymentResult()
         {
-            this.Errors = new List<string>();
+            Errors = new List<string>();
         }
 
         /// <summary>
         /// Gets a value indicating whether request has been completed successfully
         /// </summary>
-        public bool Success
-        {
-            get { return (!Errors.Any()); }
-        }
+        public bool Success => !Errors.Any();
 
         /// <summary>
         /// Add error
         /// </summary>
         /// <param name="error">Error</param>
-        public void AddError(string error) 
+        public void AddError(string error)
         {
             Errors.Add(error);
         }

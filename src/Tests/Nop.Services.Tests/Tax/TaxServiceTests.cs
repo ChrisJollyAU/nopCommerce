@@ -1,40 +1,51 @@
-﻿using System;
+﻿using System.Collections.Generic;
 using System.Linq;
+using FluentAssertions;
+using Moq;
 using Nop.Core;
+using Nop.Core.Caching;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Shipping;
+using Nop.Core.Domain.Stores;
 using Nop.Core.Domain.Tax;
-using Nop.Core.Plugins;
+using Nop.Core.Infrastructure;
+using Nop.Data;
 using Nop.Services.Common;
+using Nop.Services.Customers;
 using Nop.Services.Directory;
 using Nop.Services.Events;
 using Nop.Services.Logging;
 using Nop.Services.Tax;
+using Nop.Services.Tests.FakeServices.Providers;
 using Nop.Tests;
 using NUnit.Framework;
-using Rhino.Mocks;
 
 namespace Nop.Services.Tests.Tax
 {
     [TestFixture]
     public class TaxServiceTests : ServiceTest
     {
-        private IAddressService _addressService;
+        private Mock<IAddressService> _addressService;
         private IWorkContext _workContext;
-        private IStoreContext _storeContext;
+        private Mock<IStoreContext> _storeContext;
         private TaxSettings _taxSettings;
-        private IEventPublisher _eventPublisher;
+        private Mock<IEventPublisher> _eventPublisher;
+        private ITaxPluginManager _taxPluginManager;
         private ITaxService _taxService;
-        private IGeoLookupService _geoLookupService;
-        private ICountryService _countryService;
-        private IStateProvinceService _stateProvinceService;
-        private ILogger _logger;
-        private IWebHelper _webHelper;
+        private Mock<IGeoLookupService> _geoLookupService;
+        private Mock<ICountryService> _countryService;
+        private CustomerService _customerService;
+        private Mock<IStateProvinceService> _stateProvinceService;
+        private Mock<ILogger> _logger;
+        private Mock<IWebHelper> _webHelper;
         private CustomerSettings _customerSettings;
         private ShippingSettings _shippingSettings;
         private AddressSettings _addressSettings;
+        private Mock<IGenericAttributeService> _genericAttributeService;
+        private Mock<IRepository<CustomerCustomerRoleMapping>> _customerCustomerRoleMappingRepo;
+        private Mock<IRepository<CustomerRole>> _customerRoleRepo;
 
         [SetUp]
         public new void SetUp()
@@ -45,52 +56,116 @@ namespace Nop.Services.Tests.Tax
             };
 
             _workContext = null;
-            _storeContext = null;
+            _storeContext = new Mock<IStoreContext>();
+            _storeContext.Setup(x => x.CurrentStore).Returns(new Store { Id = 1 });
 
-            _addressService = MockRepository.GenerateMock<IAddressService>();
+            _addressService = new Mock<IAddressService>();
             //default tax address
-            _addressService.Expect(x => x.GetAddressById(_taxSettings.DefaultTaxAddressId)).Return(new Address { Id = _taxSettings.DefaultTaxAddressId });
+            _addressService.Setup(x => x.GetAddressById(_taxSettings.DefaultTaxAddressId)).Returns(new Address { Id = _taxSettings.DefaultTaxAddressId });
 
-            var pluginFinder = new PluginFinder();
+            _eventPublisher = new Mock<IEventPublisher>();
+            _eventPublisher.Setup(x => x.Publish(It.IsAny<object>()));
 
-            _eventPublisher = MockRepository.GenerateMock<IEventPublisher>();
-            _eventPublisher.Expect(x => x.Publish(Arg<object>.Is.Anything));
+            _geoLookupService = new Mock<IGeoLookupService>();
+            _countryService = new Mock<ICountryService>();
 
-            _geoLookupService = MockRepository.GenerateMock<IGeoLookupService>();
-            _countryService = MockRepository.GenerateMock<ICountryService>();
-            _stateProvinceService = MockRepository.GenerateMock<IStateProvinceService>();
-            _logger = MockRepository.GenerateMock<ILogger>();
-            _webHelper = MockRepository.GenerateMock<IWebHelper>();
+            _customerRoleRepo = new Mock<IRepository<CustomerRole>>();
+
+            _customerRoleRepo.Setup(r => r.Table).Returns(new List<CustomerRole>
+            {
+                new CustomerRole
+                {
+                    Id = 1,
+                    TaxExempt = true,
+                    Active = true
+                }
+            }.AsQueryable());
+
+            _customerCustomerRoleMappingRepo = new Mock<IRepository<CustomerCustomerRoleMapping>>();
+            var mappings = new List<CustomerCustomerRoleMapping>();
+
+            _customerCustomerRoleMappingRepo.Setup(r => r.Table).Returns(mappings.AsQueryable());
+            _customerCustomerRoleMappingRepo.Setup(r => r.Insert(It.IsAny<CustomerCustomerRoleMapping>())).Callback(
+                (CustomerCustomerRoleMapping ccrm) => { mappings.Add(ccrm); });
+
+            _stateProvinceService = new Mock<IStateProvinceService>();
+            _logger = new Mock<ILogger>();
+            _webHelper = new Mock<IWebHelper>();
+            _genericAttributeService = new Mock<IGenericAttributeService>();
 
             _customerSettings = new CustomerSettings();
             _shippingSettings = new ShippingSettings();
             _addressSettings = new AddressSettings();
 
-            _taxService = new TaxService(_addressService, _workContext, _storeContext, _taxSettings,
-                pluginFinder, _geoLookupService, _countryService, _stateProvinceService, _logger, _webHelper,
-                _customerSettings, _shippingSettings, _addressSettings);
+            _customerService = new CustomerService(new CachingSettings(),
+                new CustomerSettings(),
+                new FakeCacheKeyService(),
+                _eventPublisher.Object,
+                _genericAttributeService.Object,
+                null,
+                null,
+                null,
+                _customerCustomerRoleMappingRepo.Object,
+                null,
+                _customerRoleRepo.Object,
+                null,
+                null,
+                new TestCacheManager(),
+                _storeContext.Object,
+                null);
+
+            _taxPluginManager = new TaxPluginManager();
+            
+            _taxService = new TaxService(_addressSettings,
+                _customerSettings,
+                _addressService.Object,
+                _countryService.Object,
+                _customerService,
+                _eventPublisher.Object,
+                _genericAttributeService.Object,
+                _geoLookupService.Object,
+                _logger.Object,
+                _stateProvinceService.Object,
+                _storeContext.Object,
+                _taxPluginManager,
+                _webHelper.Object,
+                _workContext,
+                _shippingSettings,
+                _taxSettings);
         }
 
         [Test]
         public void Can_load_taxProviders()
         {
-            var providers = _taxService.LoadAllTaxProviders();
-            providers.ShouldNotBeNull();
-            (providers.Any()).ShouldBeTrue();
+            RunWithTestServiceProvider(() =>
+            {
+                var providers = _taxPluginManager.LoadAllPlugins();
+                providers.Should().NotBeNull();
+                providers.Any().Should().BeTrue();
+            });
         }
 
         [Test]
         public void Can_load_taxProvider_by_systemKeyword()
         {
-            var provider = _taxService.LoadTaxProviderBySystemName("FixedTaxRateTest");
-            provider.ShouldNotBeNull();
+            RunWithTestServiceProvider(() =>
+            {
+                var provider = _taxPluginManager.LoadPluginBySystemName("FixedTaxRateTest");
+                provider.Should().NotBeNull();
+            });
         }
 
         [Test]
         public void Can_load_active_taxProvider()
         {
-            var provider = _taxService.LoadActiveTaxProvider();
-            provider.ShouldNotBeNull();
+            var serviceProvider = new FakeServiceProvider(_genericAttributeService.Object, _taxService, _taxSettings);
+            var nopEngine = new FakeNopEngine(serviceProvider);
+            EngineContext.Replace(nopEngine);
+
+            var provider = _taxPluginManager.LoadPrimaryPlugin();
+            provider.Should().NotBeNull();
+
+            EngineContext.Replace(null);
         }
 
         [Test]
@@ -100,9 +175,9 @@ namespace Nop.Services.Tests.Tax
             {
                 IsTaxExempt = true
             };
-            _taxService.IsTaxExempt(product, null).ShouldEqual(true);
+            _taxService.IsTaxExempt(product, null).Should().BeTrue();
             product.IsTaxExempt = false;
-            _taxService.IsTaxExempt(product, null).ShouldEqual(false);
+            _taxService.IsTaxExempt(product, null).Should().BeFalse();
         }
 
         [Test]
@@ -112,9 +187,9 @@ namespace Nop.Services.Tests.Tax
             {
                 IsTaxExempt = true
             };
-            _taxService.IsTaxExempt(null, customer).ShouldEqual(true);
+            _taxService.IsTaxExempt(null, customer).Should().BeTrue();
             customer.IsTaxExempt = false;
-            _taxService.IsTaxExempt(null, customer).ShouldEqual(false);
+            _taxService.IsTaxExempt(null, customer).Should().BeFalse();
         }
 
         [Test]
@@ -122,29 +197,25 @@ namespace Nop.Services.Tests.Tax
         {
             var customer = new Customer
             {
+                Id = 1,
                 IsTaxExempt = false
             };
-            _taxService.IsTaxExempt(null, customer).ShouldEqual(false);
+            _taxService.IsTaxExempt(null, customer).Should().BeFalse();
 
-            var customerRole = new CustomerRole
-            {
-                TaxExempt = true,
-                Active = true
-            };
-            customer.CustomerRoles.Add(customerRole);
-            _taxService.IsTaxExempt(null, customer).ShouldEqual(true);
+            var customerRole = _customerRoleRepo.Object.Table.FirstOrDefault(cr => cr.Id == 1);
+
+            customerRole.Should().NotBeNull();
+
+            _customerService.AddCustomerRoleMapping(new CustomerCustomerRoleMapping { CustomerId = customer.Id, CustomerRoleId = customerRole.Id });
+
+            _taxService.IsTaxExempt(null, customer).Should().BeTrue();
+
             customerRole.TaxExempt = false;
-            _taxService.IsTaxExempt(null, customer).ShouldEqual(false);
+            _taxService.IsTaxExempt(null, customer).Should().BeFalse();
 
-            //if role is not active, weshould ignore 'TaxExempt' property
+            //if role is not active, we should ignore 'TaxExempt' property
             customerRole.Active = false;
-            _taxService.IsTaxExempt(null, customer).ShouldEqual(false);
-        }
-
-        protected decimal GetFixedTestTaxRate()
-        {
-            //10 is a fixed tax rate returned from FixedRateTestTaxProvider. Perhaps, it should be configured some other way 
-            return 10;
+            _taxService.IsTaxExempt(null, customer).Should().BeFalse();
         }
 
         [Test]
@@ -153,10 +224,17 @@ namespace Nop.Services.Tests.Tax
             var customer = new Customer();
             var product = new Product();
 
-            _taxService.GetProductPrice(product, 0, 1000M, true, customer, true, out decimal taxRate).ShouldEqual(1000);
-            _taxService.GetProductPrice(product, 0, 1000M, true, customer, false, out taxRate).ShouldEqual(1100);
-            _taxService.GetProductPrice(product, 0, 1000M, false, customer, true, out taxRate).ShouldEqual(909.0909090909090909090909091M);
-            _taxService.GetProductPrice(product, 0, 1000M, false, customer, false, out taxRate).ShouldEqual(1000);
+            var serviceProvider = new FakeServiceProvider(_genericAttributeService.Object, _taxService, _taxSettings);
+            var nopEngine = new FakeNopEngine(serviceProvider);
+            EngineContext.Replace(nopEngine);
+            
+            _taxService.GetProductPrice(product, 0, 1000M, true, customer, true, out _).Should().Be(1000);
+            _taxService.GetProductPrice(product, 0, 1000M, true, customer, false, out _).Should().Be(1100);
+            _taxService.GetProductPrice(product, 0, 1000M, false, customer, true, out _).Should()
+                .Be(909.0909090909090909090909091M);
+            _taxService.GetProductPrice(product, 0, 1000M, false, customer, false, out _).Should().Be(1000);
+            
+            EngineContext.Replace(null);
         }
 
         [Test]
@@ -168,26 +246,44 @@ namespace Nop.Services.Tests.Tax
             //not taxable
             customer.IsTaxExempt = true;
 
-            _taxService.GetProductPrice(product, 0, 1000M, true, customer, true, out decimal taxRate).ShouldEqual(909.0909090909090909090909091M);
-            _taxService.GetProductPrice(product, 0, 1000M, true, customer, false, out taxRate).ShouldEqual(1000);
-            _taxService.GetProductPrice(product, 0, 1000M, false, customer, true, out taxRate).ShouldEqual(909.0909090909090909090909091M);
-            _taxService.GetProductPrice(product, 0, 1000M, false, customer, false, out taxRate).ShouldEqual(1000);
+            var serviceProvider = new FakeServiceProvider(_genericAttributeService.Object, _taxService, _taxSettings);
+            var nopEngine = new FakeNopEngine(serviceProvider);
+            EngineContext.Replace(nopEngine);
+
+            _taxService.GetProductPrice(product, 0, 1000M, true, customer, true, out _).Should()
+                .Be(909.0909090909090909090909091M);
+            _taxService.GetProductPrice(product, 0, 1000M, true, customer, false, out _).Should().Be(1000);
+            _taxService.GetProductPrice(product, 0, 1000M, false, customer, true, out _).Should()
+                .Be(909.0909090909090909090909091M);
+            _taxService.GetProductPrice(product, 0, 1000M, false, customer, false, out _).Should().Be(1000);
+
+            EngineContext.Replace(null);
         }
 
         [Test]
         public void Can_do_VAT_check()
         {
-            //remove? this method requires Internet access
-            
             var vatNumberStatus1 = _taxService.DoVatCheck("GB", "523 2392 69",
-                out string name, out string address, out Exception exception);
-            vatNumberStatus1.ShouldEqual(VatNumberStatus.Valid);
-            exception.ShouldBeNull();
+                out _, out _, out var exception);
+
+            if (exception != null)
+            {
+                TestContext.WriteLine($"Can't run the \"Can_do_VAT_check\":\r\n{exception.Message}");
+                return;
+            }
+
+            vatNumberStatus1.Should().Be(VatNumberStatus.Valid);
 
             var vatNumberStatus2 = _taxService.DoVatCheck("GB", "000 0000 00",
-                out name, out address, out exception);
-            vatNumberStatus2.ShouldEqual(VatNumberStatus.Invalid);
-            exception.ShouldBeNull();
+                out _, out _, out exception);
+
+            if (exception != null)
+            {
+                TestContext.WriteLine($"Can't run the \"Can_do_VAT_check\":\r\n{exception.Message}");
+                return;
+            }
+
+            vatNumberStatus2.Should().Be(VatNumberStatus.Invalid);
         }
 
         [Test]
@@ -195,8 +291,8 @@ namespace Nop.Services.Tests.Tax
         {
             _taxSettings.EuVatAssumeValid = true;
 
-            var vatNumberStatus = _taxService.GetVatNumberStatus("GB", "000 0000 00", out string _, out string _);
-            vatNumberStatus.ShouldEqual(VatNumberStatus.Valid);
+            var vatNumberStatus = _taxService.GetVatNumberStatus("GB", "000 0000 00", out _, out _);
+            vatNumberStatus.Should().Be(VatNumberStatus.Valid);
         }
     }
 }

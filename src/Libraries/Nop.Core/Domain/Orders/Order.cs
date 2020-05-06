@@ -1,11 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Globalization;
-using System.Linq;
-using Nop.Core.Domain.Common;
-using Nop.Core.Domain.Customers;
-using Nop.Core.Domain.Discounts;
+﻿using System;
 using Nop.Core.Domain.Payments;
 using Nop.Core.Domain.Shipping;
 using Nop.Core.Domain.Tax;
@@ -17,57 +10,6 @@ namespace Nop.Core.Domain.Orders
     /// </summary>
     public partial class Order : BaseEntity
     {
-
-        private ICollection<DiscountUsageHistory> _discountUsageHistory;
-        private ICollection<GiftCardUsageHistory> _giftCardUsageHistory;
-        private ICollection<OrderNote> _orderNotes;
-        private ICollection<OrderItem> _orderItems;
-        private ICollection<Shipment> _shipments;
-
-        #region Utilities
-
-        /// <summary>
-        /// Parse tax rates
-        /// </summary>
-        /// <param name="taxRatesStr"></param>
-        /// <returns></returns>
-        protected virtual SortedDictionary<decimal, decimal> ParseTaxRates(string taxRatesStr)
-        {
-            var taxRatesDictionary = new SortedDictionary<decimal, decimal>();
-            if (string.IsNullOrEmpty(taxRatesStr))
-                return taxRatesDictionary;
-
-            var lines = taxRatesStr.Split(new [] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-            foreach (var line in lines)
-            {
-                if (string.IsNullOrEmpty(line.Trim()))
-                    continue;
-
-                var taxes = line.Split(':');
-                if (taxes.Length == 2)
-                {
-                    try
-                    {
-                        var taxRate = decimal.Parse(taxes[0].Trim(), CultureInfo.InvariantCulture);
-                        var taxValue = decimal.Parse(taxes[1].Trim(), CultureInfo.InvariantCulture);
-                        taxRatesDictionary.Add(taxRate, taxValue);
-                    }
-                    catch (Exception exc)
-                    {
-                        Debug.WriteLine(exc.ToString());
-                    }
-                }
-            }
-
-            //add at least one tax rate (0%)
-            if (!taxRatesDictionary.Any())
-                taxRatesDictionary.Add(decimal.Zero, decimal.Zero);
-
-            return taxRatesDictionary;
-        }
-
-        #endregion
-
         #region Properties
 
         /// <summary>
@@ -103,7 +45,7 @@ namespace Nop.Core.Domain.Orders
         /// <summary>
         /// Gets or sets a value indicating whether a customer chose "pick up in store" shipping option
         /// </summary>
-        public bool PickUpInStore { get; set; }
+        public bool PickupInStore { get; set; }
 
         /// <summary>
         /// Gets or sets an order status identifier
@@ -146,32 +88,32 @@ namespace Nop.Core.Domain.Orders
         public string VatNumber { get; set; }
 
         /// <summary>
-        /// Gets or sets the order subtotal (incl tax)
+        /// Gets or sets the order subtotal (include tax)
         /// </summary>
         public decimal OrderSubtotalInclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the order subtotal (excl tax)
+        /// Gets or sets the order subtotal (exclude tax)
         /// </summary>
         public decimal OrderSubtotalExclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the order subtotal discount (incl tax)
+        /// Gets or sets the order subtotal discount (include tax)
         /// </summary>
         public decimal OrderSubTotalDiscountInclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the order subtotal discount (excl tax)
+        /// Gets or sets the order subtotal discount (exclude tax)
         /// </summary>
         public decimal OrderSubTotalDiscountExclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the order shipping (incl tax)
+        /// Gets or sets the order shipping (include tax)
         /// </summary>
         public decimal OrderShippingInclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the order shipping (excl tax)
+        /// Gets or sets the order shipping (exclude tax)
         /// </summary>
         public decimal OrderShippingExclTax { get; set; }
 
@@ -181,7 +123,7 @@ namespace Nop.Core.Domain.Orders
         public decimal PaymentMethodAdditionalFeeInclTax { get; set; }
 
         /// <summary>
-        /// Gets or sets the payment method additional fee (excl tax)
+        /// Gets or sets the payment method additional fee (exclude tax)
         /// </summary>
         public decimal PaymentMethodAdditionalFeeExclTax { get; set; }
 
@@ -214,7 +156,7 @@ namespace Nop.Core.Domain.Orders
         /// Gets or sets the reward points history entry identifier when reward points were earned (gained) for placing this order
         /// </summary>
         public int? RewardPointsHistoryEntryId { get; set; }
-        
+
         /// <summary>
         /// Gets or sets the checkout attribute description
         /// </summary>
@@ -314,14 +256,14 @@ namespace Nop.Core.Domain.Orders
         /// Gets or sets the paid date and time
         /// </summary>
         public DateTime? PaidDateUtc { get; set; }
-        
+
         /// <summary>
         /// Gets or sets the shipping method
         /// </summary>
         public string ShippingMethod { get; set; }
 
         /// <summary>
-        /// Gets or sets the shipping rate computation method identifier or the pickup point provider identifier (if PickUpInStore is true)
+        /// Gets or sets the shipping rate computation method identifier or the pickup point provider identifier (if PickupInStore is true)
         /// </summary>
         public string ShippingRateComputationMethodSystemName { get; set; }
 
@@ -345,79 +287,10 @@ namespace Nop.Core.Domain.Orders
         /// </summary>
         public string CustomOrderNumber { get; set; }
 
-        #endregion
-
-        #region Navigation properties
-
-        /// <summary>
-        /// Gets or sets the customer
-        /// </summary>
-        public virtual Customer Customer { get; set; }
-
-        /// <summary>
-        /// Gets or sets the billing address
-        /// </summary>
-        public virtual Address BillingAddress { get; set; }
-
-        /// <summary>
-        /// Gets or sets the shipping address
-        /// </summary>
-        public virtual Address ShippingAddress { get; set; }
-
-        /// <summary>
-        /// Gets or sets the pickup address
-        /// </summary>
-        public virtual Address PickupAddress { get; set; }
-
         /// <summary>
         /// Gets or sets the reward points history record (spent by a customer when placing this order)
         /// </summary>
-        public virtual RewardPointsHistory RedeemedRewardPointsEntry { get; set; }
-
-        /// <summary>
-        /// Gets or sets discount usage history
-        /// </summary>
-        public virtual ICollection<DiscountUsageHistory> DiscountUsageHistory
-        {
-            get { return _discountUsageHistory ?? (_discountUsageHistory = new List<DiscountUsageHistory>()); }
-            protected set { _discountUsageHistory = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets gift card usage history (gift card that were used with this order)
-        /// </summary>
-        public virtual ICollection<GiftCardUsageHistory> GiftCardUsageHistory
-        {
-            get { return _giftCardUsageHistory ?? (_giftCardUsageHistory = new List<GiftCardUsageHistory>()); }
-            protected set { _giftCardUsageHistory = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets order notes
-        /// </summary>
-        public virtual ICollection<OrderNote> OrderNotes
-        {
-            get { return _orderNotes ?? (_orderNotes = new List<OrderNote>()); }
-            protected set { _orderNotes = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets order items
-        /// </summary>
-        public virtual ICollection<OrderItem> OrderItems
-        {
-            get { return _orderItems ?? (_orderItems = new List<OrderItem>()); }
-            protected set { _orderItems = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets shipments
-        /// </summary>
-        public virtual ICollection<Shipment> Shipments
-        {
-            get { return _shipments ?? (_shipments = new List<Shipment>()); }
-            protected set { _shipments = value; }
-        }
+        public virtual int? RedeemedRewardPointsEntryId { get; set; }
 
         #endregion
 
@@ -428,14 +301,8 @@ namespace Nop.Core.Domain.Orders
         /// </summary>
         public OrderStatus OrderStatus
         {
-            get
-            {
-                return (OrderStatus)OrderStatusId;
-            }
-            set
-            {
-                OrderStatusId = (int)value;
-            }
+            get => (OrderStatus)OrderStatusId;
+            set => OrderStatusId = (int)value;
         }
 
         /// <summary>
@@ -443,14 +310,8 @@ namespace Nop.Core.Domain.Orders
         /// </summary>
         public PaymentStatus PaymentStatus
         {
-            get
-            {
-                return (PaymentStatus)PaymentStatusId;
-            }
-            set
-            {
-                PaymentStatusId = (int)value;
-            }
+            get => (PaymentStatus)PaymentStatusId;
+            set => PaymentStatusId = (int)value;
         }
 
         /// <summary>
@@ -458,14 +319,8 @@ namespace Nop.Core.Domain.Orders
         /// </summary>
         public ShippingStatus ShippingStatus
         {
-            get
-            {
-                return (ShippingStatus)ShippingStatusId;
-            }
-            set
-            {
-                ShippingStatusId = (int)value;
-            }
+            get => (ShippingStatus)ShippingStatusId;
+            set => ShippingStatusId = (int)value;
         }
 
         /// <summary>
@@ -473,27 +328,10 @@ namespace Nop.Core.Domain.Orders
         /// </summary>
         public TaxDisplayType CustomerTaxDisplayType
         {
-            get
-            {
-                return (TaxDisplayType)CustomerTaxDisplayTypeId;
-            }
-            set
-            {
-                CustomerTaxDisplayTypeId = (int)value;
-            }
+            get => (TaxDisplayType)CustomerTaxDisplayTypeId;
+            set => CustomerTaxDisplayTypeId = (int)value;
         }
 
-        /// <summary>
-        /// Gets the applied tax rates
-        /// </summary>
-        public SortedDictionary<decimal, decimal> TaxRatesDictionary
-        {
-            get
-            {
-                return ParseTaxRates(TaxRates);
-            }
-        }
-        
         #endregion
     }
 }

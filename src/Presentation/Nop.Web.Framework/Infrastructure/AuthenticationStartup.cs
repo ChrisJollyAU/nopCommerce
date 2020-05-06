@@ -15,8 +15,8 @@ namespace Nop.Web.Framework.Infrastructure
         /// Add and configure any of the middleware
         /// </summary>
         /// <param name="services">Collection of service descriptors</param>
-        /// <param name="configuration">Configuration root of the application</param>
-        public void ConfigureServices(IServiceCollection services, IConfigurationRoot configuration)
+        /// <param name="configuration">Configuration of the application</param>
+        public void ConfigureServices(IServiceCollection services, IConfiguration configuration)
         {
             //add data protection
             services.AddNopDataProtection();
@@ -33,18 +33,11 @@ namespace Nop.Web.Framework.Infrastructure
         {
             //configure authentication
             application.UseNopAuthentication();
-
-            //set request culture
-            application.UseCulture();
         }
 
         /// <summary>
         /// Gets order of this startup configuration implementation
         /// </summary>
-        public int Order
-        {
-            //authentication should be loaded before MVC
-            get { return 500; }
-        }
+        public int Order => 500; //authentication should be loaded before MVC
     }
 }

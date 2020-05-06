@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Nop.Core;
 using Nop.Core.Domain.Catalog;
 
@@ -21,16 +21,35 @@ namespace Nop.Services.Catalog
         /// <summary>
         /// Gets specification attributes
         /// </summary>
+        /// <param name="specificationAttributeIds">The specification attribute identifiers</param>
+        /// <returns>Specification attributes</returns>
+        IList<SpecificationAttribute> GetSpecificationAttributeByIds(int[] specificationAttributeIds);
+
+        /// <summary>
+        /// Gets specification attributes
+        /// </summary>
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
         /// <returns>Specification attributes</returns>
         IPagedList<SpecificationAttribute> GetSpecificationAttributes(int pageIndex = 0, int pageSize = int.MaxValue);
 
         /// <summary>
+        /// Gets specification attributes that have options
+        /// </summary>
+        /// <returns>Specification attributes that have available options</returns>
+        IList<SpecificationAttribute> GetSpecificationAttributesWithOptions();
+
+        /// <summary>
         /// Deletes a specification attribute
         /// </summary>
         /// <param name="specificationAttribute">The specification attribute</param>
         void DeleteSpecificationAttribute(SpecificationAttribute specificationAttribute);
+
+        /// <summary>
+        /// Deletes specifications attributes
+        /// </summary>
+        /// <param name="specificationAttributes">Specification attributes</param>
+        void DeleteSpecificationAttributes(IList<SpecificationAttribute> specificationAttributes);
 
         /// <summary>
         /// Inserts a specification attribute
@@ -142,7 +161,15 @@ namespace Nop.Services.Catalog
         /// <returns>Count</returns>
         int GetProductSpecificationAttributeCount(int productId = 0, int specificationAttributeOptionId = 0);
 
-        #endregion
+        /// <summary>
+        /// Get mapped products for specification attribute
+        /// </summary>
+        /// <param name="specificationAttributeId">The specification attribute identifier</param>
+        /// <param name="pageIndex">Page index</param>
+        /// <param name="pageSize">Page size</param>
+        /// <returns>Products</returns>
+        IPagedList<Product> GetProductsBySpecificationAttributeId(int specificationAttributeId, int pageIndex, int pageSize);
 
+        #endregion
     }
 }

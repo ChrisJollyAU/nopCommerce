@@ -1,7 +1,4 @@
-using System;
-using System.Linq;
-using Nop.Core.Data;
-using Nop.Core.Domain.Common;
+﻿using System;
 using Nop.Data;
 
 namespace Nop.Services.Common
@@ -13,26 +10,15 @@ namespace Nop.Services.Common
     {
         #region Fields
 
-        private readonly IDataProvider _dataProvider;
-        private readonly IDbContext _dbContext;
-        private readonly CommonSettings _commonSettings;
+        private INopDataProvider _dataProvider;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="dataProvider">Data provider</param>
-        /// <param name="dbContext">Database Context</param>
-        /// <param name="commonSettings">Common settings</param>
-        public FulltextService(IDataProvider dataProvider, IDbContext dbContext,
-            CommonSettings commonSettings)
+        public FulltextService(INopDataProvider dataProvider)
         {
-            this._dataProvider = dataProvider;
-            this._dbContext = dbContext;
-            this._commonSettings = commonSettings;
+            _dataProvider = dataProvider;
         }
 
         #endregion
@@ -45,15 +31,7 @@ namespace Nop.Services.Common
         /// <returns>Result</returns>
         public virtual bool IsFullTextSupported()
         {
-            if (_commonSettings.UseStoredProceduresIfSupported && _dataProvider.StoredProceduredSupported)
-            {
-                //stored procedures are enabled and supported by the database. 
-                var result = _dbContext.SqlQuery<int>("EXEC [FullText_IsSupported]");
-                return result.FirstOrDefault() > 0;
-            }
-            
-            //stored procedures aren't supported
-            return false;
+            return _dataProvider.ExecuteStoredProcedure<bool>("FullText_IsSupported");
         }
 
         /// <summary>
@@ -61,15 +39,7 @@ namespace Nop.Services.Common
         /// </summary>
         public virtual void EnableFullText()
         {
-            if (_commonSettings.UseStoredProceduresIfSupported && _dataProvider.StoredProceduredSupported)
-            {
-                //stored procedures are enabled and supported by the database.
-                _dbContext.ExecuteSqlCommand("EXEC [FullText_Enable]", true);
-            }
-            else
-            {
-                throw new Exception("Stored procedures are not supported by your database");
-            }
+            _dataProvider.ExecuteStoredProcedure("FullText_Enable");
         }
 
         /// <summary>
@@ -77,15 +47,7 @@ namespace Nop.Services.Common
         /// </summary>
         public virtual void DisableFullText()
         {
-            if (_commonSettings.UseStoredProceduresIfSupported && _dataProvider.StoredProceduredSupported)
-            {
-                //stored procedures are enabled and supported by the database.
-                _dbContext.ExecuteSqlCommand("EXEC [FullText_Disable]", true);
-            }
-            else
-            {
-                throw new Exception("Stored procedures are not supported by your database");
-            }
+            _dataProvider.ExecuteStoredProcedure("FullText_Disable");
         }
 
         #endregion

@@ -1,7 +1,4 @@
-﻿//using System;
-//using System.Text.RegularExpressions;
-
-using Nop.Core.Domain.Orders;
+﻿using Nop.Core.Domain.Orders;
 
 namespace Nop.Services.Orders
 {
@@ -18,10 +15,6 @@ namespace Nop.Services.Orders
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="orderSettings">Order settings</param>
         public CustomNumberFormatter(OrderSettings orderSettings)
         {
             _orderSettings = orderSettings;

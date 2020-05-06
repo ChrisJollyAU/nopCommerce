@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Dynamic;
+using System.Linq.Dynamic.Core;
 using System.Net;
 using System.Text.RegularExpressions;
 using Nop.Core.Domain.Messages;
@@ -21,13 +21,9 @@ namespace Nop.Services.Messages
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="messageTemplatesSettings">Message templates settings</param>
         public Tokenizer(MessageTemplatesSettings messageTemplatesSettings)
         {
-            this._messageTemplatesSettings = messageTemplatesSettings;
+            _messageTemplatesSettings = messageTemplatesSettings;
         }
 
         #endregion
@@ -53,7 +49,7 @@ namespace Nop.Services.Messages
             var position0 = 0;
             int position1;
 
-            var inc = (original.Length / pattern.Length) * (replacement.Length - pattern.Length);
+            var inc = original.Length / pattern.Length * (replacement.Length - pattern.Length);
             var chars = new char[original.Length + Math.Max(0, inc)];
             while ((position1 = original.IndexOf(pattern, position0, stringComparison)) != -1)
             {
@@ -96,7 +92,7 @@ namespace Nop.Services.Messages
                     if (htmlEncode && !token.NeverHtmlEncoded)
                         tokenValue = WebUtility.HtmlEncode(tokenValue.ToString());
                 }
-                
+
                 template = Replace(template, $@"%{token.Key}%", tokenValue.ToString());
             }
 
@@ -118,10 +114,10 @@ namespace Nop.Services.Messages
                 RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace | RegexOptions.Singleline | RegexOptions.IgnoreCase);
 
             //find conditional statements in the original template
-            var conditionalStatements = regexFullConditionalSatement.Matches(template).Cast<Match>()
-                .SelectMany(match => match.Groups["Condition"].Captures.Cast<Capture>().Select(capture => new
+            var conditionalStatements = regexFullConditionalSatement.Matches(template)
+                .SelectMany(match => match.Groups["Condition"].Captures.Select(capture => new
                 {
-                    Index = capture.Index,
+                    capture.Index,
                     FullStatement = capture.Value,
                     Condition = regexCondition.Match(capture.Value).Value
                 })).ToList();
@@ -139,13 +135,17 @@ namespace Nop.Services.Messages
                     {
                         //replace tokens (string values are wrap in quotes)
                         var conditionString = ReplaceTokens(statement.Condition, tokens, stringWithQuotes: true);
-                        conditionIsMet = new[] { statement }.Where(conditionString).Any();
+                        conditionIsMet = new[] { statement }.AsQueryable().Where(conditionString).Any();
                     }
-                    catch { }
-
+                    catch
+                    {
+                        // ignored
+                    }
                 }
+
                 template = template.Replace(conditionIsMet ? statement.Condition : statement.FullStatement, string.Empty);
             }
+
             template = template.Replace("%if", string.Empty).Replace("endif%", string.Empty);
 
             //return template with resolved conditional statements
@@ -179,7 +179,7 @@ namespace Nop.Services.Messages
 
             return template;
         }
-        
+
         #endregion
     }
 }

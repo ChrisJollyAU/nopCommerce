@@ -1,5 +1,4 @@
-using System;
-using System.Collections.Generic;
+﻿using System;
 using Nop.Core.Domain.Discounts;
 using Nop.Core.Domain.Localization;
 using Nop.Core.Domain.Security;
@@ -11,20 +10,8 @@ namespace Nop.Core.Domain.Catalog
     /// <summary>
     /// Represents a product
     /// </summary>
-    public partial class Product : BaseEntity, ILocalizedEntity, ISlugSupported, IAclSupported, IStoreMappingSupported
+    public partial class Product : BaseEntity, ILocalizedEntity, ISlugSupported, IAclSupported, IStoreMappingSupported, IDiscountSupported<DiscountProductMapping>
     {
-        private ICollection<ProductCategory> _productCategories;
-        private ICollection<ProductManufacturer> _productManufacturers;
-        private ICollection<ProductPicture> _productPictures;
-        private ICollection<ProductReview> _productReviews;
-        private ICollection<ProductSpecificationAttribute> _productSpecificationAttributes;
-        private ICollection<ProductTag> _productTags;
-        private ICollection<ProductAttributeMapping> _productAttributeMappings;
-        private ICollection<ProductAttributeCombination> _productAttributeCombinations;
-        private ICollection<TierPrice> _tierPrices;
-        private ICollection<Discount> _appliedDiscounts;
-        private ICollection<ProductWarehouseInventory> _productWarehouseInventory;
-
         /// <summary>
         /// Gets or sets the product type identifier
         /// </summary>
@@ -75,7 +62,7 @@ namespace Nop.Core.Domain.Catalog
         /// <summary>
         /// Gets or sets a value indicating whether to show the product on home page
         /// </summary>
-        public bool ShowOnHomePage { get; set; }
+        public bool ShowOnHomepage { get; set; }
 
         /// <summary>
         /// Gets or sets the meta keywords
@@ -480,7 +467,7 @@ namespace Nop.Core.Domain.Catalog
 
         /// <summary>
         /// Gets or sets a value indicating whether this product has tier prices configured
-        /// <remarks>The same as if we run this.TierPrices.Count > 0
+        /// <remarks>The same as if we run TierPrices.Count > 0
         /// We use this property for performance optimization:
         /// if this property is set to false, then we do not need to load tier prices navigation property
         /// </remarks>
@@ -489,7 +476,7 @@ namespace Nop.Core.Domain.Catalog
 
         /// <summary>
         /// Gets or sets a value indicating whether this product has discounts applied
-        /// <remarks>The same as if we run this.AppliedDiscounts.Count > 0
+        /// <remarks>The same as if we run AppliedDiscounts.Count > 0
         /// We use this property for performance optimization:
         /// if this property is set to false, then we do not need to load Applied Discounts navigation property
         /// </remarks>
@@ -558,14 +545,8 @@ namespace Nop.Core.Domain.Catalog
         /// </summary>
         public ProductType ProductType
         {
-            get
-            {
-                return (ProductType)ProductTypeId;
-            }
-            set
-            {
-                ProductTypeId = (int)value;
-            }
+            get => (ProductType)ProductTypeId;
+            set => ProductTypeId = (int)value;
         }
 
         /// <summary>
@@ -573,14 +554,8 @@ namespace Nop.Core.Domain.Catalog
         /// </summary>
         public BackorderMode BackorderMode
         {
-            get
-            {
-                return (BackorderMode)BackorderModeId;
-            }
-            set
-            {
-                BackorderModeId = (int)value;
-            }
+            get => (BackorderMode)BackorderModeId;
+            set => BackorderModeId = (int)value;
         }
 
         /// <summary>
@@ -588,14 +563,8 @@ namespace Nop.Core.Domain.Catalog
         /// </summary>
         public DownloadActivationType DownloadActivationType
         {
-            get
-            {
-                return (DownloadActivationType)DownloadActivationTypeId;
-            }
-            set
-            {
-                DownloadActivationTypeId = (int)value;
-            }
+            get => (DownloadActivationType)DownloadActivationTypeId;
+            set => DownloadActivationTypeId = (int)value;
         }
 
         /// <summary>
@@ -603,14 +572,8 @@ namespace Nop.Core.Domain.Catalog
         /// </summary>
         public GiftCardType GiftCardType
         {
-            get
-            {
-                return (GiftCardType)GiftCardTypeId;
-            }
-            set
-            {
-                GiftCardTypeId = (int)value;
-            }
+            get => (GiftCardType)GiftCardTypeId;
+            set => GiftCardTypeId = (int)value;
         }
 
         /// <summary>
@@ -618,14 +581,8 @@ namespace Nop.Core.Domain.Catalog
         /// </summary>
         public LowStockActivity LowStockActivity
         {
-            get
-            {
-                return (LowStockActivity)LowStockActivityId;
-            }
-            set
-            {
-                LowStockActivityId = (int)value;
-            }
+            get => (LowStockActivity)LowStockActivityId;
+            set => LowStockActivityId = (int)value;
         }
 
         /// <summary>
@@ -633,14 +590,8 @@ namespace Nop.Core.Domain.Catalog
         /// </summary>
         public ManageInventoryMethod ManageInventoryMethod
         {
-            get
-            {
-                return (ManageInventoryMethod)ManageInventoryMethodId;
-            }
-            set
-            {
-                ManageInventoryMethodId = (int)value;
-            }
+            get => (ManageInventoryMethod)ManageInventoryMethodId;
+            set => ManageInventoryMethodId = (int)value;
         }
 
         /// <summary>
@@ -648,14 +599,8 @@ namespace Nop.Core.Domain.Catalog
         /// </summary>
         public RecurringProductCyclePeriod RecurringCyclePeriod
         {
-            get
-            {
-                return (RecurringProductCyclePeriod)RecurringCyclePeriodId;
-            }
-            set
-            {
-                RecurringCyclePeriodId = (int)value;
-            }
+            get => (RecurringProductCyclePeriod)RecurringCyclePeriodId;
+            set => RecurringCyclePeriodId = (int)value;
         }
 
         /// <summary>
@@ -663,113 +608,8 @@ namespace Nop.Core.Domain.Catalog
         /// </summary>
         public RentalPricePeriod RentalPricePeriod
         {
-            get
-            {
-                return (RentalPricePeriod)RentalPricePeriodId;
-            }
-            set
-            {
-                RentalPricePeriodId = (int)value;
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets the collection of ProductCategory
-        /// </summary>
-        public virtual ICollection<ProductCategory> ProductCategories
-        {
-            get { return _productCategories ?? (_productCategories = new List<ProductCategory>()); }
-            protected set { _productCategories = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the collection of ProductManufacturer
-        /// </summary>
-        public virtual ICollection<ProductManufacturer> ProductManufacturers
-        {
-            get { return _productManufacturers ?? (_productManufacturers = new List<ProductManufacturer>()); }
-            protected set { _productManufacturers = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the collection of ProductPicture
-        /// </summary>
-        public virtual ICollection<ProductPicture> ProductPictures
-        {
-            get { return _productPictures ?? (_productPictures = new List<ProductPicture>()); }
-            protected set { _productPictures = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the collection of product reviews
-        /// </summary>
-        public virtual ICollection<ProductReview> ProductReviews
-        {
-            get { return _productReviews ?? (_productReviews = new List<ProductReview>()); }
-            protected set { _productReviews = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the product specification attribute
-        /// </summary>
-        public virtual ICollection<ProductSpecificationAttribute> ProductSpecificationAttributes
-        {
-            get { return _productSpecificationAttributes ?? (_productSpecificationAttributes = new List<ProductSpecificationAttribute>()); }
-            protected set { _productSpecificationAttributes = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the product tags
-        /// </summary>
-        public virtual ICollection<ProductTag> ProductTags
-        {
-            get { return _productTags ?? (_productTags = new List<ProductTag>()); }
-            protected set { _productTags = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the product attribute mappings
-        /// </summary>
-        public virtual ICollection<ProductAttributeMapping> ProductAttributeMappings
-        {
-            get { return _productAttributeMappings ?? (_productAttributeMappings = new List<ProductAttributeMapping>()); }
-            protected set { _productAttributeMappings = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the product attribute combinations
-        /// </summary>
-        public virtual ICollection<ProductAttributeCombination> ProductAttributeCombinations
-        {
-            get { return _productAttributeCombinations ?? (_productAttributeCombinations = new List<ProductAttributeCombination>()); }
-            protected set { _productAttributeCombinations = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the tier prices
-        /// </summary>
-        public virtual ICollection<TierPrice> TierPrices
-        {
-            get { return _tierPrices ?? (_tierPrices = new List<TierPrice>()); }
-            protected set { _tierPrices = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the collection of applied discounts
-        /// </summary>
-        public virtual ICollection<Discount> AppliedDiscounts
-        {
-            get { return _appliedDiscounts ?? (_appliedDiscounts = new List<Discount>()); }
-            protected set { _appliedDiscounts = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the collection of "ProductWarehouseInventory" records. We use it only when "UseMultipleWarehouses" is set to "true" and ManageInventoryMethod" to "ManageStock"
-        /// </summary>
-        public virtual ICollection<ProductWarehouseInventory> ProductWarehouseInventory
-        {
-            get { return _productWarehouseInventory ?? (_productWarehouseInventory = new List<ProductWarehouseInventory>()); }
-            protected set { _productWarehouseInventory = value; }
+            get => (RentalPricePeriod)RentalPricePeriodId;
+            set => RentalPricePeriodId = (int)value;
         }
     }
 }

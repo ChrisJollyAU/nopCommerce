@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using Nop.Core.Domain.Catalog;
 
 namespace Nop.Core.Domain.Discounts
 {
@@ -9,15 +7,15 @@ namespace Nop.Core.Domain.Discounts
     /// </summary>
     public partial class Discount : BaseEntity
     {
-        private ICollection<DiscountRequirement> _discountRequirements;
-        private ICollection<Category> _appliedToCategories;
-        private ICollection<Manufacturer> _appliedToManufacturers;
-        private ICollection<Product> _appliedToProducts;
-
         /// <summary>
         /// Gets or sets the name
         /// </summary>
         public string Name { get; set; }
+
+        /// <summary>
+        /// Gets or sets the admin comment
+        /// </summary>
+        public string AdminComment { get; set; }
 
         /// <summary>
         /// Gets or sets the discount type identifier
@@ -96,14 +94,8 @@ namespace Nop.Core.Domain.Discounts
         /// </summary>
         public DiscountType DiscountType
         {
-            get
-            {
-                return (DiscountType)DiscountTypeId;
-            }
-            set
-            {
-                DiscountTypeId = (int)value;
-            }
+            get => (DiscountType)DiscountTypeId;
+            set => DiscountTypeId = (int)value;
         }
 
         /// <summary>
@@ -111,50 +103,8 @@ namespace Nop.Core.Domain.Discounts
         /// </summary>
         public DiscountLimitationType DiscountLimitation
         {
-            get
-            {
-                return (DiscountLimitationType)DiscountLimitationId;
-            }
-            set
-            {
-                DiscountLimitationId = (int)value;
-            }
-        }
-
-        /// <summary>
-        /// Gets or sets the discount requirement
-        /// </summary>
-        public virtual ICollection<DiscountRequirement> DiscountRequirements
-        {
-            get { return _discountRequirements ?? (_discountRequirements = new List<DiscountRequirement>()); }
-            protected set { _discountRequirements = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the categories
-        /// </summary>
-        public virtual ICollection<Category> AppliedToCategories
-        {
-            get { return _appliedToCategories ?? (_appliedToCategories = new List<Category>()); }
-            protected set { _appliedToCategories = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the categories
-        /// </summary>
-        public virtual ICollection<Manufacturer> AppliedToManufacturers
-        {
-            get { return _appliedToManufacturers ?? (_appliedToManufacturers = new List<Manufacturer>()); }
-            protected set { _appliedToManufacturers = value; }
-        }
-
-        /// <summary>
-        /// Gets or sets the products 
-        /// </summary>
-        public virtual ICollection<Product> AppliedToProducts
-        {
-            get { return _appliedToProducts ?? (_appliedToProducts = new List<Product>()); }
-            protected set { _appliedToProducts = value; }
+            get => (DiscountLimitationType)DiscountLimitationId;
+            set => DiscountLimitationId = (int)value;
         }
     }
 }

@@ -14,7 +14,7 @@ namespace Nop.Core.Domain.Seo
         public string PageTitleSeparator { get; set; }
 
         /// <summary>
-        /// Page itle SEO adjustment
+        /// Page title SEO adjustment
         /// </summary>
         public PageTitleSeoAdjustment PageTitleSeoAdjustment { get; set; }
 
@@ -39,7 +39,7 @@ namespace Nop.Core.Domain.Seo
         public bool GenerateProductMetaDescription { get; set; }
 
         /// <summary>
-        /// A value indicating whether we should conver non-wetern chars to western ones
+        /// A value indicating whether we should convert non-western chars to western ones
         /// </summary>
         public bool ConvertNonWesternChars { get; set; }
 
@@ -62,17 +62,7 @@ namespace Nop.Core.Domain.Seo
         /// WWW requires (with or without WWW)
         /// </summary>
         public WwwRequirement WwwRequirement { get; set; }
-
-        /// <summary>
-        /// A value indicating whether JS file bundling and minification is enabled
-        /// </summary>
-        public bool EnableJsBundling { get; set; }
-
-        /// <summary>
-        /// A value indicating whether CSS file bundling and minification is enabled
-        /// </summary>
-        public bool EnableCssBundling { get; set; }
-
+        
         /// <summary>
         /// A value indicating whether Twitter META tags should be generated
         /// </summary>
@@ -92,5 +82,10 @@ namespace Nop.Core.Domain.Seo
         /// Custom tags in the <![CDATA[<head></head>]]> section
         /// </summary>
         public string CustomHeadTags { get; set; }
+
+        /// <summary>
+        /// A value indicating whether Microdata tags should be generated
+        /// </summary>
+        public bool MicrodataEnabled { get; set; }
     }
 }

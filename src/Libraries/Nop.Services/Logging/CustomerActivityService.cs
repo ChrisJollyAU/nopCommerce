@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Caching;
-using Nop.Core.Data;
-using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Logging;
 using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
+using Nop.Services.Events;
 
 namespace Nop.Services.Logging
 {
@@ -16,124 +16,36 @@ namespace Nop.Services.Logging
     /// </summary>
     public class CustomerActivityService : ICustomerActivityService
     {
-        #region Constants
+        #region Fields
 
-        /// <summary>
-        /// Key for caching
-        /// </summary>
-        private const string ACTIVITYTYPE_ALL_KEY = "Nop.activitytype.all";
-        /// <summary>
-        /// Key pattern to clear cache
-        /// </summary>
-        private const string ACTIVITYTYPE_PATTERN_KEY = "Nop.activitytype.";
+        private readonly ICacheKeyService _cacheKeyService;
+        private readonly IEventPublisher _eventPublisher;
+        private readonly IRepository<ActivityLog> _activityLogRepository;
+        private readonly IRepository<ActivityLogType> _activityLogTypeRepository;
+        private readonly IWebHelper _webHelper;
+        private readonly IWorkContext _workContext;
 
         #endregion
 
-        #region Fields
+        #region Ctor
 
-        private readonly IStaticCacheManager _cacheManager;
-        private readonly IRepository<ActivityLog> _activityLogRepository;
-        private readonly IRepository<ActivityLogType> _activityLogTypeRepository;
-        private readonly IWorkContext _workContext;
-        private readonly IDbContext _dbContext;
-        private readonly IDataProvider _dataProvider;
-        private readonly CommonSettings _commonSettings;
-        private readonly IWebHelper _webHelper;
+        public CustomerActivityService(ICacheKeyService cacheKeyService,
+            IEventPublisher eventPublisher,
+            IRepository<ActivityLog> activityLogRepository,
+            IRepository<ActivityLogType> activityLogTypeRepository,
+            IWebHelper webHelper,
+            IWorkContext workContext)
+        {
+            _cacheKeyService = cacheKeyService;
+            _eventPublisher = eventPublisher;
+            _activityLogRepository = activityLogRepository;
+            _activityLogTypeRepository = activityLogTypeRepository;
+            _webHelper = webHelper;
+            _workContext = workContext;
+        }
 
         #endregion
         
-        #region Ctor
-
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="cacheManager">Static cache manager</param>
-        /// <param name="activityLogRepository">Activity log repository</param>
-        /// <param name="activityLogTypeRepository">Activity log type repository</param>
-        /// <param name="workContext">Work context</param>
-        /// <param name="dbContext">DB context</param>>
-        /// <param name="dataProvider">WeData provider</param>
-        /// <param name="commonSettings">Common settings</param>
-        /// <param name="webHelper">Web helper</param>
-        public CustomerActivityService(IStaticCacheManager cacheManager,
-            IRepository<ActivityLog> activityLogRepository,
-            IRepository<ActivityLogType> activityLogTypeRepository,
-            IWorkContext workContext,
-            IDbContext dbContext, IDataProvider dataProvider,
-            CommonSettings commonSettings,
-            IWebHelper webHelper)
-        {
-            this._cacheManager = cacheManager;
-            this._activityLogRepository = activityLogRepository;
-            this._activityLogTypeRepository = activityLogTypeRepository;
-            this._workContext = workContext;
-            this._dbContext = dbContext;
-            this._dataProvider = dataProvider;
-            this._commonSettings = commonSettings;
-            this._webHelper = webHelper;
-        }
-
-        #endregion
-
-        #region Nested classes
-
-        /// <summary>
-        /// Activity log type for caching
-        /// </summary>
-        [Serializable]
-        public class ActivityLogTypeForCaching
-        {
-            /// <summary>
-            /// Identifier
-            /// </summary>
-            public int Id { get; set; }
-            /// <summary>
-            /// System keyword
-            /// </summary>
-            public string SystemKeyword { get; set; }
-            /// <summary>
-            /// Name
-            /// </summary>
-            public string Name { get; set; }
-            /// <summary>
-            /// Enabled
-            /// </summary>
-            public bool Enabled { get; set; }
-        }
-
-        #endregion
-
-        #region Utilities
-
-        /// <summary>
-        /// Gets all activity log types (class for caching)
-        /// </summary>
-        /// <returns>Activity log types</returns>
-        protected virtual IList<ActivityLogTypeForCaching> GetAllActivityTypesCached()
-        {
-            //cache
-            var key = string.Format(ACTIVITYTYPE_ALL_KEY);
-            return _cacheManager.Get(key, () =>
-            {
-                var result = new List<ActivityLogTypeForCaching>();
-                var activityLogTypes = GetAllActivityTypes();
-                foreach (var alt in activityLogTypes)
-                {
-                    var altForCaching = new ActivityLogTypeForCaching
-                    {
-                        Id = alt.Id,
-                        SystemKeyword = alt.SystemKeyword,
-                        Name = alt.Name,
-                        Enabled = alt.Enabled
-                    };
-                    result.Add(altForCaching);
-                }
-                return result;
-            });
-        }
-
-        #endregion
-
         #region Methods
 
         /// <summary>
@@ -146,7 +58,9 @@ namespace Nop.Services.Logging
                 throw new ArgumentNullException(nameof(activityLogType));
 
             _activityLogTypeRepository.Insert(activityLogType);
-            _cacheManager.RemoveByPattern(ACTIVITYTYPE_PATTERN_KEY);
+
+            //event notification
+            _eventPublisher.EntityInserted(activityLogType);
         }
 
         /// <summary>
@@ -159,9 +73,11 @@ namespace Nop.Services.Logging
                 throw new ArgumentNullException(nameof(activityLogType));
 
             _activityLogTypeRepository.Update(activityLogType);
-            _cacheManager.RemoveByPattern(ACTIVITYTYPE_PATTERN_KEY);
+
+            //event notification
+            _eventPublisher.EntityUpdated(activityLogType);
         }
-                
+
         /// <summary>
         /// Deletes an activity log type item
         /// </summary>
@@ -172,7 +88,9 @@ namespace Nop.Services.Logging
                 throw new ArgumentNullException(nameof(activityLogType));
 
             _activityLogTypeRepository.Delete(activityLogType);
-            _cacheManager.RemoveByPattern(ACTIVITYTYPE_PATTERN_KEY);
+
+            //event notification
+            _eventPublisher.EntityDeleted(activityLogType);
         }
 
         /// <summary>
@@ -182,9 +100,10 @@ namespace Nop.Services.Logging
         public virtual IList<ActivityLogType> GetAllActivityTypes()
         {
             var query = from alt in _activityLogTypeRepository.Table
-                orderby alt.Name
-                select alt;
-            var activityLogTypes = query.ToList();
+                        orderby alt.Name
+                        select alt;
+            var activityLogTypes = query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopLoggingDefaults.ActivityTypeAllCacheKey));
+
             return activityLogTypes;
         }
 
@@ -198,57 +117,58 @@ namespace Nop.Services.Logging
             if (activityLogTypeId == 0)
                 return null;
 
-            return _activityLogTypeRepository.GetById(activityLogTypeId);
+            return _activityLogTypeRepository.ToCachedGetById(activityLogTypeId);
         }
 
         /// <summary>
         /// Inserts an activity log item
         /// </summary>
-        /// <param name="systemKeyword">The system keyword</param>
-        /// <param name="comment">The activity comment</param>
-        /// <param name="commentParams">The activity comment parameters for string.Format() function.</param>
+        /// <param name="systemKeyword">System keyword</param>
+        /// <param name="comment">Comment</param>
+        /// <param name="entity">Entity</param>
         /// <returns>Activity log item</returns>
-        public virtual ActivityLog InsertActivity(string systemKeyword, string comment, params object[] commentParams)
+        public virtual ActivityLog InsertActivity(string systemKeyword, string comment, BaseEntity entity = null)
         {
-            return InsertActivity(_workContext.CurrentCustomer, systemKeyword, comment, commentParams);
+            return InsertActivity(_workContext.CurrentCustomer, systemKeyword, comment, entity);
         }
 
         /// <summary>
         /// Inserts an activity log item
         /// </summary>
-        /// <param name="customer">The customer</param>
-        /// <param name="systemKeyword">The system keyword</param>
-        /// <param name="comment">The activity comment</param>
-        /// <param name="commentParams">The activity comment parameters for string.Format() function.</param>
+        /// <param name="customer">Customer</param>
+        /// <param name="systemKeyword">System keyword</param>
+        /// <param name="comment">Comment</param>
+        /// <param name="entity">Entity</param>
         /// <returns>Activity log item</returns>
-        public virtual ActivityLog InsertActivity(Customer customer, string systemKeyword, string comment, params object[] commentParams)
+        public virtual ActivityLog InsertActivity(Customer customer, string systemKeyword, string comment, BaseEntity entity = null)
         {
             if (customer == null)
                 return null;
 
-            var activityTypes = GetAllActivityTypesCached();
-            var activityType = activityTypes.ToList().Find(at => at.SystemKeyword == systemKeyword);
-            if (activityType == null || !activityType.Enabled)
+            //try to get activity log type by passed system keyword
+            var activityLogType = GetAllActivityTypes().FirstOrDefault(type => type.SystemKeyword.Equals(systemKeyword));
+            if (!activityLogType?.Enabled ?? true)
                 return null;
 
-            comment = CommonHelper.EnsureNotNull(comment);
-            comment = string.Format(comment, commentParams);
-            comment = CommonHelper.EnsureMaximumLength(comment, 4000);
-
-            var activity = new ActivityLog
+            //insert log item
+            var logItem = new ActivityLog
             {
-                ActivityLogTypeId = activityType.Id,
-                Customer = customer,
-                Comment = comment,
+                ActivityLogTypeId = activityLogType.Id,
+                EntityId = entity?.Id,
+                EntityName = entity?.GetType().Name,
+                CustomerId = customer.Id,
+                Comment = CommonHelper.EnsureMaximumLength(comment ?? string.Empty, 4000),
                 CreatedOnUtc = DateTime.UtcNow,
                 IpAddress = _webHelper.GetCurrentIpAddress()
             };
+            _activityLogRepository.Insert(logItem);
 
-            _activityLogRepository.Insert(activity);
+            //event notification
+            _eventPublisher.EntityInserted(logItem);
 
-            return activity;
+            return logItem;
         }
-        
+
         /// <summary>
         /// Deletes an activity log item
         /// </summary>
@@ -259,41 +179,59 @@ namespace Nop.Services.Logging
                 throw new ArgumentNullException(nameof(activityLog));
 
             _activityLogRepository.Delete(activityLog);
+
+            //event notification
+            _eventPublisher.EntityDeleted(activityLog);
         }
 
         /// <summary>
         /// Gets all activity log items
         /// </summary>
-        /// <param name="createdOnFrom">Log item creation from; null to load all activities</param>
-        /// <param name="createdOnTo">Log item creation to; null to load all activities</param>
-        /// <param name="customerId">Customer identifier; null to load all activities</param>
-        /// <param name="activityLogTypeId">Activity log type identifier</param>
+        /// <param name="createdOnFrom">Log item creation from; pass null to load all records</param>
+        /// <param name="createdOnTo">Log item creation to; pass null to load all records</param>
+        /// <param name="customerId">Customer identifier; pass null to load all records</param>
+        /// <param name="activityLogTypeId">Activity log type identifier; pass null to load all records</param>
+        /// <param name="ipAddress">IP address; pass null or empty to load all records</param>
+        /// <param name="entityName">Entity name; pass null to load all records</param>
+        /// <param name="entityId">Entity identifier; pass null to load all records</param>
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
-        /// <param name="ipAddress">IP address; null or empty to load all activities</param>
         /// <returns>Activity log items</returns>
-        public virtual IPagedList<ActivityLog> GetAllActivities(DateTime? createdOnFrom = null,
-            DateTime? createdOnTo = null, int? customerId = null, int activityLogTypeId = 0,
-            int pageIndex = 0, int pageSize = int.MaxValue, string ipAddress = null)
+        public virtual IPagedList<ActivityLog> GetAllActivities(DateTime? createdOnFrom = null, DateTime? createdOnTo = null,
+            int? customerId = null, int? activityLogTypeId = null, string ipAddress = null, string entityName = null, int? entityId = null,
+            int pageIndex = 0, int pageSize = int.MaxValue)
         {
             var query = _activityLogRepository.Table;
-            if(!string.IsNullOrEmpty(ipAddress))
-                query = query.Where(al => al.IpAddress.Contains(ipAddress));
+
+            //filter by IP
+            if (!string.IsNullOrEmpty(ipAddress))
+                query = query.Where(logItem => logItem.IpAddress.Contains(ipAddress));
+
+            //filter by creation date
             if (createdOnFrom.HasValue)
-                query = query.Where(al => createdOnFrom.Value <= al.CreatedOnUtc);
+                query = query.Where(logItem => createdOnFrom.Value <= logItem.CreatedOnUtc);
             if (createdOnTo.HasValue)
-                query = query.Where(al => createdOnTo.Value >= al.CreatedOnUtc);
-            if (activityLogTypeId > 0)
-                query = query.Where(al => activityLogTypeId == al.ActivityLogTypeId);
-            if (customerId.HasValue)
-                query = query.Where(al => customerId.Value == al.CustomerId);
+                query = query.Where(logItem => createdOnTo.Value >= logItem.CreatedOnUtc);
 
-            query = query.OrderByDescending(al => al.CreatedOnUtc);
+            //filter by log type
+            if (activityLogTypeId.HasValue && activityLogTypeId.Value > 0)
+                query = query.Where(logItem => activityLogTypeId == logItem.ActivityLogTypeId);
 
-            var activityLog = new PagedList<ActivityLog>(query, pageIndex, pageSize);
-            return activityLog;
+            //filter by customer
+            if (customerId.HasValue && customerId.Value > 0)
+                query = query.Where(logItem => customerId.Value == logItem.CustomerId);
+
+            //filter by entity
+            if (!string.IsNullOrEmpty(entityName))
+                query = query.Where(logItem => logItem.EntityName.Equals(entityName));
+            if (entityId.HasValue && entityId.Value > 0)
+                query = query.Where(logItem => entityId.Value == logItem.EntityId);
+
+            query = query.OrderByDescending(logItem => logItem.CreatedOnUtc).ThenBy(logItem => logItem.Id);
+
+            return new PagedList<ActivityLog>(query, pageIndex, pageSize);
         }
-        
+
         /// <summary>
         /// Gets an activity log item
         /// </summary>
@@ -312,22 +250,7 @@ namespace Nop.Services.Logging
         /// </summary>
         public virtual void ClearAllActivities()
         {
-            if (_commonSettings.UseStoredProceduresIfSupported && _dataProvider.StoredProceduredSupported)
-            {
-                //although it's not a stored procedure we use it to ensure that a database supports them
-                //we cannot wait until EF team has it implemented - http://data.uservoice.com/forums/72025-entity-framework-feature-suggestions/suggestions/1015357-batch-cud-support
-
-
-                //do all databases support "Truncate command"?
-                var activityLogTableName = _dbContext.GetTableName<ActivityLog>();
-                _dbContext.ExecuteSqlCommand($"TRUNCATE TABLE [{activityLogTableName}]");
-            }
-            else
-            {
-                var activityLog = _activityLogRepository.Table.ToList();
-                foreach (var activityLogItem in activityLog)
-                    _activityLogRepository.Delete(activityLogItem);
-            }
+            _activityLogRepository.Truncate();
         }
 
         #endregion

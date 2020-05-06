@@ -4,6 +4,7 @@ using System.Linq;
 using Nop.Core;
 using Nop.Core.Caching;
 using Nop.Core.Domain.Polls;
+using Nop.Services.Caching;
 using Nop.Services.Polls;
 using Nop.Web.Infrastructure.Cache;
 using Nop.Web.Models.Polls;
@@ -17,21 +18,27 @@ namespace Nop.Web.Factories
     {
         #region Fields
 
-        private readonly IWorkContext _workContext;
+        private readonly ICacheKeyService _cacheKeyService;
         private readonly IPollService _pollService;
-        private readonly IStaticCacheManager _cacheManager;
+        private readonly IStaticCacheManager _staticCacheManager;
+        private readonly IStoreContext _storeContext;
+        private readonly IWorkContext _workContext;
 
         #endregion
 
         #region Ctor
 
-        public PollModelFactory(IWorkContext workContext,
+        public PollModelFactory(ICacheKeyService cacheKeyService,
             IPollService pollService,
-            IStaticCacheManager cacheManager)
+            IStaticCacheManager staticCacheManager,
+            IStoreContext storeContext,
+            IWorkContext workContext)
         {
-            this._workContext = workContext;
-            this._pollService = pollService;
-            this._cacheManager = cacheManager;
+            _cacheKeyService = cacheKeyService;
+            _pollService = pollService;
+            _staticCacheManager = staticCacheManager;
+            _storeContext = storeContext;
+            _workContext = workContext;
         }
 
         #endregion
@@ -55,7 +62,8 @@ namespace Nop.Web.Factories
                 AlreadyVoted = setAlreadyVotedProperty && _pollService.AlreadyVoted(poll.Id, _workContext.CurrentCustomer.Id),
                 Name = poll.Name
             };
-            var answers = poll.PollAnswers.OrderBy(x => x.DisplayOrder);
+            var answers = _pollService.GetPollAnswerByPoll(poll.Id);
+            
             foreach (var answer in answers)
                 model.TotalVotes += answer.NumberOfVotes;
             foreach (var pa in answers)
@@ -82,17 +90,23 @@ namespace Nop.Web.Factories
             if (string.IsNullOrWhiteSpace(systemKeyword))
                 return null;
 
-            var cacheKey = string.Format(ModelCacheEventConsumer.POLL_BY_SYSTEMNAME_MODEL_KEY, systemKeyword, _workContext.WorkingLanguage.Id);
-            var cachedModel = _cacheManager.Get(cacheKey, () =>
+            var cacheKey = _cacheKeyService.PrepareKeyForDefaultCache(NopModelCacheDefaults.PollBySystemNameModelKey, 
+                systemKeyword, _workContext.WorkingLanguage, _storeContext.CurrentStore);
+
+            var cachedModel = _staticCacheManager.Get(cacheKey, () =>
             {
-                var poll = _pollService.GetPolls(languageId: _workContext.WorkingLanguage.Id, systemKeyword: systemKeyword).FirstOrDefault();
+                var poll = _pollService
+                    .GetPolls(_storeContext.CurrentStore.Id, _workContext.WorkingLanguage.Id, systemKeyword: systemKeyword)
+                    .FirstOrDefault();
+
+                //we do not cache nulls. that's why let's return an empty record (ID = 0)
                 if (poll == null)
-                    //we do not cache nulls. that's why let's return an empty record (ID = 0)
-                    return new PollModel { Id = 0};
+                    return new PollModel { Id = 0 };
 
                 return PreparePollModel(poll, false);
             });
-            if (cachedModel == null || cachedModel.Id == 0)
+
+            if ((cachedModel?.Id ?? 0) == 0)
                 return null;
 
             //"AlreadyVoted" property of "PollModel" object depends on the current customer. Let's update it.
@@ -107,19 +121,21 @@ namespace Nop.Web.Factories
         /// Prepare the home page poll models
         /// </summary>
         /// <returns>List of the poll model</returns>
-        public virtual List<PollModel> PrepareHomePagePollModels()
+        public virtual List<PollModel> PrepareHomepagePollModels()
         {
-            var cacheKey = string.Format(ModelCacheEventConsumer.HOMEPAGE_POLLS_MODEL_KEY, _workContext.WorkingLanguage.Id);
-            var cachedModel = _cacheManager.Get(cacheKey, () =>
-                _pollService.GetPolls(_workContext.WorkingLanguage.Id, true)
-                .Select(x => PreparePollModel(x, false))
-                .ToList());
+            var cacheKey = _cacheKeyService.PrepareKeyForDefaultCache(NopModelCacheDefaults.HomepagePollsModelKey, 
+                _workContext.WorkingLanguage, _storeContext.CurrentStore);
+
+            var cachedPolls = _staticCacheManager.Get(cacheKey, () =>
+                _pollService.GetPolls(_storeContext.CurrentStore.Id, _workContext.WorkingLanguage.Id, loadShownOnHomepageOnly: true)
+                    .Select(poll => PreparePollModel(poll, false)).ToList());
+
             //"AlreadyVoted" property of "PollModel" object depends on the current customer. Let's update it.
             //But first we need to clone the cached model (the updated one should not be cached)
             var model = new List<PollModel>();
-            foreach (var p in cachedModel)
+            foreach (var poll in cachedPolls)
             {
-                var pollModel = (PollModel) p.Clone();
+                var pollModel = (PollModel)poll.Clone();
                 pollModel.AlreadyVoted = _pollService.AlreadyVoted(pollModel.Id, _workContext.CurrentCustomer.Id);
                 model.Add(pollModel);
             }

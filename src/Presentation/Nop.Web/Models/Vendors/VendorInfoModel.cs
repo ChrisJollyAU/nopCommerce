@@ -1,14 +1,17 @@
-﻿using System.ComponentModel.DataAnnotations;
-using FluentValidation.Attributes;
+﻿using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using Nop.Web.Framework.Mvc.ModelBinding;
-using Nop.Web.Framework.Mvc.Models;
-using Nop.Web.Validators.Vendors;
+using Nop.Web.Framework.Models;
 
 namespace Nop.Web.Models.Vendors
 {
-    [Validator(typeof(VendorInfoValidator))]
     public class VendorInfoModel : BaseNopModel
     {
+        public VendorInfoModel()
+        {
+            VendorAttributes = new List<VendorAttributeModel>();
+        }
+
         [NopResourceDisplayName("Account.VendorInfo.Name")]
         public string Name { get; set; }
 
@@ -21,5 +24,7 @@ namespace Nop.Web.Models.Vendors
 
         [NopResourceDisplayName("Account.VendorInfo.Picture")]
         public string PictureUrl { get; set; }
+
+        public IList<VendorAttributeModel> VendorAttributes { get; set; }
     }
 }

@@ -1,11 +1,15 @@
 ﻿using System.Collections.Generic;
-using Nop.Web.Framework.Mvc.Models;
+using Nop.Web.Framework.Models;
 using Nop.Web.Models.Common;
 
 namespace Nop.Web.Models.Catalog
 {
     public class CustomerProductReviewModel : BaseNopModel
     {
+        public CustomerProductReviewModel()
+        {
+            AdditionalProductReviewList = new List<ProductReviewReviewTypeMappingModel>();
+        }
         public int ProductId { get; set; }
         public string ProductName { get; set; }
         public string ProductSeName { get; set; }
@@ -15,6 +19,7 @@ namespace Nop.Web.Models.Catalog
         public int Rating { get; set; }
         public string WrittenOnStr { get; set; }
         public string ApprovalStatus { get; set; }
+        public IList<ProductReviewReviewTypeMappingModel> AdditionalProductReviewList { get; set; }
     }
 
     public class CustomerProductReviewsModel : BaseNopModel

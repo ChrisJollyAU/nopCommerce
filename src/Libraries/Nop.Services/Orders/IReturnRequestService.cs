@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Nop.Core;
 using Nop.Core.Domain.Orders;
@@ -10,6 +10,12 @@ namespace Nop.Services.Orders
     /// </summary>
     public partial interface IReturnRequestService
     {
+        /// <summary>
+        /// Updates a return request
+        /// </summary>
+        /// <param name="returnRequest">Return request</param>
+        void UpdateReturnRequest(ReturnRequest returnRequest);
+
         /// <summary>
         /// Deletes a return request
         /// </summary>
@@ -35,10 +41,11 @@ namespace Nop.Services.Orders
         /// <param name="createdToUtc">Created date to (UTC); null to load all records</param>
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
+        /// <param name="getOnlyTotalCount">A value in indicating whether you want to load only total number of records. Set to "true" if you don't want to load data from database</param>
         /// <returns>Return requests</returns>
         IPagedList<ReturnRequest> SearchReturnRequests(int storeId = 0, int customerId = 0,
             int orderItemId = 0, string customNumber = "", ReturnRequestStatus? rs = null, DateTime? createdFromUtc = null,
-            DateTime? createdToUtc = null, int pageIndex = 0, int pageSize = int.MaxValue);
+            DateTime? createdToUtc = null, int pageIndex = 0, int pageSize = int.MaxValue, bool getOnlyTotalCount = false);
 
         /// <summary>
         /// Delete a return request action
@@ -58,6 +65,12 @@ namespace Nop.Services.Orders
         /// <param name="returnRequestActionId">Return request action identifier</param>
         /// <returns>Return request action</returns>
         ReturnRequestAction GetReturnRequestActionById(int returnRequestActionId);
+
+        /// <summary>
+        /// Inserts a return request
+        /// </summary>
+        /// <param name="returnRequest">Return request</param>
+        void InsertReturnRequest(ReturnRequest returnRequest);
 
         /// <summary>
         /// Inserts a return request action

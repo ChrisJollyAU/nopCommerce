@@ -1,6 +1,6 @@
-using System;
+﻿using System;
+using Microsoft.AspNetCore.Http;
 using Nop.Core.Domain.Media;
-using Nop.Core.Domain.Orders;
 
 namespace Nop.Services.Media
 {
@@ -42,17 +42,10 @@ namespace Nop.Services.Media
         void UpdateDownload(Download download);
 
         /// <summary>
-        /// Gets a value indicating whether download is allowed
+        /// Gets the download binary array
         /// </summary>
-        /// <param name="orderItem">Order item to check</param>
-        /// <returns>True if download is allowed; otherwise, false.</returns>
-        bool IsDownloadAllowed(OrderItem orderItem);
-
-        /// <summary>
-        /// Gets a value indicating whether license download is allowed
-        /// </summary>
-        /// <param name="orderItem">Order item to check</param>
-        /// <returns>True if license download is allowed; otherwise, false.</returns>
-        bool IsLicenseDownloadAllowed(OrderItem orderItem);
+        /// <param name="file">File</param>
+        /// <returns>Download binary array</returns>
+        byte[] GetDownloadBits(IFormFile file);
     }
 }

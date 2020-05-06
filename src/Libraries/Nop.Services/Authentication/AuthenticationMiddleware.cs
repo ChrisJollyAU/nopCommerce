@@ -19,15 +19,10 @@ namespace Nop.Services.Authentication
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="next">Next</param>
-        /// <param name="schemes">Schemes</param>
-        public AuthenticationMiddleware(RequestDelegate next, IAuthenticationSchemeProvider schemes)
+        public AuthenticationMiddleware(IAuthenticationSchemeProvider schemes, RequestDelegate next)
         {
-            _next = next ?? throw new ArgumentNullException(nameof(next));
             Schemes = schemes ?? throw new ArgumentNullException(nameof(schemes));
+            _next = next ?? throw new ArgumentNullException(nameof(next));
         }
 
         #endregion
@@ -65,7 +60,10 @@ namespace Nop.Services.Authentication
                     if (await handlers.GetHandlerAsync(context, scheme.Name) is IAuthenticationRequestHandler handler && await handler.HandleRequestAsync())
                         return;
                 }
-                catch { continue; }
+                catch
+                {
+                    // ignored
+                }
             }
 
             var defaultAuthenticate = await Schemes.GetDefaultAuthenticateSchemeAsync();

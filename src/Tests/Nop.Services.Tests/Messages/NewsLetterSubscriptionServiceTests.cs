@@ -1,32 +1,34 @@
-﻿using Nop.Core.Data;
+﻿using Moq;
+using Nop.Data;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Messages;
-using Nop.Data;
+using Nop.Core.Events;
 using Nop.Services.Customers;
 using Nop.Services.Events;
 using Nop.Services.Messages;
 using NUnit.Framework;
-using Rhino.Mocks;
 
 namespace Nop.Services.Tests.Messages 
 {
     [TestFixture]
     public class NewsLetterSubscriptionServiceTests : ServiceTest
     {
-        private IEventPublisher _eventPublisher;
-        private IRepository<NewsLetterSubscription> _newsLetterSubscriptionRepository;
-        private IRepository<Customer> _customerRepository;
-        private ICustomerService _customerService;
-        private IDbContext _dbContext;
+        private Mock<IEventPublisher> _eventPublisher;
+        private Mock<INopDataProvider> _dataProvider;
+        private Mock<IRepository<NewsLetterSubscription>> _newsLetterSubscriptionRepository;
+        private Mock<IRepository<Customer>> _customerRepository;
+        private Mock<IRepository<CustomerCustomerRoleMapping>> _customerCustomerRoleMappingRepository;
+        private Mock<ICustomerService> _customerService;
 
         [SetUp]
         public new void SetUp()
         {
-            _eventPublisher = MockRepository.GenerateStub<IEventPublisher>();
-            _newsLetterSubscriptionRepository = MockRepository.GenerateMock<IRepository<NewsLetterSubscription>>();
-            _customerRepository = MockRepository.GenerateMock<IRepository<Customer>>();
-            _customerService = MockRepository.GenerateMock<ICustomerService>();
-            _dbContext = MockRepository.GenerateStub<IDbContext>();
+            _dataProvider=new Mock<INopDataProvider>();
+            _eventPublisher = new Mock<IEventPublisher>();
+            _newsLetterSubscriptionRepository = new Mock<IRepository<NewsLetterSubscription>>();
+            _customerRepository = new Mock<IRepository<Customer>>();
+            _customerCustomerRoleMappingRepository = new Mock<IRepository<CustomerCustomerRoleMapping>>();
+            _customerService = new Mock<ICustomerService>();
         }
 
         /// <summary>
@@ -35,13 +37,13 @@ namespace Nop.Services.Tests.Messages
         [Test]
         public void VerifyActiveInsertTriggersSubscribeEvent()
         {
-            var service = new NewsLetterSubscriptionService(_dbContext, _newsLetterSubscriptionRepository,
-                _customerRepository, _eventPublisher, _customerService);
+            var service = new NewsLetterSubscriptionService(_customerService.Object, _eventPublisher.Object,
+                _customerRepository.Object, _customerCustomerRoleMappingRepository.Object, _newsLetterSubscriptionRepository.Object);
 
             var subscription = new NewsLetterSubscription { Active = true, Email = "test@test.com" };
-            service.InsertNewsLetterSubscription(subscription, true);
+            service.InsertNewsLetterSubscription(subscription);
 
-            _eventPublisher.AssertWasCalled(x => x.Publish(new EmailSubscribedEvent(subscription)));
+            _eventPublisher.Verify(x => x.Publish(new EmailSubscribedEvent(subscription)));
         }
 
         /// <summary>
@@ -50,13 +52,13 @@ namespace Nop.Services.Tests.Messages
         [Test]
         public void VerifyDeleteTriggersUnsubscribeEvent()
         {
-            var service = new NewsLetterSubscriptionService(_dbContext, _newsLetterSubscriptionRepository,
-                _customerRepository, _eventPublisher, _customerService);
+            var service = new NewsLetterSubscriptionService(_customerService.Object, _eventPublisher.Object,
+                _customerRepository.Object, _customerCustomerRoleMappingRepository.Object, _newsLetterSubscriptionRepository.Object);
 
             var subscription = new NewsLetterSubscription { Active = true, Email = "test@test.com" };
-            service.DeleteNewsLetterSubscription(subscription, true);
+            service.DeleteNewsLetterSubscription(subscription);
 
-            _eventPublisher.AssertWasCalled(x => x.Publish(new EmailUnsubscribedEvent(subscription)));
+            _eventPublisher.Verify(x => x.Publish(new EmailUnsubscribedEvent(subscription)));
         }
         
         /// <summary>
@@ -65,12 +67,14 @@ namespace Nop.Services.Tests.Messages
         [Test]
         public void VerifyInsertEventIsFired()
         {
-            var service = new NewsLetterSubscriptionService(_dbContext, _newsLetterSubscriptionRepository,
-                _customerRepository, _eventPublisher, _customerService);
+            var service = new NewsLetterSubscriptionService(_customerService.Object, _eventPublisher.Object,
+                _customerRepository.Object, _customerCustomerRoleMappingRepository.Object, _newsLetterSubscriptionRepository.Object);
 
-            service.InsertNewsLetterSubscription(new NewsLetterSubscription { Email = "test@test.com" });
+            var subscription = new NewsLetterSubscription {Email = "test@test.com"};
 
-            _eventPublisher.AssertWasCalled(x => x.EntityInserted(Arg<NewsLetterSubscription>.Is.Anything));
+            service.InsertNewsLetterSubscription(subscription);
+
+            _eventPublisher.Verify(x => x.Publish(It.IsAny<EntityInsertedEvent<NewsLetterSubscription>>()));
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Nop.Web.Framework.Mvc.Models;
+using Nop.Web.Framework.Models;
 
 namespace Nop.Web.Models.Blogs
 {
@@ -20,7 +20,7 @@ namespace Nop.Web.Models.Blogs
             foreach (var tag in Tags)
                 itemWeights.Add(tag.BlogPostCount);
 
-            var stdDev = StdDev(itemWeights, out double mean);
+            var stdDev = StdDev(itemWeights, out var mean);
             return GetFontSize(blogPostTag.BlogPostCount, mean, stdDev);
         }
 
@@ -82,6 +82,6 @@ namespace Nop.Web.Models.Blogs
         }
 
 
-        public IList<BlogPostTagModel> Tags { get; set; }
+        public List<BlogPostTagModel> Tags { get; set; }
     }
 }

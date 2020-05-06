@@ -1,5 +1,4 @@
-using System.Collections.Generic;
-using Nop.Core.Domain.Catalog;
+﻿using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Localization;
 
 namespace Nop.Core.Domain.Customers
@@ -9,8 +8,6 @@ namespace Nop.Core.Domain.Customers
     /// </summary>
     public partial class CustomerAttribute : BaseEntity, ILocalizedEntity
     {
-        private ICollection<CustomerAttributeValue> _customerAttributeValues;
-
         /// <summary>
         /// Gets or sets the name
         /// </summary>
@@ -36,23 +33,8 @@ namespace Nop.Core.Domain.Customers
         /// </summary>
         public AttributeControlType AttributeControlType
         {
-            get
-            {
-                return (AttributeControlType)AttributeControlTypeId;
-            }
-            set
-            {
-                AttributeControlTypeId = (int)value;
-            }
-        }
-        /// <summary>
-        /// Gets the customer attribute values
-        /// </summary>
-        public virtual ICollection<CustomerAttributeValue> CustomerAttributeValues
-        {
-            get { return _customerAttributeValues ?? (_customerAttributeValues = new List<CustomerAttributeValue>()); }
-            protected set { _customerAttributeValues = value; }
+            get => (AttributeControlType)AttributeControlTypeId;
+            set => AttributeControlTypeId = (int)value;
         }
     }
-
 }

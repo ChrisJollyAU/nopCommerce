@@ -1,7 +1,9 @@
 ﻿using System;
+using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using Nop.Core.Domain.Security;
 using Nop.Web.Framework.Security.Captcha;
 
 namespace Nop.Web.Framework.TagHelpers.Public
@@ -26,7 +28,6 @@ namespace Nop.Web.Framework.TagHelpers.Public
         /// Ctor
         /// </summary>
         /// <param name="htmlHelper">HTML helper</param>
-        /// <param name="captchaSettings">Captcha settings</param>
         public NopGenerateCaptchaTagHelper(IHtmlHelper htmlHelper, CaptchaSettings captchaSettings)
         {
             _htmlHelper = htmlHelper;
@@ -54,20 +55,24 @@ namespace Nop.Web.Framework.TagHelpers.Public
             var viewContextAware = _htmlHelper as IViewContextAware;
             viewContextAware?.Contextualize(ViewContext);
 
-            //generate captcha control
-            var captchaControl = new GRecaptchaControl(_captchaSettings.ReCaptchaVersion)
+            IHtmlContent captchaHtmlContent;
+            switch (_captchaSettings.CaptchaType)
             {
-                Theme = _captchaSettings.ReCaptchaTheme,
-                Id = "recaptcha",
-                PublicKey = _captchaSettings.ReCaptchaPublicKey,
-                Language = _captchaSettings.ReCaptchaLanguage
-            };
-            var captchaControlHtml = captchaControl.RenderControl();
+                case CaptchaType.CheckBoxReCaptchaV2:
+                    output.Attributes.Add("class", "captcha-box");
+                    captchaHtmlContent = _htmlHelper.GenerateCheckBoxReCaptchaV2(_captchaSettings);
+                    break;
+                case CaptchaType.ReCaptchaV3:
+                    captchaHtmlContent = _htmlHelper.GenerateReCaptchaV3(_captchaSettings);
+                    break;
+                default:
+                    throw new InvalidOperationException("Invalid captcha type.");
+            }
 
             //tag details
             output.TagName = "div";
             output.TagMode = TagMode.StartTagAndEndTag;
-            output.Content.SetHtmlContent(captchaControlHtml);
+            output.Content.SetHtmlContent(captchaHtmlContent);
         }
     }
 }

@@ -9,20 +9,25 @@ namespace Nop.Services.Directory
     /// </summary>
     public partial class UpdateExchangeRateTask : IScheduleTask
     {
-        private readonly ICurrencyService _currencyService;
-        private readonly CurrencySettings _currencySettings;
+        #region Fields
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="currencyService">Currency service</param>
-        /// <param name="currencySettings">Currency settings</param>
-        public UpdateExchangeRateTask(ICurrencyService currencyService,
-            CurrencySettings currencySettings)
+        private readonly CurrencySettings _currencySettings;
+        private readonly ICurrencyService _currencyService;
+
+        #endregion
+
+        #region Ctor
+
+        public UpdateExchangeRateTask(CurrencySettings currencySettings,
+            ICurrencyService currencyService)
         {
-            this._currencyService = currencyService;
-            this._currencySettings = currencySettings;
+            _currencySettings = currencySettings;
+            _currencyService = currencyService;
         }
+
+        #endregion
+
+        #region Methods
 
         /// <summary>
         /// Executes a task
@@ -32,19 +37,19 @@ namespace Nop.Services.Directory
             if (!_currencySettings.AutoUpdateEnabled)
                 return;
 
-            var primaryCurrencyCode = _currencyService.GetCurrencyById(_currencySettings.PrimaryExchangeRateCurrencyId).CurrencyCode;
-            var exchangeRates = _currencyService.GetCurrencyLiveRates(primaryCurrencyCode);
-
+            var exchangeRates = _currencyService.GetCurrencyLiveRates();
             foreach (var exchageRate in exchangeRates)
             {
-                var currency = _currencyService.GetCurrencyByCode(exchageRate.CurrencyCode, false);
-                if (currency != null)
-                {
-                    currency.Rate = exchageRate.Rate;
-                    currency.UpdatedOnUtc = DateTime.UtcNow;
-                    _currencyService.UpdateCurrency(currency);
-                }
+                var currency = _currencyService.GetCurrencyByCode(exchageRate.CurrencyCode);
+                if (currency == null)
+                    continue;
+
+                currency.Rate = exchageRate.Rate;
+                currency.UpdatedOnUtc = DateTime.UtcNow;
+                _currencyService.UpdateCurrency(currency);
             }
         }
+
+        #endregion
     }
 }

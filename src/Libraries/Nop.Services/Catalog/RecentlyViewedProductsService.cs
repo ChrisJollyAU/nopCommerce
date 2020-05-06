@@ -1,8 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.AspNetCore.Http;
+using Nop.Core;
 using Nop.Core.Domain.Catalog;
+using Nop.Core.Http;
+using Nop.Core.Security;
 
 namespace Nop.Services.Catalog
 {
@@ -11,38 +14,29 @@ namespace Nop.Services.Catalog
     /// </summary>
     public partial class RecentlyViewedProductsService : IRecentlyViewedProductsService
     {
-        #region Constants
-
-        /// <summary>
-        /// Recently viewed products cookie name
-        /// </summary>
-        private const string RECENTLY_VIEWED_PRODUCTS_COOKIE_NAME = ".Nop.RecentlyViewedProducts";
-
-        #endregion
-
         #region Fields
 
         private readonly CatalogSettings _catalogSettings;
+        private readonly CookieSettings _cookieSettings;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IProductService _productService;
+        private readonly IWebHelper _webHelper;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="catalogSettings">Catalog settings</param>
-        /// <param name="httpContextAccessor">HTTP context accessor</param>
-        /// <param name="productService">Product service</param>
         public RecentlyViewedProductsService(CatalogSettings catalogSettings,
+            CookieSettings cookieSettings,
             IHttpContextAccessor httpContextAccessor,
-            IProductService productService)
+            IProductService productService,
+            IWebHelper webHelper)
         {
-            this._catalogSettings = catalogSettings;
-            this._httpContextAccessor = httpContextAccessor;
-            this._productService = productService;
+            _catalogSettings = catalogSettings;
+            _cookieSettings = cookieSettings;
+            _httpContextAccessor = httpContextAccessor;
+            _productService = productService;
+            _webHelper = webHelper;
         }
 
         #endregion
@@ -70,14 +64,15 @@ namespace Nop.Services.Catalog
                 return new List<int>();
 
             //try to get cookie
-            if (!httpContext.Request.Cookies.TryGetValue(RECENTLY_VIEWED_PRODUCTS_COOKIE_NAME, out string productIdsCookie) || string.IsNullOrEmpty(productIdsCookie))
+            var cookieName = $"{NopCookieDefaults.Prefix}{NopCookieDefaults.RecentlyViewedProductsCookie}";
+            if (!httpContext.Request.Cookies.TryGetValue(cookieName, out var productIdsCookie) || string.IsNullOrEmpty(productIdsCookie))
                 return new List<int>();
 
             //get array of string product identifiers from cookie
             var productIds = productIdsCookie.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
 
             //return list of int product identifiers
-            return productIds.Select(productId => int.Parse(productId)).Distinct().Take(number).ToList();
+            return productIds.Select(int.Parse).Distinct().Take(number).ToList();
         }
 
         /// <summary>
@@ -87,21 +82,23 @@ namespace Nop.Services.Catalog
         protected virtual void AddRecentlyViewedProductsCookie(IEnumerable<int> recentlyViewedProductIds)
         {
             //delete current cookie if exists
-            _httpContextAccessor.HttpContext.Response.Cookies.Delete(RECENTLY_VIEWED_PRODUCTS_COOKIE_NAME);
+            var cookieName = $"{NopCookieDefaults.Prefix}{NopCookieDefaults.RecentlyViewedProductsCookie}";
+            _httpContextAccessor.HttpContext.Response.Cookies.Delete(cookieName);
 
             //create cookie value
             var productIdsCookie = string.Join(",", recentlyViewedProductIds);
 
             //create cookie options 
-            var cookieExpires = 24 * 10; //TODO make configurable
+            var cookieExpires = _cookieSettings.RecentlyViewedProductsCookieExpires;
             var cookieOptions = new CookieOptions
             {
                 Expires = DateTime.Now.AddHours(cookieExpires),
-                HttpOnly = true
+                HttpOnly = true,
+                Secure = _webHelper.IsCurrentConnectionSecured()
             };
 
             //add cookie
-            _httpContextAccessor.HttpContext.Response.Cookies.Append(RECENTLY_VIEWED_PRODUCTS_COOKIE_NAME, productIdsCookie, cookieOptions);
+            _httpContextAccessor.HttpContext.Response.Cookies.Append(cookieName, productIdsCookie, cookieOptions);
         }
 
         #endregion
@@ -129,7 +126,7 @@ namespace Nop.Services.Catalog
         /// <param name="productId">Product identifier</param>
         public virtual void AddProductToRecentlyViewedList(int productId)
         {
-            if (_httpContextAccessor.HttpContext == null || _httpContextAccessor.HttpContext.Response == null)
+            if (_httpContextAccessor.HttpContext?.Response == null)
                 return;
 
             //whether recently viewed products is enabled

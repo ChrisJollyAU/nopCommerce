@@ -1,23 +1,23 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using FluentValidation;
-using Nop.Web.Areas.Admin.Models.Customers;
 using Nop.Core.Domain.Customers;
 using Nop.Data;
 using Nop.Services.Customers;
 using Nop.Services.Directory;
 using Nop.Services.Localization;
+using Nop.Web.Areas.Admin.Models.Customers;
 using Nop.Web.Framework.Validators;
 
 namespace Nop.Web.Areas.Admin.Validators.Customers
 {
     public partial class CustomerValidator : BaseNopValidator<CustomerModel>
     {
-        public CustomerValidator(ILocalizationService localizationService,
-            IStateProvinceService stateProvinceService,
+        public CustomerValidator(CustomerSettings customerSettings,
             ICustomerService customerService,
-            CustomerSettings customerSettings,
-            IDbContext dbContext)
+            ILocalizationService localizationService,
+            INopDataProvider dataProvider,
+            IStateProvinceService stateProvinceService)
         {
             //ensure that valid email address is entered if Registered role is checked to avoid registered customers with empty email address
             RuleFor(x => x.Email)
@@ -95,6 +95,14 @@ namespace Nop.Web.Areas.Admin.Validators.Customers
                     //only for registered users
                     .When(x => IsRegisteredCustomerRoleChecked(x, customerService));
             }
+            if (customerSettings.CountyRequired && customerSettings.CountyEnabled)
+            {
+                RuleFor(x => x.County)
+                    .NotEmpty()
+                    .WithMessage(localizationService.GetResource("Admin.Customers.Customers.Fields.County.Required"))
+                    //only for registered users
+                    .When(x => IsRegisteredCustomerRoleChecked(x, customerService));
+            }
             if (customerSettings.PhoneRequired && customerSettings.PhoneEnabled)
             {
                 RuleFor(x => x.Phone)
@@ -112,7 +120,7 @@ namespace Nop.Web.Areas.Admin.Validators.Customers
                     .When(x => IsRegisteredCustomerRoleChecked(x, customerService));
             }
 
-            SetDatabaseValidationRules<Customer>(dbContext);
+            SetDatabaseValidationRules<Customer>(dataProvider);
         }
 
         private bool IsRegisteredCustomerRoleChecked(CustomerModel model, ICustomerService customerService)
@@ -123,7 +131,7 @@ namespace Nop.Web.Areas.Admin.Validators.Customers
                 if (model.SelectedCustomerRoleIds.Contains(customerRole.Id))
                     newCustomerRoles.Add(customerRole);
 
-            var isInRegisteredRole = newCustomerRoles.FirstOrDefault(cr => cr.SystemName == SystemCustomerRoleNames.Registered) != null;
+            var isInRegisteredRole = newCustomerRoles.FirstOrDefault(cr => cr.SystemName == NopCustomerDefaults.RegisteredRoleName) != null;
             return isInRegisteredRole;
         }
     }

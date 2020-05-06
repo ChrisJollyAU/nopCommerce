@@ -1,8 +1,11 @@
-using System;
+﻿using System;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Data;
+using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Polls;
+using Nop.Core.Domain.Stores;
+using Nop.Data;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Events;
 
 namespace Nop.Services.Polls
@@ -14,31 +17,30 @@ namespace Nop.Services.Polls
     {
         #region Fields
 
+        private readonly CatalogSettings _catalogSettings;
+        private readonly IEventPublisher _eventPublisher;
         private readonly IRepository<Poll> _pollRepository;
         private readonly IRepository<PollAnswer> _pollAnswerRepository;
         private readonly IRepository<PollVotingRecord> _pollVotingRecordRepository;
-        private readonly IEventPublisher _eventPublisher;
+        private readonly IRepository<StoreMapping> _storeMappingRepository;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="pollRepository">Poll repository</param>
-        /// <param name="pollAnswerRepository">Poll answer repository</param>
-        /// <param name="pollVotingRecordRepository">Poll voting record repository></param>
-        /// <param name="eventPublisher"></param>
-        public PollService(IRepository<Poll> pollRepository, 
+        public PollService(CatalogSettings catalogSettings,
+            IEventPublisher eventPublisher,
+            IRepository<Poll> pollRepository,
             IRepository<PollAnswer> pollAnswerRepository,
             IRepository<PollVotingRecord> pollVotingRecordRepository,
-            IEventPublisher eventPublisher)
+             IRepository<StoreMapping> storeMappingRepository)
         {
-            this._pollRepository = pollRepository;
-            this._pollAnswerRepository = pollAnswerRepository;
-            this._pollVotingRecordRepository = pollVotingRecordRepository;
-            this._eventPublisher = eventPublisher;
+            _catalogSettings = catalogSettings;
+            _eventPublisher = eventPublisher;
+            _pollRepository = pollRepository;
+            _pollAnswerRepository = pollAnswerRepository;
+            _pollVotingRecordRepository = pollVotingRecordRepository;
+            _storeMappingRepository = storeMappingRepository;
         }
 
         #endregion
@@ -55,46 +57,73 @@ namespace Nop.Services.Polls
             if (pollId == 0)
                 return null;
 
-            return _pollRepository.GetById(pollId);
+            return _pollRepository.ToCachedGetById(pollId);
         }
-        
+
         /// <summary>
         /// Gets polls
         /// </summary>
-        /// <param name="languageId">Language identifier. 0 if you want to get all polls</param>
-        /// <param name="loadShownOnHomePageOnly">Retrieve only shown on home page polls</param>
-        /// <param name="systemKeyword">The poll system keyword. Pass null if you want to get all polls</param>
+        /// <param name="storeId">The store identifier; pass 0 to load all records</param>
+        /// <param name="languageId">Language identifier; pass 0 to load all records</param>
+        /// <param name="showHidden">Whether to show hidden records (not published, not started and expired)</param>
+        /// <param name="loadShownOnHomepageOnly">Retrieve only shown on home page polls</param>
+        /// <param name="systemKeyword">The poll system keyword; pass null to load all records</param>
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
-        /// <param name="showHidden">A value indicating whether to show hidden records</param>
         /// <returns>Polls</returns>
-        public virtual IPagedList<Poll> GetPolls(int languageId = 0, bool loadShownOnHomePageOnly = false,
-            string systemKeyword = null, int pageIndex = 0, int pageSize = int.MaxValue, bool showHidden = false)
+        public virtual IPagedList<Poll> GetPolls(int storeId, int languageId = 0, bool showHidden = false,
+            bool loadShownOnHomepageOnly = false, string systemKeyword = null,
+            int pageIndex = 0, int pageSize = int.MaxValue)
         {
             var query = _pollRepository.Table;
+
+            //whether to load not published, not started and expired polls
             if (!showHidden)
             {
                 var utcNow = DateTime.UtcNow;
-                query = query.Where(p => p.Published);
-                query = query.Where(p => !p.StartDateUtc.HasValue || p.StartDateUtc <= utcNow);
-                query = query.Where(p => !p.EndDateUtc.HasValue || p.EndDateUtc >= utcNow);
+                query = query.Where(poll => poll.Published);
+                query = query.Where(poll => !poll.StartDateUtc.HasValue || poll.StartDateUtc <= utcNow);
+                query = query.Where(poll => !poll.EndDateUtc.HasValue || poll.EndDateUtc >= utcNow);
             }
-            if (loadShownOnHomePageOnly)
-            {
-                query = query.Where(p => p.ShowOnHomePage);
-            }
-            if (languageId > 0)
-            {
-                query = query.Where(p => p.LanguageId == languageId);
-            }
-            if (!string.IsNullOrEmpty(systemKeyword))
-            {
-                query = query.Where(p => p.SystemKeyword == systemKeyword);
-            }
-            query = query.OrderBy(p => p.DisplayOrder).ThenBy(p => p.Id);
 
-            var polls = new PagedList<Poll>(query, pageIndex, pageSize);
-            return polls;
+            //load homepage polls only
+            if (loadShownOnHomepageOnly)
+                query = query.Where(poll => poll.ShowOnHomepage);
+
+            //filter by language
+            if (languageId > 0)
+                query = query.Where(poll => poll.LanguageId == languageId);
+
+            //filter by system keyword
+            if (!string.IsNullOrEmpty(systemKeyword))
+                query = query.Where(poll => poll.SystemKeyword == systemKeyword);
+
+            //filter by store
+            if (storeId > 0 && !_catalogSettings.IgnoreStoreLimitations)
+            {
+                query = from poll in query
+                    join storeMapping in _storeMappingRepository.Table
+                        on new
+                        {
+                            poll.Id,
+                            Name = nameof(Poll)
+                        }
+                        equals new
+                        {
+                            Id = storeMapping.EntityId,
+                            Name = storeMapping.EntityName
+                        } 
+                        into storeMappingsWithNulls
+                    from storeMapping in storeMappingsWithNulls.DefaultIfEmpty()
+                    where !poll.LimitedToStores || storeMapping.StoreId == storeId
+                    select poll;
+            }
+
+            //order records by display order
+            query = query.OrderBy(poll => poll.DisplayOrder).ThenBy(poll => poll.Id);
+
+            //return paged list of polls
+            return new PagedList<Poll>(query, pageIndex, pageSize);
         }
 
         /// <summary>
@@ -141,7 +170,7 @@ namespace Nop.Services.Polls
             //event notification
             _eventPublisher.EntityUpdated(poll);
         }
-        
+
         /// <summary>
         /// Gets a poll answer
         /// </summary>
@@ -152,9 +181,9 @@ namespace Nop.Services.Polls
             if (pollAnswerId == 0)
                 return null;
 
-            return _pollAnswerRepository.GetById(pollAnswerId);
+            return _pollAnswerRepository.ToCachedGetById(pollAnswerId);
         }
-        
+
         /// <summary>
         /// Deletes a poll answer
         /// </summary>
@@ -168,6 +197,54 @@ namespace Nop.Services.Polls
 
             //event notification
             _eventPublisher.EntityDeleted(pollAnswer);
+        }
+
+        /// <summary>
+        /// Gets a poll answers by parent poll
+        /// </summary>
+        /// <param name="pollId">The poll identifier</param>
+        /// <returns>Poll answer</returns>
+        /// <param name="pageIndex">Page index</param>
+        /// <param name="pageSize">Page size</param>
+        public virtual IPagedList<PollAnswer> GetPollAnswerByPoll(int pollId, int pageIndex = 0, int pageSize = int.MaxValue)
+        {
+            var query = _pollAnswerRepository.Table.Where(pa => pa.PollId == pollId);
+
+            //order records by display order
+            query = query.OrderBy(pa => pa.DisplayOrder).ThenBy(pa => pa.Id);
+
+            //return paged list of polls
+            return new PagedList<PollAnswer>(query, pageIndex, pageSize);
+        }
+
+        /// <summary>
+        /// Inserts a poll answer
+        /// </summary>
+        /// <param name="pollAnswer">Poll answer</param>
+        public virtual void InsertPollAnswer(PollAnswer pollAnswer)
+        {
+            if (pollAnswer == null)
+                throw new ArgumentNullException(nameof(pollAnswer));
+
+            _pollAnswerRepository.Insert(pollAnswer);
+
+            //event notification
+            _eventPublisher.EntityInserted(pollAnswer);
+        }
+
+        /// <summary>
+        /// Updates the poll answer
+        /// </summary>
+        /// <param name="pollAnswer">Poll answer</param>
+        public virtual void UpdatePollAnswer(PollAnswer pollAnswer)
+        {
+            if (pollAnswer == null)
+                throw new ArgumentNullException(nameof(pollAnswer));
+
+            _pollAnswerRepository.Update(pollAnswer);
+
+            //event notification
+            _eventPublisher.EntityUpdated(pollAnswer);
         }
 
         /// <summary>
@@ -186,6 +263,36 @@ namespace Nop.Services.Polls
                           where pa.PollId == pollId && pvr.CustomerId == customerId
                           select pvr).Any();
             return result;
+        }
+
+        /// <summary>
+        /// Inserts a poll voting record
+        /// </summary>
+        /// <param name="pollVotingRecord">Voting record</param>
+        public virtual void InsertPollVotingRecord(PollVotingRecord pollVotingRecord)
+        {
+            if (pollVotingRecord == null)
+                throw new ArgumentNullException(nameof(pollVotingRecord));
+
+            _pollVotingRecordRepository.Insert(pollVotingRecord);
+
+            //event notification
+            _eventPublisher.EntityInserted(pollVotingRecord);
+        }
+
+        /// <summary>
+        /// Gets a poll voting records by parent answer
+        /// </summary>
+        /// <param name="pollAnswerId">Poll answer identifier</param>
+        /// <returns>Poll answer</returns>
+        /// <param name="pageIndex">Page index</param>
+        /// <param name="pageSize">Page size</param>
+        public virtual IPagedList<PollVotingRecord> GetPollVotingRecordsByPollAnswer(int pollAnswerId, int pageIndex = 0, int pageSize = int.MaxValue)
+        {
+            var query = _pollVotingRecordRepository.Table.Where(pa => pa.PollAnswerId == pollAnswerId);
+
+            //return paged list of poll voting records
+            return new PagedList<PollVotingRecord>(query, pageIndex, pageSize);
         }
 
         #endregion

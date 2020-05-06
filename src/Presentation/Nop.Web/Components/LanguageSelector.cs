@@ -10,7 +10,7 @@ namespace Nop.Web.Components
 
         public LanguageSelectorViewComponent(ICommonModelFactory commonModelFactory)
         {
-            this._commonModelFactory = commonModelFactory;
+            _commonModelFactory = commonModelFactory;
         }
 
         public IViewComponentResult Invoke()
@@ -18,7 +18,7 @@ namespace Nop.Web.Components
             var model = _commonModelFactory.PrepareLanguageSelectorModel();
 
             if (model.AvailableLanguages.Count == 1)
-                Content("");
+                return Content("");
 
             return View(model);
         }

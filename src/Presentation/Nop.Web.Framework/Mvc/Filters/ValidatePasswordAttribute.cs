@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.Routing;
 using Nop.Core;
-using Nop.Core.Data;
+using Nop.Data;
 using Nop.Services.Customers;
 
 namespace Nop.Web.Framework.Mvc.Filters
@@ -12,7 +12,7 @@ namespace Nop.Web.Framework.Mvc.Filters
     /// <summary>
     /// Represents filter attribute that validates customer password expiration
     /// </summary>
-    public class ValidatePasswordAttribute : TypeFilterAttribute
+    public sealed class ValidatePasswordAttribute : TypeFilterAttribute
     {
         #region Ctor
 
@@ -34,6 +34,7 @@ namespace Nop.Web.Framework.Mvc.Filters
         {
             #region Fields
 
+            private readonly ICustomerService _customerService;
             private readonly IUrlHelperFactory _urlHelperFactory;
             private readonly IWorkContext _workContext;
 
@@ -41,11 +42,13 @@ namespace Nop.Web.Framework.Mvc.Filters
 
             #region Ctor
 
-            public ValidatePasswordFilter(IUrlHelperFactory urlHelperFactory, 
+            public ValidatePasswordFilter(ICustomerService customerService,
+                IUrlHelperFactory urlHelperFactory,
                 IWorkContext workContext)
             {
-                this._urlHelperFactory = urlHelperFactory;
-                this._workContext = workContext;
+                _customerService = customerService;
+                _urlHelperFactory = urlHelperFactory;
+                _workContext = workContext;
             }
 
             #endregion
@@ -64,7 +67,7 @@ namespace Nop.Web.Framework.Mvc.Filters
                 if (context.HttpContext.Request == null)
                     return;
 
-                if (!DataSettingsHelper.DatabaseIsInstalled())
+                if (!DataSettingsManager.DatabaseIsInstalled)
                     return;
 
                 //get action and controller names
@@ -74,13 +77,13 @@ namespace Nop.Web.Framework.Mvc.Filters
 
                 if (string.IsNullOrEmpty(actionName) || string.IsNullOrEmpty(controllerName))
                     return;
-                
+
                 //don't validate on ChangePassword page
                 if (!(controllerName.Equals("Customer", StringComparison.InvariantCultureIgnoreCase) &&
                     actionName.Equals("ChangePassword", StringComparison.InvariantCultureIgnoreCase)))
                 {
                     //check password expiration
-                    if (_workContext.CurrentCustomer.PasswordIsExpired())
+                    if (_customerService.PasswordIsExpired(_workContext.CurrentCustomer))
                     {
                         //redirect to ChangePassword page if expires
                         var changePasswordUrl = _urlHelperFactory.GetUrlHelper(context).RouteUrl("CustomerChangePassword");

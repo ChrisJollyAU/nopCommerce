@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using Microsoft.AspNetCore.Mvc.ApplicationParts;
-using Nop.Core.Configuration;
-using Nop.Core.Plugins;
+using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
+using Moq;
+using Nop.Core;
+using Nop.Core.Events;
+using Nop.Core.Infrastructure;
 using Nop.Services.Events;
+using Nop.Tests;
 using NUnit.Framework;
-using Rhino.Mocks;
 
 namespace Nop.Web.MVC.Tests.Events
 {
@@ -17,11 +20,17 @@ namespace Nop.Web.MVC.Tests.Events
         [OneTimeSetUp]
         public void SetUp()
         {
-            PluginManager.Initialize(new ApplicationPartManager(), new NopConfig());
-            var subscriptionService = MockRepository.GenerateMock<ISubscriptionService>();
-            var consumers = new List<IConsumer<DateTime>> {new DateTimeConsumer()};
-            subscriptionService.Expect(c => c.GetSubscriptions<DateTime>()).Return(consumers);
-            _eventPublisher = new EventPublisher(subscriptionService);
+            var webHostEnvironment = new Mock<IWebHostEnvironment>();
+            webHostEnvironment.Setup(x => x.ContentRootPath).Returns(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            webHostEnvironment.Setup(x => x.WebRootPath).Returns(System.IO.Directory.GetCurrentDirectory());
+            CommonHelper.DefaultFileProvider = new NopFileProvider(webHostEnvironment.Object);
+
+            var nopEngine = new Mock<NopEngine>();
+            var serviceProvider = new TestServiceProvider();
+            nopEngine.Setup(x => x.ServiceProvider).Returns(serviceProvider);
+            nopEngine.Setup(x => x.ResolveAll<IConsumer<DateTime>>()).Returns(new List<IConsumer<DateTime>> { new DateTimeConsumer() });
+            EngineContext.Replace(nopEngine.Object);
+            _eventPublisher = new EventPublisher();
         }
 
         [Test]
@@ -32,7 +41,7 @@ namespace Nop.Web.MVC.Tests.Events
 
             var newDateTime = DateTime.Now.Subtract(TimeSpan.FromDays(5));
             _eventPublisher.Publish(newDateTime);
-            Assert.AreEqual(DateTimeConsumer.DateTime, newDateTime);
+            newDateTime.Should().Be(DateTimeConsumer.DateTime);
         }
     }
 }

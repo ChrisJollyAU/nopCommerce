@@ -39,8 +39,8 @@ namespace Nop.Web.Framework.TagHelpers.Public
         /// <param name="httpContextAccessor">HTTP context accessor</param>
         public ScriptTagHelper(IHtmlHelper htmlHelper, IHttpContextAccessor httpContextAccessor)
         {
-            this._htmlHelper = htmlHelper;
-            this._httpContextAccessor = httpContextAccessor;
+            _htmlHelper = htmlHelper;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         /// <summary>
@@ -82,7 +82,7 @@ namespace Nop.Web.Framework.TagHelpers.Public
                 if (!attribute.Name.StartsWith("asp-"))
                     scriptTag.Attributes.Add(attribute.Name, attribute.Value.ToString());
 
-            _htmlHelper.AppendInlineScriptParts(Location, scriptTag.RenderHtmlContent());
+            _htmlHelper.AddInlineScriptParts(Location, scriptTag.RenderHtmlContent());
 
             //generate nothing
             output.SuppressOutput();

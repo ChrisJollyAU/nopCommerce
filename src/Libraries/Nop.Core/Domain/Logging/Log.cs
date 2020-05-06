@@ -1,5 +1,4 @@
-using System;
-using Nop.Core.Domain.Customers;
+﻿using System;
 
 namespace Nop.Core.Domain.Logging
 {
@@ -53,19 +52,8 @@ namespace Nop.Core.Domain.Logging
         /// </summary>
         public LogLevel LogLevel
         {
-            get
-            {
-                return (LogLevel)this.LogLevelId;
-            }
-            set
-            {
-                this.LogLevelId = (int)value;
-            }
+            get => (LogLevel)LogLevelId;
+            set => LogLevelId = (int)value;
         }
-
-        /// <summary>
-        /// Gets or sets the customer
-        /// </summary>
-        public virtual Customer Customer { get; set; }
     }
 }

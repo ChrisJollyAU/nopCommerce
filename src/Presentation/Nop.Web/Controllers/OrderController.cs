@@ -8,13 +8,13 @@ using Nop.Core;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Orders;
 using Nop.Services.Common;
+using Nop.Services.Customers;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Shipping;
 using Nop.Web.Factories;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc.Filters;
-using Nop.Web.Framework.Security;
 
 namespace Nop.Web.Controllers
 {
@@ -22,39 +22,42 @@ namespace Nop.Web.Controllers
     {
         #region Fields
 
+        private readonly ICustomerService _customerService;
         private readonly IOrderModelFactory _orderModelFactory;
-        private readonly IOrderService _orderService;
-        private readonly IShipmentService _shipmentService;
-        private readonly IWorkContext _workContext;
         private readonly IOrderProcessingService _orderProcessingService;
+        private readonly IOrderService _orderService;
         private readonly IPaymentService _paymentService;
         private readonly IPdfService _pdfService;
+        private readonly IShipmentService _shipmentService;
         private readonly IWebHelper _webHelper;
+        private readonly IWorkContext _workContext;
         private readonly RewardPointsSettings _rewardPointsSettings;
 
         #endregion
 
 		#region Ctor
 
-        public OrderController(IOrderModelFactory orderModelFactory,
-            IOrderService orderService, 
-            IShipmentService shipmentService, 
-            IWorkContext workContext,
+        public OrderController(ICustomerService customerService,
+            IOrderModelFactory orderModelFactory,
             IOrderProcessingService orderProcessingService, 
+            IOrderService orderService, 
             IPaymentService paymentService, 
-            IPdfService pdfService, 
+            IPdfService pdfService,
+            IShipmentService shipmentService, 
             IWebHelper webHelper,
+            IWorkContext workContext,
             RewardPointsSettings rewardPointsSettings)
         {
-            this._orderModelFactory = orderModelFactory;
-            this._orderService = orderService;
-            this._shipmentService = shipmentService;
-            this._workContext = workContext;
-            this._orderProcessingService = orderProcessingService;
-            this._paymentService = paymentService;
-            this._pdfService = pdfService;
-            this._webHelper = webHelper;
-            this._rewardPointsSettings = rewardPointsSettings;
+            _customerService = customerService;
+            _orderModelFactory = orderModelFactory;
+            _orderProcessingService = orderProcessingService;
+            _orderService = orderService;
+            _paymentService = paymentService;
+            _pdfService = pdfService;
+            _shipmentService = shipmentService;
+            _webHelper = webHelper;
+            _workContext = workContext;
+            _rewardPointsSettings = rewardPointsSettings;
         }
 
         #endregion
@@ -62,10 +65,10 @@ namespace Nop.Web.Controllers
         #region Methods
 
         //My account / Orders
-        [HttpsRequirement(SslRequirement.Yes)]
+        [HttpsRequirement]
         public virtual IActionResult CustomerOrders()
         {
-            if (!_workContext.CurrentCustomer.IsRegistered())
+            if (!_customerService.IsRegistered(_workContext.CurrentCustomer))
                 return Challenge();
 
             var model = _orderModelFactory.PrepareCustomerOrderListModel();
@@ -74,11 +77,11 @@ namespace Nop.Web.Controllers
 
         //My account / Orders / Cancel recurring order
         [HttpPost, ActionName("CustomerOrders")]
-        [PublicAntiForgery]
+        [AutoValidateAntiforgeryToken]
         [FormValueRequired(FormValueRequirement.StartsWith, "cancelRecurringPayment")]
         public virtual IActionResult CancelRecurringPayment(IFormCollection form)
         {
-            if (!_workContext.CurrentCustomer.IsRegistered())
+            if (!_customerService.IsRegistered(_workContext.CurrentCustomer))
                 return Challenge();
 
             //get recurring payment identifier
@@ -108,11 +111,11 @@ namespace Nop.Web.Controllers
 
         //My account / Orders / Retry last recurring order
         [HttpPost, ActionName("CustomerOrders")]
-        [PublicAntiForgery]
+        [AutoValidateAntiforgeryToken]
         [FormValueRequired(FormValueRequirement.StartsWith, "retryLastPayment")]
         public virtual IActionResult RetryLastRecurringPayment(IFormCollection form)
         {
-            if (!_workContext.CurrentCustomer.IsRegistered())
+            if (!_customerService.IsRegistered(_workContext.CurrentCustomer))
                 return Challenge();
 
             //get recurring payment identifier
@@ -138,10 +141,10 @@ namespace Nop.Web.Controllers
         }
 
         //My account / Reward points
-        [HttpsRequirement(SslRequirement.Yes)]
+        [HttpsRequirement]
         public virtual IActionResult CustomerRewardPoints(int? pageNumber)
         {
-            if (!_workContext.CurrentCustomer.IsRegistered())
+            if (!_customerService.IsRegistered(_workContext.CurrentCustomer))
                 return Challenge();
 
             if (!_rewardPointsSettings.Enabled)
@@ -152,7 +155,7 @@ namespace Nop.Web.Controllers
         }
 
         //My account / Order details page
-        [HttpsRequirement(SslRequirement.Yes)]
+        [HttpsRequirement]
         public virtual IActionResult Details(int orderId)
         {
             var order = _orderService.GetOrderById(orderId);
@@ -164,7 +167,7 @@ namespace Nop.Web.Controllers
         }
 
         //My account / Order details page / Print
-        [HttpsRequirement(SslRequirement.Yes)]
+        [HttpsRequirement]
         public virtual IActionResult PrintOrderDetails(int orderId)
         {
             var order = _orderService.GetOrderById(orderId);
@@ -208,7 +211,7 @@ namespace Nop.Web.Controllers
 
         //My account / Order details page / Complete payment
         [HttpPost, ActionName("Details")]
-        [PublicAntiForgery]
+        [AutoValidateAntiforgeryToken]
         [FormValueRequired("repost-payment")]
         public virtual IActionResult RePostPayment(int orderId)
         {
@@ -237,14 +240,15 @@ namespace Nop.Web.Controllers
         }
 
         //My account / Order details page / Shipment details page
-        [HttpsRequirement(SslRequirement.Yes)]
+        [HttpsRequirement]
         public virtual IActionResult ShipmentDetails(int shipmentId)
         {
             var shipment = _shipmentService.GetShipmentById(shipmentId);
             if (shipment == null)
                 return Challenge();
 
-            var order = shipment.Order;
+            var order = _orderService.GetOrderById(shipment.OrderId);
+            
             if (order == null || order.Deleted || _workContext.CurrentCustomer.Id != order.CustomerId)
                 return Challenge();
 

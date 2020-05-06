@@ -1,7 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using Nop.Web.Framework.Mvc.ModelBinding;
-using Nop.Web.Framework.Mvc.Models;
+using Nop.Web.Framework.Models;
 
 namespace Nop.Web.Areas.Admin.Models.Common
 {
@@ -12,12 +12,22 @@ namespace Nop.Web.Areas.Admin.Models.Common
             DeleteGuests = new DeleteGuestsModel();
             DeleteAbandonedCarts = new DeleteAbandonedCartsModel();
             DeleteExportedFiles = new DeleteExportedFilesModel();
+            BackupFileSearchModel = new BackupFileSearchModel();
+            DeleteAlreadySentQueuedEmails = new DeleteAlreadySentQueuedEmailsModel();
         }
 
         public DeleteGuestsModel DeleteGuests { get; set; }
+
         public DeleteAbandonedCartsModel DeleteAbandonedCarts { get; set; }
+
         public DeleteExportedFilesModel DeleteExportedFiles { get; set; }
-        
+
+        public BackupFileSearchModel BackupFileSearchModel { get; set; }
+
+        public DeleteAlreadySentQueuedEmailsModel DeleteAlreadySentQueuedEmails { get; set; }
+
+        public bool BackupSupported { get; set; }
+
         #region Nested classes
 
         public partial class DeleteGuestsModel : BaseNopModel
@@ -56,6 +66,19 @@ namespace Nop.Web.Areas.Admin.Models.Common
             public DateTime? EndDate { get; set; }
 
             public int? NumberOfDeletedFiles { get; set; }
+        }
+
+        public partial class DeleteAlreadySentQueuedEmailsModel : BaseNopModel
+        {
+            [NopResourceDisplayName("Admin.System.Maintenance.DeleteAlreadySentQueuedEmails.StartDate")]
+            [UIHint("DateNullable")]
+            public DateTime? StartDate { get; set; }
+
+            [NopResourceDisplayName("Admin.System.Maintenance.DeleteAlreadySentQueuedEmails.EndDate")]
+            [UIHint("DateNullable")]
+            public DateTime? EndDate { get; set; }
+
+            public int? NumberOfDeletedEmails { get; set; }
         }
 
         #endregion

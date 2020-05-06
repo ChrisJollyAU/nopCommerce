@@ -3,15 +3,15 @@ using System.Net;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using Nop.Core;
-using Nop.Core.Data;
 using Nop.Core.Domain.Seo;
+using Nop.Data;
 
 namespace Nop.Web.Framework.Mvc.Filters
 {
     /// <summary>
     /// Represents a filter attribute that checks WWW at the beginning of the URL and properly redirect if necessary
     /// </summary>
-    public class WwwRequirementAttribute : TypeFilterAttribute
+    public sealed class WwwRequirementAttribute : TypeFilterAttribute
     {
         #region Ctor
 
@@ -43,8 +43,8 @@ namespace Nop.Web.Framework.Mvc.Filters
             public WwwRequirementFilter(IWebHelper webHelper,
                 SeoSettings seoSettings)
             {
-                this._webHelper = webHelper;
-                this._seoSettings = seoSettings;
+                _webHelper = webHelper;
+                _seoSettings = seoSettings;
             }
 
             #endregion
@@ -59,7 +59,7 @@ namespace Nop.Web.Framework.Mvc.Filters
             protected void RedirectRequest(AuthorizationFilterContext filterContext, bool withWww)
             {
                 //get scheme depending on securing connection
-                var urlScheme = _webHelper.IsCurrentConnectionSecured() ? "https://" : "http://";
+                var urlScheme = $"{_webHelper.CurrentRequestProtocol}{Uri.SchemeDelimiter}";
 
                 //compose start of URL with WWW
                 var urlWith3W = $"{urlScheme}www.";
@@ -96,7 +96,7 @@ namespace Nop.Web.Framework.Mvc.Filters
                 if (!filterContext.HttpContext.Request.Method.Equals(WebRequestMethods.Http.Get, StringComparison.InvariantCultureIgnoreCase))
                     return;
 
-                if (!DataSettingsHelper.DatabaseIsInstalled())
+                if (!DataSettingsManager.DatabaseIsInstalled)
                     return;
 
                 //ignore this rule for localhost

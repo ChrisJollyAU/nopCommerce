@@ -9,7 +9,7 @@ namespace Nop.Web.Framework.Mvc.Filters
     /// <summary>
     /// Represents filter attribute that sign out from the external authentication scheme
     /// </summary>
-    public class SignOutFromExternalAuthenticationAttribute : TypeFilterAttribute
+    public sealed class SignOutFromExternalAuthenticationAttribute : TypeFilterAttribute
     {
         #region Ctor
 
@@ -41,9 +41,9 @@ namespace Nop.Web.Framework.Mvc.Filters
                     throw new ArgumentNullException(nameof(filterContext));
 
                 //sign out from the external authentication scheme
-                var authenticateResult = await filterContext.HttpContext.AuthenticateAsync(NopCookieAuthenticationDefaults.ExternalAuthenticationScheme);
+                var authenticateResult = await filterContext.HttpContext.AuthenticateAsync(NopAuthenticationDefaults.ExternalAuthenticationScheme);
                 if (authenticateResult.Succeeded)
-                    await filterContext.HttpContext.SignOutAsync(NopCookieAuthenticationDefaults.ExternalAuthenticationScheme);
+                    await filterContext.HttpContext.SignOutAsync(NopAuthenticationDefaults.ExternalAuthenticationScheme);
             }
 
             #endregion

@@ -4,7 +4,7 @@ using System;
 using MaxMind.GeoIP2;
 using MaxMind.GeoIP2.Exceptions;
 using MaxMind.GeoIP2.Responses;
-using Nop.Core;
+using Nop.Core.Infrastructure;
 using Nop.Services.Logging;
 
 namespace Nop.Services.Directory
@@ -17,18 +17,17 @@ namespace Nop.Services.Directory
         #region Fields
 
         private readonly ILogger _logger;
+        private readonly INopFileProvider _fileProvider;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="logger">Logger</param>
-        public GeoLookupService(ILogger logger)
+        public GeoLookupService(ILogger logger,
+            INopFileProvider fileProvider)
         {
-            this._logger = logger;
+            _logger = logger;
+            _fileProvider = fileProvider;
         }
 
         #endregion
@@ -48,7 +47,7 @@ namespace Nop.Services.Directory
             try
             {
                 //This product includes GeoLite2 data created by MaxMind, available from http://www.maxmind.com
-                var databasePath = CommonHelper.MapPath("~/App_Data/GeoLite2-Country.mmdb");
+                var databasePath = _fileProvider.MapPath("~/App_Data/GeoLite2-Country.mmdb");
                 var reader = new DatabaseReader(databasePath);
                 var omni = reader.Country(ipAddress);
                 return omni;
@@ -85,7 +84,7 @@ namespace Nop.Services.Directory
         #region Methods
 
         /// <summary>
-        /// Get country name
+        /// Get country ISO code
         /// </summary>
         /// <param name="ipAddress">IP address</param>
         /// <returns>Country name</returns>
@@ -95,7 +94,7 @@ namespace Nop.Services.Directory
             if (response?.Country != null)
                 return response.Country.IsoCode;
 
-            return "";
+            return string.Empty;
         }
 
         /// <summary>
@@ -109,7 +108,7 @@ namespace Nop.Services.Directory
             if (response?.Country != null)
                 return response.Country.Name;
 
-            return "";
+            return string.Empty;
         }
 
         #endregion

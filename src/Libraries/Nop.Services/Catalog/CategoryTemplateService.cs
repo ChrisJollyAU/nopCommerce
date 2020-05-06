@@ -1,8 +1,10 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Nop.Core.Data;
 using Nop.Core.Domain.Catalog;
+using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Events;
 
 namespace Nop.Services.Catalog
@@ -14,23 +16,21 @@ namespace Nop.Services.Catalog
     {
         #region Fields
 
-        private readonly IRepository<CategoryTemplate> _categoryTemplateRepository;
+        private readonly ICacheKeyService _cacheKeyService;
         private readonly IEventPublisher _eventPublisher;
+        private readonly IRepository<CategoryTemplate> _categoryTemplateRepository;
 
         #endregion
-        
+
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="categoryTemplateRepository">Category template repository</param>
-        /// <param name="eventPublisher">Event published</param>
-        public CategoryTemplateService(IRepository<CategoryTemplate> categoryTemplateRepository, 
-            IEventPublisher eventPublisher)
+        public CategoryTemplateService(ICacheKeyService cacheKeyService,
+        IEventPublisher eventPublisher,
+            IRepository<CategoryTemplate> categoryTemplateRepository)
         {
-            this._categoryTemplateRepository = categoryTemplateRepository;
-            this._eventPublisher = eventPublisher;
+            _cacheKeyService = cacheKeyService;
+            _eventPublisher = eventPublisher;
+            _categoryTemplateRepository = categoryTemplateRepository;
         }
 
         #endregion
@@ -62,10 +62,11 @@ namespace Nop.Services.Catalog
                         orderby pt.DisplayOrder, pt.Id
                         select pt;
 
-            var templates = query.ToList();
+            var templates = query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopCatalogDefaults.CategoryTemplatesAllCacheKey));
+
             return templates;
         }
- 
+
         /// <summary>
         /// Gets a category template
         /// </summary>
@@ -76,7 +77,7 @@ namespace Nop.Services.Catalog
             if (categoryTemplateId == 0)
                 return null;
 
-            return _categoryTemplateRepository.GetById(categoryTemplateId);
+            return _categoryTemplateRepository.ToCachedGetById(categoryTemplateId);
         }
 
         /// <summary>
@@ -108,7 +109,7 @@ namespace Nop.Services.Catalog
             //event notification
             _eventPublisher.EntityUpdated(categoryTemplate);
         }
-        
+
         #endregion
     }
 }

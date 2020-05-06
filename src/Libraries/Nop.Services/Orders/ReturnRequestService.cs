@@ -1,9 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Nop.Core;
-using Nop.Core.Data;
 using Nop.Core.Domain.Orders;
+using Nop.Data;
+using Nop.Services.Caching;
+using Nop.Services.Caching.Extensions;
 using Nop.Services.Events;
 
 namespace Nop.Services.Orders
@@ -15,31 +17,27 @@ namespace Nop.Services.Orders
     {
         #region Fields
 
+        private readonly ICacheKeyService _cacheKeyService;
+        private readonly IEventPublisher _eventPublisher;
         private readonly IRepository<ReturnRequest> _returnRequestRepository;
         private readonly IRepository<ReturnRequestAction> _returnRequestActionRepository;
         private readonly IRepository<ReturnRequestReason> _returnRequestReasonRepository;
-        private readonly IEventPublisher _eventPublisher;
 
         #endregion
 
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        /// <param name="returnRequestRepository">Return request repository</param>
-        /// <param name="returnRequestActionRepository">Return request action repository</param>
-        /// <param name="returnRequestReasonRepository">Return request reason repository</param>
-        /// <param name="eventPublisher">Event published</param>
-        public ReturnRequestService(IRepository<ReturnRequest> returnRequestRepository,
+        public ReturnRequestService(ICacheKeyService cacheKeyService,
+            IEventPublisher eventPublisher,
+            IRepository<ReturnRequest> returnRequestRepository,
             IRepository<ReturnRequestAction> returnRequestActionRepository,
-            IRepository<ReturnRequestReason> returnRequestReasonRepository,
-            IEventPublisher eventPublisher)
+            IRepository<ReturnRequestReason> returnRequestReasonRepository)
         {
-            this._returnRequestRepository = returnRequestRepository;
-            this._returnRequestActionRepository = returnRequestActionRepository;
-            this._returnRequestReasonRepository = returnRequestReasonRepository;
-            this._eventPublisher = eventPublisher;
+            _cacheKeyService = cacheKeyService;
+            _eventPublisher = eventPublisher;
+            _returnRequestRepository = returnRequestRepository;
+            _returnRequestActionRepository = returnRequestActionRepository;
+            _returnRequestReasonRepository = returnRequestReasonRepository;
         }
 
         #endregion
@@ -73,7 +71,7 @@ namespace Nop.Services.Orders
 
             return _returnRequestRepository.GetById(returnRequestId);
         }
-        
+
         /// <summary>
         /// Search return requests
         /// </summary>
@@ -86,10 +84,11 @@ namespace Nop.Services.Orders
         /// <param name="createdToUtc">Created date to (UTC); null to load all records</param>
         /// <param name="pageIndex">Page index</param>
         /// <param name="pageSize">Page size</param>
+        /// <param name="getOnlyTotalCount">A value in indicating whether you want to load only total number of records. Set to "true" if you don't want to load data from database</param>
         /// <returns>Return requests</returns>
         public IPagedList<ReturnRequest> SearchReturnRequests(int storeId = 0, int customerId = 0,
-            int orderItemId = 0, string customNumber = "", ReturnRequestStatus? rs = null,  DateTime? createdFromUtc = null,
-            DateTime? createdToUtc = null, int pageIndex = 0, int pageSize = int.MaxValue)
+            int orderItemId = 0, string customNumber = "", ReturnRequestStatus? rs = null, DateTime? createdFromUtc = null,
+            DateTime? createdToUtc = null, int pageIndex = 0, int pageSize = int.MaxValue, bool getOnlyTotalCount = false)
         {
             var query = _returnRequestRepository.Table;
             if (storeId > 0)
@@ -101,10 +100,11 @@ namespace Nop.Services.Orders
                 var returnStatusId = (int)rs.Value;
                 query = query.Where(rr => rr.ReturnRequestStatusId == returnStatusId);
             }
+
             if (orderItemId > 0)
                 query = query.Where(rr => rr.OrderItemId == orderItemId);
 
-            if(!string.IsNullOrEmpty(customNumber))
+            if (!string.IsNullOrEmpty(customNumber))
                 query = query.Where(rr => rr.CustomNumber == customNumber);
 
             if (createdFromUtc.HasValue)
@@ -112,12 +112,13 @@ namespace Nop.Services.Orders
             if (createdToUtc.HasValue)
                 query = query.Where(rr => createdToUtc.Value >= rr.CreatedOnUtc);
 
-            query = query.OrderByDescending(rr => rr.CreatedOnUtc).ThenByDescending(rr=>rr.Id);
+            query = query.OrderByDescending(rr => rr.CreatedOnUtc).ThenByDescending(rr => rr.Id);
 
-            var returnRequests = new PagedList<ReturnRequest>(query, pageIndex, pageSize);
+            var returnRequests = new PagedList<ReturnRequest>(query, pageIndex, pageSize, getOnlyTotalCount);
+
             return returnRequests;
         }
-        
+
         /// <summary>
         /// Delete a return request action
         /// </summary>
@@ -140,9 +141,10 @@ namespace Nop.Services.Orders
         public virtual IList<ReturnRequestAction> GetAllReturnRequestActions()
         {
             var query = from rra in _returnRequestActionRepository.Table
-                orderby rra.DisplayOrder, rra.Id
-                select rra;
-            return query.ToList();
+                        orderby rra.DisplayOrder, rra.Id
+                        select rra;
+
+            return query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopOrderDefaults.ReturnRequestActionAllCacheKey));
         }
 
         /// <summary>
@@ -154,8 +156,23 @@ namespace Nop.Services.Orders
         {
             if (returnRequestActionId == 0)
                 return null;
-            
-            return _returnRequestActionRepository.GetById(returnRequestActionId);
+
+            return _returnRequestActionRepository.ToCachedGetById(returnRequestActionId);
+        }
+
+        /// <summary>
+        /// Inserts a return request
+        /// </summary>
+        /// <param name="returnRequest">Return request</param>
+        public virtual void InsertReturnRequest(ReturnRequest returnRequest)
+        {
+            if (returnRequest == null)
+                throw new ArgumentNullException(nameof(returnRequest));
+
+            _returnRequestRepository.Insert(returnRequest);
+
+            //event notification
+            _eventPublisher.EntityInserted(returnRequest);
         }
 
         /// <summary>
@@ -174,7 +191,22 @@ namespace Nop.Services.Orders
         }
 
         /// <summary>
-        /// Updates the  return request action
+        /// Updates the return request
+        /// </summary>
+        /// <param name="returnRequest">Return request</param>
+        public virtual void UpdateReturnRequest(ReturnRequest returnRequest)
+        {
+            if (returnRequest == null)
+                throw new ArgumentNullException(nameof(returnRequest));
+
+            _returnRequestRepository.Update(returnRequest);
+
+            //event notification
+            _eventPublisher.EntityUpdated(returnRequest);
+        }
+
+        /// <summary>
+        /// Updates the return request action
         /// </summary>
         /// <param name="returnRequestAction">Return request action</param>
         public virtual void UpdateReturnRequestAction(ReturnRequestAction returnRequestAction)
@@ -210,9 +242,10 @@ namespace Nop.Services.Orders
         public virtual IList<ReturnRequestReason> GetAllReturnRequestReasons()
         {
             var query = from rra in _returnRequestReasonRepository.Table
-                orderby rra.DisplayOrder, rra.Id
-                select rra;
-            return query.ToList();
+                        orderby rra.DisplayOrder, rra.Id
+                        select rra;
+
+            return query.ToCachedList(_cacheKeyService.PrepareKeyForDefaultCache(NopOrderDefaults.ReturnRequestReasonAllCacheKey));
         }
 
         /// <summary>
@@ -225,7 +258,7 @@ namespace Nop.Services.Orders
             if (returnRequestReasonId == 0)
                 return null;
 
-            return _returnRequestReasonRepository.GetById(returnRequestReasonId);
+            return _returnRequestReasonRepository.ToCachedGetById(returnRequestReasonId);
         }
 
         /// <summary>

@@ -1,12 +1,11 @@
 ﻿using System;
-using Nop.Core.Domain.Directory;
 
 namespace Nop.Core.Domain.Common
 {
     /// <summary>
     /// Address
     /// </summary>
-    public partial class Address : BaseEntity, ICloneable
+    public partial class Address : BaseEntity
     {
         /// <summary>
         /// Gets or sets the first name
@@ -37,7 +36,12 @@ namespace Nop.Core.Domain.Common
         /// Gets or sets the state/province identifier
         /// </summary>
         public int? StateProvinceId { get; set; }
-        
+
+        /// <summary>
+        /// Gets or sets the county
+        /// </summary>
+        public string County { get; set; }
+
         /// <summary>
         /// Gets or sets the city
         /// </summary>
@@ -77,43 +81,5 @@ namespace Nop.Core.Domain.Common
         /// Gets or sets the date and time of instance creation
         /// </summary>
         public DateTime CreatedOnUtc { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the country
-        /// </summary>
-        public virtual Country Country { get; set; }
-
-        /// <summary>
-        /// Gets or sets the state/province
-        /// </summary>
-        public virtual StateProvince StateProvince { get; set; }
-
-        /// <summary>
-        /// Clone
-        /// </summary>
-        /// <returns></returns>
-        public object Clone()
-        {
-            var addr = new Address
-            {
-                FirstName = this.FirstName,
-                LastName = this.LastName,
-                Email = this.Email,
-                Company = this.Company,
-                Country = this.Country,
-                CountryId = this.CountryId,
-                StateProvince = this.StateProvince,
-                StateProvinceId = this.StateProvinceId,
-                City = this.City,
-                Address1 = this.Address1,
-                Address2 = this.Address2,
-                ZipPostalCode = this.ZipPostalCode,
-                PhoneNumber = this.PhoneNumber,
-                FaxNumber = this.FaxNumber,
-                CustomAttributes = this.CustomAttributes,
-                CreatedOnUtc = this.CreatedOnUtc,
-            };
-            return addr;
-        }
     }
 }

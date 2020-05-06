@@ -1,120 +1,138 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
+using FluentAssertions;
+using Moq;
 using Nop.Core;
-using Nop.Core.Caching;
-using Nop.Core.Data;
+using Nop.Data;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Shipping;
 using Nop.Core.Domain.Stores;
-using Nop.Core.Plugins;
 using Nop.Services.Catalog;
-using Nop.Services.Common;
 using Nop.Services.Events;
-using Nop.Services.Localization;
-using Nop.Services.Logging;
-using Nop.Services.Orders;
 using Nop.Services.Shipping;
-using Nop.Tests;
+using Nop.Services.Shipping.Pickup;
+using Nop.Services.Tests.FakeServices;
 using NUnit.Framework;
-using Rhino.Mocks;
 
 namespace Nop.Services.Tests.Shipping
 {
     [TestFixture]
     public class ShippingServiceTests : ServiceTest
     {
-        private IRepository<ShippingMethod> _shippingMethodRepository;
-        private IRepository<Warehouse> _warehouseRepository;
-        private ILogger _logger;
-        private IProductAttributeParser _productAttributeParser;
-        private ICheckoutAttributeParser _checkoutAttributeParser;
-        private ShippingSettings _shippingSettings;
-        private IEventPublisher _eventPublisher;
-        private ILocalizationService _localizationService;
-        private IAddressService _addressService;
-        private IGenericAttributeService _genericAttributeService;
-        private IShippingService _shippingService;
-        private ShoppingCartSettings _shoppingCartSettings;
+        #region Fields
+
+        private IPickupPluginManager _pickupPluginManager;
         private IProductService _productService;
-        private Store _store;
-        private IStoreContext _storeContext;
+        private IShippingPluginManager _shippingPluginManager;
+        private IShippingService _shippingService;
+        private IRepository<Product> _productRepository;
+        private Mock<IEventPublisher> _eventPublisher;
+        private Mock<IStoreContext> _storeContext;
+        private ShippingSettings _shippingSettings;
+
+        #endregion
+
+        #region Ctor
+
+        public ShippingServiceTests()
+        {
+            _eventPublisher = new Mock<IEventPublisher>();
+            _eventPublisher.Setup(x => x.Publish(It.IsAny<object>()));
+
+            _productRepository = _fakeDataStore.RegRepository(new[] {
+                new Product
+                {
+                    Id = 1,
+                    Weight = 1.5M,
+                    Height = 2.5M,
+                    Length = 3.5M,
+                    Width = 4.5M
+                },
+                new Product
+                {
+                    Id = 2,
+                    Weight = 11.5M,
+                    Height = 12.5M,
+                    Length = 13.5M,
+                    Width = 14.5M
+                }
+            });
+
+            _productService = new FakeProductService(productRepository: _productRepository, eventPublisher: _eventPublisher.Object);
+
+            _shippingSettings = new ShippingSettings
+            {
+                ActiveShippingRateComputationMethodSystemNames = new List<string> { "FixedRateTestShippingRateComputationMethod" }
+            };
+
+            _pickupPluginManager = new PickupPluginManager();
+            _shippingPluginManager = new ShippingPluginManager();
+
+            _storeContext = new Mock<IStoreContext>();
+            _storeContext.Setup(x => x.CurrentStore).Returns(new Store { Id = 1 });
+
+            _shippingService = new FakeShippingService(eventPublisher: _eventPublisher.Object,
+                pickupPluginManager: _pickupPluginManager,
+                productService: _productService,
+                shippingPluginManager: _shippingPluginManager,
+                storeContext: _storeContext.Object,
+                shippingSettings: _shippingSettings);
+
+        }
+
+        #endregion
+
+        #region Setup
 
         [SetUp]
         public new void SetUp()
         {
-            _shippingSettings = new ShippingSettings
-            {
-                ActiveShippingRateComputationMethodSystemNames = new List<string>()
-            };
-            _shippingSettings.ActiveShippingRateComputationMethodSystemNames.Add("FixedRateTestShippingRateComputationMethod");
 
-            _shippingMethodRepository = MockRepository.GenerateMock<IRepository<ShippingMethod>>();
-            _warehouseRepository = MockRepository.GenerateMock<IRepository<Warehouse>>();
-            _logger = new NullLogger();
-            _productAttributeParser = MockRepository.GenerateMock<IProductAttributeParser>();
-            _checkoutAttributeParser = MockRepository.GenerateMock<ICheckoutAttributeParser>();
+        } 
 
-            var cacheManager = new NopNullCache();
-
-            var pluginFinder = new PluginFinder();
-            _productService = MockRepository.GenerateMock<IProductService>();
-
-            _eventPublisher = MockRepository.GenerateMock<IEventPublisher>();
-            _eventPublisher.Expect(x => x.Publish(Arg<object>.Is.Anything));
-
-            _localizationService = MockRepository.GenerateMock<ILocalizationService>();
-            _addressService = MockRepository.GenerateMock<IAddressService>();
-            _genericAttributeService = MockRepository.GenerateMock<IGenericAttributeService>();
-
-            _store = new Store { Id = 1 };
-            _storeContext = MockRepository.GenerateMock<IStoreContext>();
-            _storeContext.Expect(x => x.CurrentStore).Return(_store);
-
-            _shoppingCartSettings = new ShoppingCartSettings();
-            _shippingService = new ShippingService(_shippingMethodRepository,
-                _warehouseRepository,
-                _logger,
-                _productService,
-                _productAttributeParser,
-                _checkoutAttributeParser,
-                _genericAttributeService,
-                _localizationService,
-                _addressService,
-                _shippingSettings, 
-                pluginFinder,
-                _storeContext,
-                _eventPublisher,
-                _shoppingCartSettings,
-                cacheManager);
-        }
+        #endregion
 
         [Test]
         public void Can_load_shippingRateComputationMethods()
         {
-            var srcm = _shippingService.LoadAllShippingRateComputationMethods();
-            srcm.ShouldNotBeNull();
-            (srcm.Any()).ShouldBeTrue();
+            RunWithTestServiceProvider(() =>
+            {
+                var srcm = _shippingPluginManager.LoadAllPlugins();
+                srcm.Should().NotBeNull();
+                srcm.Any().Should().BeTrue();
+            });
         }
 
         [Test]
         public void Can_load_shippingRateComputationMethod_by_systemKeyword()
         {
-            var srcm = _shippingService.LoadShippingRateComputationMethodBySystemName("FixedRateTestShippingRateComputationMethod");
-            srcm.ShouldNotBeNull();
+            RunWithTestServiceProvider(() =>
+            {
+                var srcm = _shippingPluginManager.LoadPluginBySystemName("FixedRateTestShippingRateComputationMethod");
+                srcm.Should().NotBeNull();
+            });
         }
 
         [Test]
         public void Can_load_active_shippingRateComputationMethods()
         {
-            var srcm = _shippingService.LoadActiveShippingRateComputationMethods();
-            srcm.ShouldNotBeNull();
-            (srcm.Any()).ShouldBeTrue();
+            RunWithTestServiceProvider(() =>
+            {
+                var srcm = _shippingPluginManager.LoadActivePlugins(_shippingSettings
+                    .ActiveShippingRateComputationMethodSystemNames);
+                srcm.Should().NotBeNull();
+                srcm.Any().Should().BeTrue();
+            });
         }
-        
+
         [Test]
         public void Can_get_shoppingCart_totalWeight_without_attributes()
         {
+
+            var product1 = _productRepository.GetById(1);
+            var product2 = _productRepository.GetById(2);
+
             var request = new GetShippingOptionRequest
             {
                 Items =
@@ -123,29 +141,20 @@ namespace Nop.Services.Tests.Shipping
                     {
                         AttributesXml = "",
                         Quantity = 3,
-                        Product = new Product
-                        {
-                            Weight = 1.5M,
-                            Height = 2.5M,
-                            Length = 3.5M,
-                            Width = 4.5M
-                        }
-                    }),
+                        ProductId = product1.Id
+                    }, product1),
                     new GetShippingOptionRequest.PackageItem(new ShoppingCartItem
                     {
                         AttributesXml = "",
                         Quantity = 4,
-                        Product = new Product
-                        {
-                            Weight = 11.5M,
-                            Height = 12.5M,
-                            Length = 13.5M,
-                            Width = 14.5M
-                        }
-                    })
+                        ProductId = product2.Id
+                    }, product2)
                 }
             };
-            _shippingService.GetTotalWeight(request).ShouldEqual(50.5M);
+            RunWithTestServiceProvider(() =>
+            {
+                _shippingService.GetTotalWeight(request).Should().Be(50.5M);
+            });
         }
     }
 }

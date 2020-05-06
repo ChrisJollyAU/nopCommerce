@@ -1,13 +1,12 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using Nop.Core.Infrastructure;
 
 namespace Nop.Core
 {
@@ -18,9 +17,10 @@ namespace Nop.Core
     {
         #region Fields
 
-        private static readonly Regex _emailRegex;
         //we use EmailValidator from FluentValidation. So let's keep them sync - https://github.com/JeremySkinner/FluentValidation/blob/master/src/FluentValidation/Validators/EmailValidator.cs
-        private const string _emailExpression = @"^((([a-z]|\d|[!#\$%&'\*\+\-\/=\?\^_`{\|}~]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+(\.([a-z]|\d|[!#\$%&'\*\+\-\/=\?\^_`{\|}~]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+)*)|((\x22)((((\x20|\x09)*(\x0d\x0a))?(\x20|\x09)+)?(([\x01-\x08\x0b\x0c\x0e-\x1f\x7f]|\x21|[\x23-\x5b]|[\x5d-\x7e]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(\\([\x01-\x09\x0b\x0c\x0d-\x7f]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]))))*(((\x20|\x09)*(\x0d\x0a))?(\x20|\x09)+)?(\x22)))@((([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])([a-z]|\d|-||_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])*([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))\.)+(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+|(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+([a-z]+|\d|-|\.{0,1}|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])?([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))$";
+        private const string EMAIL_EXPRESSION = @"^((([a-z]|\d|[!#\$%&'\*\+\-\/=\?\^_`{\|}~]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+(\.([a-z]|\d|[!#\$%&'\*\+\-\/=\?\^_`{\|}~]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+)*)|((\x22)((((\x20|\x09)*(\x0d\x0a))?(\x20|\x09)+)?(([\x01-\x08\x0b\x0c\x0e-\x1f\x7f]|\x21|[\x23-\x5b]|[\x5d-\x7e]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(\\([\x01-\x09\x0b\x0c\x0d-\x7f]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF]))))*(((\x20|\x09)*(\x0d\x0a))?(\x20|\x09)+)?(\x22)))@((([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])|(([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])([a-z]|\d|-||_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])*([a-z]|\d|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))\.)+(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+|(([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])+([a-z]+|\d|-|\.{0,1}|_|~|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])?([a-z]|[\u00A0-\uD7FF\uF900-\uFDCF\uFDF0-\uFFEF])))$";
+
+        private static readonly Regex _emailRegex;
 
         #endregion
 
@@ -28,7 +28,7 @@ namespace Nop.Core
 
         static CommonHelper()
         {
-            _emailRegex = new Regex(_emailExpression, RegexOptions.IgnoreCase);
+            _emailRegex = new Regex(EMAIL_EXPRESSION, RegexOptions.IgnoreCase);
         }
 
         #endregion
@@ -76,7 +76,7 @@ namespace Nop.Core
         /// <returns>true if the string is a valid IpAddress and false if it's not</returns>
         public static bool IsValidIpAddress(string ipAddress)
         {
-            return IPAddress.TryParse(ipAddress, out IPAddress _);
+            return IPAddress.TryParse(ipAddress, out var _);
         }
 
         /// <summary>
@@ -86,7 +86,7 @@ namespace Nop.Core
         /// <returns>Result string</returns>
         public static string GenerateRandomDigitCode(int length)
         {
-            var random = new Random();
+            using var random = new SecureRandomNumberGenerator();
             var str = string.Empty;
             for (var i = 0; i < length; i++)
                 str = string.Concat(str, random.Next(10).ToString());
@@ -94,16 +94,15 @@ namespace Nop.Core
         }
 
         /// <summary>
-        /// Returns an random interger number within a specified rage
+        /// Returns an random integer number within a specified rage
         /// </summary>
         /// <param name="min">Minimum number</param>
         /// <param name="max">Maximum number</param>
         /// <returns>Result</returns>
         public static int GenerateRandomInteger(int min = 0, int max = int.MaxValue)
         {
-            var randomNumberBuffer = new byte[10];
-            new RNGCryptoServiceProvider().GetBytes(randomNumberBuffer);
-            return new Random(BitConverter.ToInt32(randomNumberBuffer, 0)).Next(min, max);
+            using var random = new SecureRandomNumberGenerator();
+            return random.Next(min, max);
         }
 
         /// <summary>
@@ -112,25 +111,24 @@ namespace Nop.Core
         /// <param name="str">Input string</param>
         /// <param name="maxLength">Maximum length</param>
         /// <param name="postfix">A string to add to the end if the original string was shorten</param>
-        /// <returns>Input string if its lengh is OK; otherwise, truncated input string</returns>
+        /// <returns>Input string if its length is OK; otherwise, truncated input string</returns>
         public static string EnsureMaximumLength(string str, int maxLength, string postfix = null)
         {
             if (string.IsNullOrEmpty(str))
                 return str;
 
-            if (str.Length > maxLength)
-            {
-                var pLen = postfix == null ? 0 : postfix.Length;
+            if (str.Length <= maxLength) 
+                return str;
 
-                var result = str.Substring(0, maxLength - pLen);
-                if (!string.IsNullOrEmpty(postfix))
-                {
-                    result += postfix;
-                }
-                return result;
+            var pLen = postfix?.Length ?? 0;
+
+            var result = str.Substring(0, maxLength - pLen);
+            if (!string.IsNullOrEmpty(postfix))
+            {
+                result += postfix;
             }
 
-            return str;
+            return result;
         }
 
         /// <summary>
@@ -140,7 +138,7 @@ namespace Nop.Core
         /// <returns>Input string with only numeric values, empty string if input is null/empty</returns>
         public static string EnsureNumericOnly(string str)
         {
-            return string.IsNullOrEmpty(str) ? string.Empty : new string(str.Where(p => char.IsDigit(p)).ToArray());
+            return string.IsNullOrEmpty(str) ? string.Empty : new string(str.Where(char.IsDigit).ToArray());
         }
 
         /// <summary>
@@ -160,11 +158,11 @@ namespace Nop.Core
         /// <returns>Boolean</returns>
         public static bool AreNullOrEmpty(params string[] stringsToValidate)
         {
-            return stringsToValidate.Any(p => string.IsNullOrEmpty(p));
+            return stringsToValidate.Any(string.IsNullOrEmpty);
         }
 
         /// <summary>
-        /// Compare two arrasy
+        /// Compare two arrays
         /// </summary>
         /// <typeparam name="T">Type</typeparam>
         /// <param name="a1">Array 1</param>
@@ -183,16 +181,11 @@ namespace Nop.Core
                 return false;
 
             var comparer = EqualityComparer<T>.Default;
-            for (var i = 0; i < a1.Length; i++)
-            {
-                if (!comparer.Equals(a1[i], a2[i])) return false;
-            }
-            return true;
+            return !a1.Where((t, i) => !comparer.Equals(t, a2[i])).Any();
         }
         
-       
         /// <summary>
-        /// Sets a property on an object to a valuae.
+        /// Sets a property on an object to a value.
         /// </summary>
         /// <param name="instance">The object whose property to set.</param>
         /// <param name="propertyName">The name of the property to set.</param>
@@ -210,7 +203,7 @@ namespace Nop.Core
                 throw new NopException("The property '{0}' on the instance of type '{1}' does not have a setter.", propertyName, instanceType);
             if (value != null && !value.GetType().IsAssignableFrom(pi.PropertyType))
                 value = To(value, pi.PropertyType);
-            pi.SetValue(instance, value, new object[0]);
+            pi.SetValue(instance, value, Array.Empty<object>());
         }
 
         /// <summary>
@@ -233,24 +226,25 @@ namespace Nop.Core
         /// <returns>The converted value.</returns>
         public static object To(object value, Type destinationType, CultureInfo culture)
         {
-            if (value != null)
-            {
-                var sourceType = value.GetType();
+            if (value == null) 
+                return null;
 
-                var destinationConverter = TypeDescriptor.GetConverter(destinationType);
-                if (destinationConverter != null && destinationConverter.CanConvertFrom(value.GetType()))
-                    return destinationConverter.ConvertFrom(null, culture, value);
+            var sourceType = value.GetType();
 
-                var sourceConverter = TypeDescriptor.GetConverter(sourceType);
-                if (sourceConverter != null && sourceConverter.CanConvertTo(destinationType))
-                    return sourceConverter.ConvertTo(null, culture, value, destinationType);
+            var destinationConverter = TypeDescriptor.GetConverter(destinationType);
+            if (destinationConverter.CanConvertFrom(value.GetType()))
+                return destinationConverter.ConvertFrom(null, culture, value);
 
-                if (destinationType.IsEnum && value is int)
-                    return Enum.ToObject(destinationType, (int)value);
+            var sourceConverter = TypeDescriptor.GetConverter(sourceType);
+            if (sourceConverter.CanConvertTo(destinationType))
+                return sourceConverter.ConvertTo(null, culture, value, destinationType);
 
-                if (!destinationType.IsInstanceOfType(value))
-                    return Convert.ChangeType(value, destinationType, culture);
-            }
+            if (destinationType.IsEnum && value is int)
+                return Enum.ToObject(destinationType, (int)value);
+
+            if (!destinationType.IsInstanceOfType(value))
+                return Convert.ChangeType(value, destinationType, culture);
+
             return value;
         }
 
@@ -287,18 +281,6 @@ namespace Nop.Core
         }
 
         /// <summary>
-        /// Set Telerik (Kendo UI) culture
-        /// </summary>
-        public static void SetTelerikCulture()
-        {
-            //little hack here
-            //always set culture to 'en-US' (Kendo UI has a bug related to editing decimal values in other cultures)
-            var culture = new CultureInfo("en-US");
-            CultureInfo.CurrentCulture = culture;
-            CultureInfo.CurrentUICulture = culture;
-        }
-
-        /// <summary>
         /// Get difference in years
         /// </summary>
         /// <param name="startDate"></param>
@@ -315,27 +297,16 @@ namespace Nop.Core
         }
 
         /// <summary>
-        /// Maps a virtual path to a physical disk path.
-        /// </summary>
-        /// <param name="path">The path to map. E.g. "~/bin"</param>
-        /// <returns>The physical path. E.g. "c:\inetpub\wwwroot\bin"</returns>
-        public static string MapPath(string path)
-        {
-            path = path.Replace("~/", "").TrimStart('/').Replace('/', '\\');
-            return Path.Combine(BaseDirectory??string.Empty, path);
-        }
-
-        /// <summary>
         /// Get private fields property value
         /// </summary>
         /// <param name="target">Target object</param>
-        /// <param name="fieldName">Feild name</param>
+        /// <param name="fieldName">Field name</param>
         /// <returns>Value</returns>
         public static object GetPrivateFieldValue(object target, string fieldName)
         {
             if (target == null)
             {
-                throw new ArgumentNullException("target", "The assignment target cannot be null.");
+                throw new ArgumentNullException(nameof(target), "The assignment target cannot be null.");
             }
 
             if (string.IsNullOrEmpty(fieldName))
@@ -350,7 +321,8 @@ namespace Nop.Core
             {
                 fi = t.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
 
-                if (fi != null) break;
+                if (fi != null)
+                    break;
 
                 t = t.BaseType;
             }
@@ -363,46 +335,15 @@ namespace Nop.Core
             return fi.GetValue(target);
         }
 
-        /// <summary>
-        ///  Depth-first recursive delete, with handling for descendant directories open in Windows Explorer.
-        /// </summary>
-        /// <param name="path">Directory path</param>
-        public static void DeleteDirectory(string path)
-        {
-            if (string.IsNullOrEmpty(path))
-                throw new ArgumentNullException(path);
-
-            //find more info about directory deletion
-            //and why we use this approach at https://stackoverflow.com/questions/329355/cannot-delete-directory-with-directory-deletepath-true
-
-            foreach (var directory in Directory.GetDirectories(path))
-            {
-                DeleteDirectory(directory);
-            }
-
-            try
-            {
-                Directory.Delete(path, true);
-            }
-            catch (IOException)
-            {
-                Directory.Delete(path, true);
-            }
-            catch (UnauthorizedAccessException)
-            {
-                Directory.Delete(path, true);
-            }
-        }
-
         #endregion
 
         #region Properties
 
         /// <summary>
-        /// Gets or sets application base path
+        /// Gets or sets the default file provider
         /// </summary>
-        internal static string BaseDirectory { get; set; }
-        
+        public static INopFileProvider DefaultFileProvider { get; set; }
+
         #endregion
     }
 }

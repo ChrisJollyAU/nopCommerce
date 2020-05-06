@@ -5,13 +5,14 @@ using Nop.Core.Caching;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Media;
 using Nop.Core.Domain.News;
+using Nop.Core.Domain.Security;
+using Nop.Services.Caching;
 using Nop.Services.Common;
 using Nop.Services.Customers;
 using Nop.Services.Helpers;
 using Nop.Services.Media;
 using Nop.Services.News;
 using Nop.Services.Seo;
-using Nop.Web.Framework.Security.Captcha;
 using Nop.Web.Infrastructure.Cache;
 using Nop.Web.Models.News;
 
@@ -24,44 +25,54 @@ namespace Nop.Web.Factories
     {
         #region Fields
 
-        private readonly INewsService _newsService;
-        private readonly IWorkContext _workContext;
-        private readonly IStoreContext _storeContext;
-        private readonly IPictureService _pictureService;
+        private readonly CaptchaSettings _captchaSettings;
+        private readonly CustomerSettings _customerSettings;
+        private readonly ICacheKeyService _cacheKeyService;
+        private readonly ICustomerService _customerService;
         private readonly IDateTimeHelper _dateTimeHelper;
-        private readonly IStaticCacheManager _cacheManager;
-
+        private readonly IGenericAttributeService _genericAttributeService;
+        private readonly INewsService _newsService;
+        private readonly IPictureService _pictureService;
+        private readonly IStaticCacheManager _staticCacheManager;
+        private readonly IStoreContext _storeContext;
+        private readonly IUrlRecordService _urlRecordService;
+        private readonly IWorkContext _workContext;
         private readonly MediaSettings _mediaSettings;
         private readonly NewsSettings _newsSettings;
-        private readonly CustomerSettings _customerSettings;
-        private readonly CaptchaSettings _captchaSettings;
 
         #endregion
 
         #region Ctor
 
-        public NewsModelFactory(INewsService newsService,
-            IWorkContext workContext, 
-            IStoreContext storeContext,
-            IPictureService pictureService, 
-            IDateTimeHelper dateTimeHelper,
-            IStaticCacheManager cacheManager,
-            MediaSettings mediaSettings, 
-            NewsSettings newsSettings,
+        public NewsModelFactory(CaptchaSettings captchaSettings,
             CustomerSettings customerSettings,
-            CaptchaSettings captchaSettings)
+            ICacheKeyService cacheKeyService,
+            ICustomerService customerService,
+            IDateTimeHelper dateTimeHelper,
+            IGenericAttributeService genericAttributeService,
+            INewsService newsService,
+            IPictureService pictureService,
+            IStaticCacheManager staticCacheManager,
+            IStoreContext storeContext,
+            IUrlRecordService urlRecordService,
+            IWorkContext workContext,
+            MediaSettings mediaSettings,
+            NewsSettings newsSettings)
         {
-            this._newsService = newsService;
-            this._workContext = workContext;
-            this._storeContext = storeContext;
-            this._pictureService = pictureService;
-            this._dateTimeHelper = dateTimeHelper;
-            this._cacheManager = cacheManager;
-
-            this._mediaSettings = mediaSettings;
-            this._newsSettings = newsSettings;
-            this._customerSettings = customerSettings;
-            this._captchaSettings = captchaSettings;
+            _captchaSettings = captchaSettings;
+            _customerSettings = customerSettings;
+            _cacheKeyService = cacheKeyService;
+            _customerService = customerService;
+            _dateTimeHelper = dateTimeHelper;
+            _genericAttributeService = genericAttributeService;
+            _newsService = newsService;
+            _pictureService = pictureService;
+            _staticCacheManager = staticCacheManager;
+            _storeContext = storeContext;
+            _urlRecordService = urlRecordService;
+            _workContext = workContext;
+            _mediaSettings = mediaSettings;
+            _newsSettings = newsSettings;
         }
 
         #endregion
@@ -78,23 +89,24 @@ namespace Nop.Web.Factories
             if (newsComment == null)
                 throw new ArgumentNullException(nameof(newsComment));
 
+            var customer = _customerService.GetCustomerById(newsComment.CustomerId);
+
             var model = new NewsCommentModel
             {
                 Id = newsComment.Id,
                 CustomerId = newsComment.CustomerId,
-                CustomerName = newsComment.Customer.FormatUserName(),
+                CustomerName = _customerService.FormatUsername(customer),
                 CommentTitle = newsComment.CommentTitle,
                 CommentText = newsComment.CommentText,
                 CreatedOn = _dateTimeHelper.ConvertToUserTime(newsComment.CreatedOnUtc, DateTimeKind.Utc),
-                AllowViewingProfiles = _customerSettings.AllowViewingProfiles && newsComment.Customer != null && !newsComment.Customer.IsGuest(),
+                AllowViewingProfiles = _customerSettings.AllowViewingProfiles && newsComment.CustomerId != 0 && !_customerService.IsGuest(customer),
             };
+
             if (_customerSettings.AllowCustomersToUploadAvatars)
             {
                 model.CustomerAvatarUrl = _pictureService.GetPictureUrl(
-                    newsComment.Customer.GetAttribute<int>(SystemCustomerAttributeNames.AvatarPictureId),
-                    _mediaSettings.AvatarPictureSize,
-                    _customerSettings.DefaultAvatarEnabled,
-                    defaultPictureType: PictureType.Avatar);
+                    _genericAttributeService.GetAttribute<Customer, int>(newsComment.CustomerId, NopCustomerDefaults.AvatarPictureIdAttribute),
+                    _mediaSettings.AvatarPictureSize, _customerSettings.DefaultAvatarEnabled, defaultPictureType: PictureType.Avatar);
             }
 
             return model;
@@ -119,7 +131,7 @@ namespace Nop.Web.Factories
             model.MetaTitle = newsItem.MetaTitle;
             model.MetaDescription = newsItem.MetaDescription;
             model.MetaKeywords = newsItem.MetaKeywords;
-            model.SeName = newsItem.GetSeName(newsItem.LanguageId, ensureTwoPublishedLanguages: false);
+            model.SeName = _urlRecordService.GetSeName(newsItem, newsItem.LanguageId, ensureTwoPublishedLanguages: false);
             model.Title = newsItem.Title;
             model.Short = newsItem.Short;
             model.Full = newsItem.Full;
@@ -129,14 +141,15 @@ namespace Nop.Web.Factories
 
             //number of news comments
             var storeId = _newsSettings.ShowNewsCommentsPerStore ? _storeContext.CurrentStore.Id : 0;
-            var cacheKey = string.Format(ModelCacheEventConsumer.NEWS_COMMENTS_NUMBER_KEY, newsItem.Id, storeId, true);
-            model.NumberOfComments = _cacheManager.Get(cacheKey, () => _newsService.GetNewsCommentsCount(newsItem, storeId, true));
+            
+            model.NumberOfComments = _newsService.GetNewsCommentsCount(newsItem, storeId, true);
 
             if (prepareComments)
             {
-                var newsComments = newsItem.NewsComments.Where(comment => comment.IsApproved);
-                if (_newsSettings.ShowNewsCommentsPerStore)
-                    newsComments = newsComments.Where(comment => comment.StoreId == _storeContext.CurrentStore.Id);
+                var newsComments = _newsService.GetAllComments(
+                    newsItemId: newsItem.Id,
+                    approved: true,
+                    storeId: _newsSettings.ShowNewsCommentsPerStore ? _storeContext.CurrentStore.Id : 0);
 
                 foreach (var nc in newsComments.OrderBy(comment => comment.CreatedOnUtc))
                 {
@@ -152,13 +165,13 @@ namespace Nop.Web.Factories
         /// Prepare the home page news items model
         /// </summary>
         /// <returns>Home page news items model</returns>
-        public virtual HomePageNewsItemsModel PrepareHomePageNewsItemsModel()
+        public virtual HomepageNewsItemsModel PrepareHomepageNewsItemsModel()
         {
-            var cacheKey = string.Format(ModelCacheEventConsumer.HOMEPAGE_NEWSMODEL_KEY, _workContext.WorkingLanguage.Id, _storeContext.CurrentStore.Id);
-            var cachedModel = _cacheManager.Get(cacheKey, () =>
+            var cacheKey = _cacheKeyService.PrepareKeyForDefaultCache(NopModelCacheDefaults.HomepageNewsModelKey, _workContext.WorkingLanguage, _storeContext.CurrentStore);
+            var cachedModel = _staticCacheManager.Get(cacheKey, () =>
             {
                 var newsItems = _newsService.GetAllNews(_workContext.WorkingLanguage.Id, _storeContext.CurrentStore.Id, 0, _newsSettings.MainPageNewsCount);
-                return new HomePageNewsItemsModel
+                return new HomepageNewsItemsModel
                 {
                     WorkingLanguageId = _workContext.WorkingLanguage.Id,
                     NewsItems = newsItems
@@ -167,17 +180,17 @@ namespace Nop.Web.Factories
                             var newsModel = new NewsItemModel();
                             PrepareNewsItemModel(newsModel, x, false);
                             return newsModel;
-                        })
-                        .ToList()
+                        }).ToList()
                 };
             });
 
             //"Comments" property of "NewsItemModel" object depends on the current customer.
             //Furthermore, we just don't need it for home page news. So let's reset it.
             //But first we need to clone the cached model (the updated one should not be cached)
-            var model = (HomePageNewsItemsModel)cachedModel.Clone();
+            var model = (HomepageNewsItemsModel)cachedModel.Clone();
             foreach (var newsItemModel in model.NewsItems)
                 newsItemModel.Comments.Clear();
+
             return model;
         }
 
@@ -193,8 +206,10 @@ namespace Nop.Web.Factories
                 WorkingLanguageId = _workContext.WorkingLanguage.Id
             };
 
-            if (command.PageSize <= 0) command.PageSize = _newsSettings.NewsArchivePageSize;
-            if (command.PageNumber <= 0) command.PageNumber = 1;
+            if (command.PageSize <= 0)
+                command.PageSize = _newsSettings.NewsArchivePageSize;
+            if (command.PageNumber <= 0)
+                command.PageNumber = 1;
 
             var newsItems = _newsService.GetAllNews(_workContext.WorkingLanguage.Id, _storeContext.CurrentStore.Id,
                 command.PageNumber - 1, command.PageSize);
@@ -206,8 +221,7 @@ namespace Nop.Web.Factories
                     var newsModel = new NewsItemModel();
                     PrepareNewsItemModel(newsModel, x, false);
                     return newsModel;
-                })
-                .ToList();
+                }).ToList();
 
             return model;
         }

@@ -5,7 +5,9 @@ using Nop.Core;
 using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Customers;
 using Nop.Services.Catalog;
+using Nop.Services.Customers;
 using Nop.Services.Localization;
+using Nop.Services.Messages;
 using Nop.Services.Seo;
 using Nop.Web.Models.Catalog;
 using Nop.Web.Models.Common;
@@ -14,35 +16,44 @@ namespace Nop.Web.Controllers
 {
     public partial class BackInStockSubscriptionController : BasePublicController
     {
-		#region Fields
+        #region Fields
 
-        private readonly IProductService _productService;
-        private readonly IWorkContext _workContext;
-        private readonly IStoreContext _storeContext;
-        private readonly ILocalizationService _localizationService;
         private readonly IBackInStockSubscriptionService _backInStockSubscriptionService;
         private readonly CatalogSettings _catalogSettings;
         private readonly CustomerSettings _customerSettings;
-        
+        private readonly ICustomerService _customerService;
+        private readonly ILocalizationService _localizationService;
+        private readonly INotificationService _notificationService;
+        private readonly IProductService _productService;
+        private readonly IStoreContext _storeContext;
+        private readonly IUrlRecordService _urlRecordService;
+        private readonly IWorkContext _workContext;
+
         #endregion
 
-		#region Ctor
+        #region Ctor
 
-        public BackInStockSubscriptionController(IProductService productService,
-            IWorkContext workContext, 
-            IStoreContext storeContext,
-            ILocalizationService localizationService,
+        public BackInStockSubscriptionController(CatalogSettings catalogSettings,
+            CustomerSettings customerSettings,
             IBackInStockSubscriptionService backInStockSubscriptionService,
-            CatalogSettings catalogSettings,
-            CustomerSettings customerSettings)
+            ICustomerService customerService,
+            ILocalizationService localizationService,
+            INotificationService notificationService,
+            IProductService productService,
+            IStoreContext storeContext,
+            IUrlRecordService urlRecordService,
+            IWorkContext workContext)
         {
-            this._productService = productService;
-            this._workContext = workContext;
-            this._storeContext = storeContext;
-            this._localizationService = localizationService;
-            this._backInStockSubscriptionService = backInStockSubscriptionService;
-            this._catalogSettings = catalogSettings;
-            this._customerSettings = customerSettings;
+            _catalogSettings = catalogSettings;
+            _customerSettings = customerSettings;
+            _backInStockSubscriptionService = backInStockSubscriptionService;
+            _customerService = customerService;
+            _localizationService = localizationService;
+            _notificationService = notificationService;
+            _productService = productService;
+            _storeContext = storeContext;
+            _urlRecordService = urlRecordService;
+            _workContext = workContext;
         }
 
         #endregion
@@ -59,9 +70,9 @@ namespace Nop.Web.Controllers
             var model = new BackInStockSubscribeModel
             {
                 ProductId = product.Id,
-                ProductName = product.GetLocalized(x => x.Name),
-                ProductSeName = product.GetSeName(),
-                IsCurrentCustomerRegistered = _workContext.CurrentCustomer.IsRegistered(),
+                ProductName = _localizationService.GetLocalized(product, x => x.Name),
+                ProductSeName = _urlRecordService.GetSeName(product),
+                IsCurrentCustomerRegistered = _customerService.IsRegistered(_workContext.CurrentCustomer),
                 MaximumBackInStockSubscriptions = _catalogSettings.MaximumBackInStockSubscriptions,
                 CurrentNumberOfBackInStockSubscriptions = _backInStockSubscriptionService
                 .GetAllSubscriptionsByCustomerId(_workContext.CurrentCustomer.Id, _storeContext.CurrentStore.Id, 0, 1)
@@ -70,30 +81,32 @@ namespace Nop.Web.Controllers
             if (product.ManageInventoryMethod == ManageInventoryMethod.ManageStock &&
                 product.BackorderMode == BackorderMode.NoBackorders &&
                 product.AllowBackInStockSubscriptions &&
-                product.GetTotalStockQuantity() <= 0)
+                _productService.GetTotalStockQuantity(product) <= 0)
             {
                 //out of stock
                 model.SubscriptionAllowed = true;
                 model.AlreadySubscribed = _backInStockSubscriptionService
                     .FindSubscription(_workContext.CurrentCustomer.Id, product.Id, _storeContext.CurrentStore.Id) != null;
             }
+
             return PartialView(model);
         }
 
         [HttpPost]
+        [IgnoreAntiforgeryToken]
         public virtual IActionResult SubscribePopupPOST(int productId)
         {
             var product = _productService.GetProductById(productId);
             if (product == null || product.Deleted)
                 throw new ArgumentException("No product found with the specified id");
 
-            if (!_workContext.CurrentCustomer.IsRegistered())
+            if (!_customerService.IsRegistered(_workContext.CurrentCustomer))
                 return Content(_localizationService.GetResource("BackInStockSubscriptions.OnlyRegistered"));
 
             if (product.ManageInventoryMethod == ManageInventoryMethod.ManageStock &&
                 product.BackorderMode == BackorderMode.NoBackorders &&
                 product.AllowBackInStockSubscriptions &&
-                product.GetTotalStockQuantity() <= 0)
+                _productService.GetTotalStockQuantity(product) <= 0)
             {
                 //out of stock
                 var subscription = _backInStockSubscriptionService
@@ -104,10 +117,8 @@ namespace Nop.Web.Controllers
                     //unsubscribe
                     _backInStockSubscriptionService.DeleteSubscription(subscription);
 
-                    return Json(new
-                    {
-                        result = "Unsubscribed"
-                    });
+                    _notificationService.SuccessNotification(_localizationService.GetResource("BackInStockSubscriptions.Notification.Unsubscribed"));
+                    return new OkResult();
                 }
 
                 //subscription does not exist
@@ -123,17 +134,15 @@ namespace Nop.Web.Controllers
                 }
                 subscription = new BackInStockSubscription
                 {
-                    Customer = _workContext.CurrentCustomer,
-                    Product = product,
+                    CustomerId = _workContext.CurrentCustomer.Id,
+                    ProductId = product.Id,
                     StoreId = _storeContext.CurrentStore.Id,
                     CreatedOnUtc = DateTime.UtcNow
                 };
                 _backInStockSubscriptionService.InsertSubscription(subscription);
 
-                return Json(new
-                {
-                    result = "Subscribed"
-                });
+                _notificationService.SuccessNotification(_localizationService.GetResource("BackInStockSubscriptions.Notification.Subscribed"));
+                return new OkResult();
             }
 
             //subscription not possible
@@ -163,7 +172,7 @@ namespace Nop.Web.Controllers
 
             foreach (var subscription in list)
             {
-                var product = subscription.Product;
+                var product = _productService.GetProductById(subscription.ProductId);
 
                 if (product != null)
                 {
@@ -171,8 +180,8 @@ namespace Nop.Web.Controllers
                     {
                         Id = subscription.Id,
                         ProductId = product.Id,
-                        ProductName = product.GetLocalized(x => x.Name),
-                        SeName = product.GetSeName(),
+                        ProductName = _localizationService.GetLocalized(product, x => x.Name),
+                        SeName = _urlRecordService.GetSeName(product),
                     };
                     model.Subscriptions.Add(subscriptionModel);
                 }
@@ -184,7 +193,7 @@ namespace Nop.Web.Controllers
                 TotalRecords = list.TotalCount,
                 PageIndex = list.PageIndex,
                 ShowTotalSummary = false,
-                RouteActionName = "CustomerBackInStockSubscriptionsPaged",
+                RouteActionName = "CustomerBackInStockSubscriptions",
                 UseRouteLinks = true,
                 RouteValues = new BackInStockSubscriptionsRouteValues { pageNumber = pageIndex }
             };
@@ -193,6 +202,7 @@ namespace Nop.Web.Controllers
         }
 
         [HttpPost, ActionName("CustomerSubscriptions")]
+        [IgnoreAntiforgeryToken]
         public virtual IActionResult CustomerSubscriptionsPOST(IFormCollection formCollection)
         {
             foreach (var key in formCollection.Keys)
@@ -202,7 +212,7 @@ namespace Nop.Web.Controllers
                 if (value.Equals("on") && key.StartsWith("biss", StringComparison.InvariantCultureIgnoreCase))
                 {
                     var id = key.Replace("biss", "").Trim();
-                    if (int.TryParse(id, out int subscriptionId))
+                    if (int.TryParse(id, out var subscriptionId))
                     {
                         var subscription = _backInStockSubscriptionService.GetSubscriptionById(subscriptionId);
                         if (subscription != null && subscription.CustomerId == _workContext.CurrentCustomer.Id)

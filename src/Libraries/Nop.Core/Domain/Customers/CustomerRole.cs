@@ -1,22 +1,17 @@
-using System.Collections.Generic;
-using Nop.Core.Domain.Security;
-
-namespace Nop.Core.Domain.Customers
+﻿namespace Nop.Core.Domain.Customers
 {
     /// <summary>
     /// Represents a customer role
     /// </summary>
     public partial class CustomerRole : BaseEntity
     {
-        private ICollection<PermissionRecord> _permissionRecords;
-
         /// <summary>
         /// Gets or sets the customer role name
         /// </summary>
         public string Name { get; set; }
 
         /// <summary>
-        /// Gets or sets a value indicating whether the customer role is marked as free shippping
+        /// Gets or sets a value indicating whether the customer role is marked as free shipping
         /// </summary>
         public bool FreeShipping { get; set; }
 
@@ -49,6 +44,7 @@ namespace Nop.Core.Domain.Customers
         /// Gets or sets a value indicating whether the customers of this role have other tax display type chosen instead of the default one
         /// </summary>
         public bool OverrideTaxDisplayType { get; set; }
+
         /// <summary>
         /// Gets or sets identifier of the default tax display type (used only with "OverrideTaxDisplayType" enabled)
         /// </summary>
@@ -59,14 +55,5 @@ namespace Nop.Core.Domain.Customers
         /// A customer is added to this customer role once a specified product is purchased.
         /// </summary>
         public int PurchasedWithProductId { get; set; }
-        
-        /// <summary>
-        /// Gets or sets the permission records
-        /// </summary>
-        public virtual ICollection<PermissionRecord> PermissionRecords
-        {
-            get { return _permissionRecords ?? (_permissionRecords = new List<PermissionRecord>()); }
-            protected set { _permissionRecords = value; }
-        }
     }
 }

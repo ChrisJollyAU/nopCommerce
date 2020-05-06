@@ -2,14 +2,12 @@
 using Microsoft.AspNetCore.Html;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Nop.Core;
-using Nop.Core.Caching;
 using Nop.Core.Infrastructure;
 using Nop.Services.Localization;
 using Nop.Services.Seo;
 using Nop.Services.Topics;
 using Nop.Web.Framework.Extensions;
 using Nop.Web.Framework.UI.Paging;
-using Nop.Web.Infrastructure.Cache;
 using Nop.Web.Models.Boards;
 using Nop.Web.Models.Common;
 
@@ -17,32 +15,6 @@ namespace Nop.Web.Extensions
 {
     public static class HtmlExtensions
     {
-        /// <summary>
-        /// BBCode editor
-        /// </summary>
-        /// <typeparam name="TModel">Model</typeparam>
-        /// <param name="html">HTML Helper</param>
-        /// <param name="name">Name</param>
-        /// <returns>Editor</returns>
-        public static IHtmlContent BBCodeEditor<TModel>(this IHtmlHelper<TModel> html, string name)
-        {
-            var sb = new StringBuilder();
-
-            var storeLocation = EngineContext.Current.Resolve<IWebHelper>().GetStoreLocation();
-            var bbEditorWebRoot = $"{storeLocation}js/";
-
-            sb.AppendFormat("<script src=\"{0}js/bbeditor/ed.js\" type=\"{1}\"></script>", storeLocation, MimeTypes.TextJavascript);
-            sb.AppendLine();
-            sb.AppendFormat("<script language=\"javascript\" type=\"{0}\">", MimeTypes.TextJavascript);
-            sb.AppendLine();
-            sb.AppendFormat("edToolbar('{0}','{1}');", name, bbEditorWebRoot);
-            sb.AppendLine();
-            sb.Append("</script>");
-            sb.AppendLine();
-
-            return new HtmlString(sb.ToString());
-        }
-
         //we have two pagers:
         //The first one can have custom routes
         //The second one just adds query string parameter
@@ -144,7 +116,7 @@ namespace Nop.Web.Extensions
                         links.Append("<li class=\"next-page\">");
                         if (model.UseRouteLinks)
                         {
-                            var link = html.RouteLink(model.NextButtonText, model.RouteActionName, model.RouteValues, new {title = localizationService.GetResource("Pager.NextPageTitle")});
+                            var link = html.RouteLink(model.NextButtonText, model.RouteActionName, model.RouteValues, new { title = localizationService.GetResource("Pager.NextPageTitle") });
                             links.Append(link.ToHtmlString());
                         }
                         else
@@ -201,7 +173,7 @@ namespace Nop.Web.Extensions
                 {
                     for (var x = 1; x <= totalPages; x++)
                     {
-                        var link = html.RouteLink(x.ToString(), "TopicSlugPaged", new { id = forumTopicId, page = (x), slug = forumTopicSlug }, new { title = string.Format(localizationService.GetResource("Pager.PageLinkTitle"), x.ToString()) });
+                        var link = html.RouteLink(x.ToString(), "TopicSlugPaged", new { id = forumTopicId, pageNumber = x, slug = forumTopicSlug }, new { title = string.Format(localizationService.GetResource("Pager.PageLinkTitle"), x.ToString()) });
                         links.Append(link.ToHtmlString());
                         if (x < totalPages)
                         {
@@ -211,13 +183,13 @@ namespace Nop.Web.Extensions
                 }
                 else
                 {
-                    var link1 = html.RouteLink("1", "TopicSlugPaged", new { id = forumTopicId, page = (1), slug = forumTopicSlug }, new { title = string.Format(localizationService.GetResource("Pager.PageLinkTitle"), 1) });
+                    var link1 = html.RouteLink("1", "TopicSlugPaged", new { id = forumTopicId, pageNumber = 1, slug = forumTopicSlug }, new { title = string.Format(localizationService.GetResource("Pager.PageLinkTitle"), 1) });
                     links.Append(link1.ToHtmlString());
                     links.Append(" ... ");
 
                     for (var x = (totalPages - 2); x <= totalPages; x++)
                     {
-                        var link2 = html.RouteLink(x.ToString(), "TopicSlugPaged", new { id = forumTopicId, page = (x), slug = forumTopicSlug }, new { title = string.Format(localizationService.GetResource("Pager.PageLinkTitle"), x.ToString()) });
+                        var link2 = html.RouteLink(x.ToString(), "TopicSlugPaged", new { id = forumTopicId, pageNumber = x, slug = forumTopicSlug }, new { title = string.Format(localizationService.GetResource("Pager.PageLinkTitle"), x.ToString()) });
                         links.Append(link2.ToHtmlString());
 
                         if (x < totalPages)
@@ -247,22 +219,16 @@ namespace Nop.Web.Extensions
         /// <returns>Topic SEO Name</returns>
         public static string GetTopicSeName<T>(this IHtmlHelper<T> html, string systemName)
         {
-            var workContext = EngineContext.Current.Resolve<IWorkContext>();
             var storeContext = EngineContext.Current.Resolve<IStoreContext>();
+            var topicService = EngineContext.Current.Resolve<ITopicService>();
 
-            //static cache manager
-            var cacheManager = EngineContext.Current.Resolve<IStaticCacheManager>();
-            var cacheKey = string.Format(ModelCacheEventConsumer.TOPIC_SENAME_BY_SYSTEMNAME, systemName, workContext.WorkingLanguage.Id, storeContext.CurrentStore.Id);
-            var cachedSeName = cacheManager.Get(cacheKey, () =>
-            {
-                var topicService = EngineContext.Current.Resolve<ITopicService>();
-                var topic = topicService.GetTopicBySystemName(systemName, storeContext.CurrentStore.Id);
-                if (topic == null)
-                    return "";
+            var topic = topicService.GetTopicBySystemName(systemName, storeContext.CurrentStore.Id);
+            if (topic == null)
+                return "";
 
-                return topic.GetSeName();
-            });
-            return cachedSeName;
+            var urlRecordService = EngineContext.Current.Resolve<IUrlRecordService>();
+
+            return urlRecordService.GetSeName(topic);
         }
 
         /// <summary>
@@ -274,22 +240,17 @@ namespace Nop.Web.Extensions
         /// <returns>Topic SEO Name</returns>
         public static string GetTopicTitle<T>(this IHtmlHelper<T> html, string systemName)
         {
-            var workContext = EngineContext.Current.Resolve<IWorkContext>();
             var storeContext = EngineContext.Current.Resolve<IStoreContext>();
 
-            //static cache manager
-            var cacheManager = EngineContext.Current.Resolve<IStaticCacheManager>();
-            var cacheKey = string.Format(ModelCacheEventConsumer.TOPIC_TITLE_BY_SYSTEMNAME, systemName, workContext.WorkingLanguage.Id, storeContext.CurrentStore.Id);
-            var cachedTitle = cacheManager.Get(cacheKey, () =>
-            {
-                var topicService = EngineContext.Current.Resolve<ITopicService>();
-                var topic = topicService.GetTopicBySystemName(systemName, storeContext.CurrentStore.Id);
-                if (topic == null)
-                    return "";
+            var topicService = EngineContext.Current.Resolve<ITopicService>();
+            var topic = topicService.GetTopicBySystemName(systemName, storeContext.CurrentStore.Id);
 
-                return topic.GetLocalized(x => x.Title);
-            });
-            return cachedTitle;
+            if (topic == null)
+                return "";
+
+            var localizationService = EngineContext.Current.Resolve<ILocalizationService>();
+
+            return localizationService.GetLocalized(topic, x => x.Title);
         }
     }
 }

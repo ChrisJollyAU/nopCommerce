@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Common;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Directory;
@@ -14,12 +15,9 @@ namespace Nop.Services.Shipping
     {
         #region Ctor
 
-        /// <summary>
-        /// Ctor
-        /// </summary>
         public GetShippingOptionRequest()
         {
-            this.Items = new List<PackageItem>();
+            Items = new List<PackageItem>();
         }
 
         #endregion
@@ -45,22 +43,32 @@ namespace Nop.Services.Shipping
         /// Shipped from warehouse
         /// </summary>
         public Warehouse WarehouseFrom { get; set; }
+
         /// <summary>
         /// Shipped from country
         /// </summary>
         public Country CountryFrom { get; set; }
+
         /// <summary>
         /// Shipped from state/province
         /// </summary>
         public StateProvince StateProvinceFrom { get; set; }
+
         /// <summary>
         /// Shipped from zip/postal code
         /// </summary>
         public string ZipPostalCodeFrom { get; set; }
+
+        /// <summary>
+        /// Shipped from county
+        /// </summary>
+        public string CountyFrom { get; set; }
+
         /// <summary>
         /// Shipped from city
         /// </summary>
         public string CityFrom { get; set; }
+
         /// <summary>
         /// Shipped from address
         /// </summary>
@@ -84,17 +92,24 @@ namespace Nop.Services.Shipping
             /// Constructor
             /// </summary>
             /// <param name="sci">Shopping cart item</param>
+            /// <param name="product">Product</param>
             /// <param name="qty">Override "Quantity" property of shopping cart item</param>
-            public PackageItem(ShoppingCartItem sci, int? qty = null)
+            public PackageItem(ShoppingCartItem sci, Product product, int? qty = null)
             {
-                this.ShoppingCartItem = sci;
-                this.OverriddenQuantity = qty;
+                ShoppingCartItem = sci;
+                Product = product;
+                OverriddenQuantity = qty;
             }
 
             /// <summary>
             /// Shopping cart item
             /// </summary>
             public ShoppingCartItem ShoppingCartItem { get; set; }
+
+            /// <summary>
+            /// Product
+            /// </summary>
+            public Product Product { get; set; }
 
             /// <summary>
             /// If specified, override "Quantity" property of "ShoppingCartItem

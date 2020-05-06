@@ -13,23 +13,26 @@ namespace Nop.Web.Components
 {
     public class RecentlyViewedProductsBlockViewComponent : NopViewComponent
     {
-        private readonly IAclService _aclService;
         private readonly CatalogSettings _catalogSettings;
+        private readonly IAclService _aclService;
         private readonly IProductModelFactory _productModelFactory;
+        private readonly IProductService _productService;
         private readonly IRecentlyViewedProductsService _recentlyViewedProductsService;
         private readonly IStoreMappingService _storeMappingService;
 
-        public RecentlyViewedProductsBlockViewComponent(IAclService aclService,
-            CatalogSettings catalogSettings,
+        public RecentlyViewedProductsBlockViewComponent(CatalogSettings catalogSettings,
+            IAclService aclService,
             IProductModelFactory productModelFactory,
+            IProductService productService,
             IRecentlyViewedProductsService recentlyViewedProductsService,
             IStoreMappingService storeMappingService)
         {
-            this._aclService = aclService;
-            this._catalogSettings = catalogSettings;
-            this._productModelFactory = productModelFactory;
-            this._recentlyViewedProductsService = recentlyViewedProductsService;
-            this._storeMappingService = storeMappingService;
+            _catalogSettings = catalogSettings;
+            _aclService = aclService;
+            _productModelFactory = productModelFactory;
+            _productService = productService;
+            _recentlyViewedProductsService = recentlyViewedProductsService;
+            _storeMappingService = storeMappingService;
         }
 
         public IViewComponentResult Invoke(int? productThumbPictureSize, bool? preparePriceModel)
@@ -43,7 +46,7 @@ namespace Nop.Web.Components
             //ACL and store mapping
             products = products.Where(p => _aclService.Authorize(p) && _storeMappingService.Authorize(p)).ToList();
             //availability dates
-            products = products.Where(p => p.IsAvailable()).ToList();
+            products = products.Where(p => _productService.ProductIsAvailable(p)).ToList();
 
             if (!products.Any())
                 return Content("");
