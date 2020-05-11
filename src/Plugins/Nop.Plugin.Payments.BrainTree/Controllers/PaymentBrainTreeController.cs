@@ -3,6 +3,7 @@ using Nop.Core;
 using Nop.Plugin.Payments.BrainTree.Models;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
+using Nop.Services.Messages;
 using Nop.Services.Security;
 using Nop.Services.Stores;
 using Nop.Web.Framework;
@@ -22,7 +23,8 @@ namespace Nop.Plugin.Payments.BrainTree.Controllers
         private readonly IWorkContext _workContext;
         private readonly IStoreService _storeService;
         private readonly IPermissionService _permissionService;
-
+        private readonly IStoreContext _storeContext;
+        private readonly INotificationService _notificationService;
         #endregion
 
         #region Ctor
@@ -31,6 +33,8 @@ namespace Nop.Plugin.Payments.BrainTree.Controllers
             ILocalizationService localizationService, 
             IWorkContext workContext, 
             IStoreService storeService,
+            IStoreContext storeContext,
+            INotificationService notificationService,
             IPermissionService permissionService)
         {
             this._settingService = settingService;
@@ -38,6 +42,8 @@ namespace Nop.Plugin.Payments.BrainTree.Controllers
             this._workContext = workContext;
             this._storeService = storeService;
             this._permissionService = permissionService;
+            _storeContext = storeContext;
+            _notificationService = notificationService;
         }
 
         #endregion
@@ -50,7 +56,7 @@ namespace Nop.Plugin.Payments.BrainTree.Controllers
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            var storeScope = this.GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var brainTreePaymentSettings = _settingService.LoadSetting<BrainTreePaymentSettings>(storeScope);
 
             var model = new ConfigurationModel
@@ -87,7 +93,7 @@ namespace Nop.Plugin.Payments.BrainTree.Controllers
                 return Configure();
 
             //load settings for a chosen store scope
-            var storeScope = GetActiveStoreScopeConfiguration(_storeService, _workContext);
+            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
             var brainTreePaymentSettings = _settingService.LoadSetting<BrainTreePaymentSettings>(storeScope);
 
             //save settings
@@ -111,7 +117,7 @@ namespace Nop.Plugin.Payments.BrainTree.Controllers
             //now clear settings cache
             _settingService.ClearCache();
 
-            SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
             return Configure();
         }

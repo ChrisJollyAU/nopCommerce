@@ -5,16 +5,18 @@ using Microsoft.AspNetCore.Http;
 using Nop.Core;
 using Nop.Core.Domain.Orders;
 using Nop.Core.Domain.Payments;
-using Nop.Core.Plugins;
 using Nop.Plugin.Payments.BrainTree.Controllers;
 using Nop.Plugin.Payments.BrainTree.Models;
+using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Customers;
+using Nop.Services.Directory;
 using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Logging;
 using Environment = Braintree.Environment;
 using Nop.Services.Localization;
+using Nop.Services.Plugins;
 
 namespace Nop.Plugin.Payments.BrainTree
 {
@@ -33,33 +35,39 @@ namespace Nop.Plugin.Payments.BrainTree
 
         private readonly ICustomerService _customerService;
         private readonly ISettingService _settingService;
-        private readonly IOrderTotalCalculationService _orderTotalCalculationService;
+        private readonly IPaymentService _paymentService;
         private readonly BrainTreePaymentSettings _brainTreePaymentSettings;
         private readonly ILocalizationService _localizationService;
         private readonly IWebHelper _webHelper;
         private readonly ILogger _logger;
         private readonly IOrderService _orderService;
+        private readonly IAddressService _addressService;
+        private readonly IStateProvinceService _stateProvinceService;
         #endregion
 
         #region Ctor
 
         public BrainTreePaymentProcessor(ICustomerService customerService,
             ISettingService settingService,
-            IOrderTotalCalculationService orderTotalCalculationService,
             BrainTreePaymentSettings brainTreePaymentSettings,
+            IPaymentService paymentService,
             ILocalizationService localizationService,
             IOrderService orderService,
+            IAddressService addressService,
+            IStateProvinceService stateProvinceService,
             ILogger logger,
             IWebHelper webHelper)
         {
             this._customerService = customerService;
             this._settingService = settingService;
-            this._orderTotalCalculationService = orderTotalCalculationService;
+            _paymentService = paymentService;
             this._brainTreePaymentSettings = brainTreePaymentSettings;
             this._localizationService = localizationService;
             this._webHelper = webHelper;
             this._orderService = orderService;
             this._logger = logger;
+            _addressService = addressService;
+            _stateProvinceService = stateProvinceService;
         }
 
         #endregion
@@ -122,6 +130,8 @@ namespace Nop.Plugin.Payments.BrainTree
             }
             _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create transactionrequest", null, customer);
             //new transaction request
+            var custbilladdress = _addressService.GetAddressById(customer.BillingAddressId.Value);
+            var custshipaddress = _addressService.GetAddressById(customer.ShippingAddressId.Value);
             var transactionRequest = new TransactionRequest
             {
                 Amount = processPaymentRequest.OrderTotal,
@@ -135,12 +145,12 @@ namespace Nop.Plugin.Payments.BrainTree
                 },
                 Customer = new CustomerRequest
                 {
-                    Company = customer.BillingAddress.Company,
+                    Company = custbilladdress.Company,
                     Email = customer.Email,
-                    FirstName = customer.BillingAddress.FirstName,
-                    LastName = customer.BillingAddress.LastName,
-                    Phone = customer.BillingAddress.PhoneNumber,
-                    Fax = customer.BillingAddress.FaxNumber
+                    FirstName = custbilladdress.FirstName,
+                    LastName = custbilladdress.LastName,
+                    Phone = custbilladdress.PhoneNumber,
+                    Fax = custbilladdress.FaxNumber
                 }
             };
             _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create billingaddress", null, customer);
@@ -149,18 +159,19 @@ namespace Nop.Plugin.Payments.BrainTree
                 var order = _orderService.GetOrderByGuid(processPaymentRequest.OrderGuid);
                 if (order != null)
                 {
-                    if (order.BillingAddress != null)
+                    var orderbilladdress = _addressService.GetAddressById(order.BillingAddressId);
+                    if (orderbilladdress != null)
                     {
                         //address request
                         var addressRequest = new AddressRequest
                         {
-                            FirstName = order.BillingAddress.FirstName,
-                            LastName = order.BillingAddress.LastName,
-                            StreetAddress = order.BillingAddress.Address1,
-                            PostalCode = order.BillingAddress.ZipPostalCode,
-                            Locality = order.BillingAddress.City,
-                            Company = order.BillingAddress.Company,
-                            Region = order.BillingAddress.StateProvince.Name
+                            FirstName = orderbilladdress.FirstName,
+                            LastName = orderbilladdress.LastName,
+                            StreetAddress = orderbilladdress.Address1,
+                            PostalCode = orderbilladdress.ZipPostalCode,
+                            Locality = orderbilladdress.City,
+                            Company = orderbilladdress.Company,
+                            Region = _stateProvinceService.GetStateProvinceById(orderbilladdress.StateProvinceId.Value).Name
                         };
                         transactionRequest.BillingAddress = addressRequest;
                     }
@@ -169,30 +180,30 @@ namespace Nop.Plugin.Payments.BrainTree
                         //address request
                         var addressRequest = new AddressRequest
                         {
-                            FirstName = customer.BillingAddress.FirstName,
-                            LastName = customer.BillingAddress.LastName,
-                            StreetAddress = customer.BillingAddress.Address1,
-                            PostalCode = customer.BillingAddress.ZipPostalCode,
-                            Locality = customer.BillingAddress.City,
-                            Company = customer.BillingAddress.Company,
-                            Region = customer.BillingAddress.StateProvince.Name
+                            FirstName = custbilladdress.FirstName,
+                            LastName = custbilladdress.LastName,
+                            StreetAddress = custbilladdress.Address1,
+                            PostalCode = custbilladdress.ZipPostalCode,
+                            Locality = custbilladdress.City,
+                            Company = custbilladdress.Company,
+                            Region = _stateProvinceService.GetStateProvinceById(custbilladdress.StateProvinceId.Value).Name
                         };
                         transactionRequest.BillingAddress = addressRequest;
                     }
                     _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create shippingrequest", null, customer);
-                    if (!order.PickUpInStore)
+                    if (!order.PickupInStore)
                     {
-                        if (customer.ShippingAddress != null)
+                        if (custshipaddress != null)
                         {
                             transactionRequest.ShippingAddress = new AddressRequest
                             {
-                                FirstName = customer.ShippingAddress.FirstName,
-                                LastName = customer.ShippingAddress.LastName,
-                                StreetAddress = customer.ShippingAddress.Address1,
-                                PostalCode = customer.ShippingAddress.ZipPostalCode,
-                                Locality = customer.ShippingAddress.City,
-                                Company = customer.ShippingAddress.Company,
-                                Region = customer.ShippingAddress.StateProvince.Name
+                                FirstName = custshipaddress.FirstName,
+                                LastName = custshipaddress.LastName,
+                                StreetAddress = custshipaddress.Address1,
+                                PostalCode = custshipaddress.ZipPostalCode,
+                                Locality = custshipaddress.City,
+                                Company = custshipaddress.Company,
+                                Region = _stateProvinceService.GetStateProvinceById(custshipaddress.StateProvinceId.Value).Name
                             };
                         }
                         else
@@ -211,26 +222,26 @@ namespace Nop.Plugin.Payments.BrainTree
                     //address request
                     var addressRequest = new AddressRequest
                     {
-                        FirstName = customer.BillingAddress.FirstName,
-                        LastName = customer.BillingAddress.LastName,
-                        StreetAddress = customer.BillingAddress.Address1,
-                        PostalCode = customer.BillingAddress.ZipPostalCode,
-                        Locality = customer.BillingAddress.City,
-                        Company = customer.BillingAddress.Company,
-                        Region = customer.BillingAddress.StateProvince.Name
+                        FirstName = custbilladdress.FirstName,
+                        LastName = custbilladdress.LastName,
+                        StreetAddress = custbilladdress.Address1,
+                        PostalCode = custbilladdress.ZipPostalCode,
+                        Locality = custbilladdress.City,
+                        Company = custbilladdress.Company,
+                        Region = _stateProvinceService.GetStateProvinceById(custbilladdress.StateProvinceId.Value).Name
                     };
                     transactionRequest.BillingAddress = addressRequest;
-                    if (customer.ShippingAddress != null)
+                    if (custshipaddress != null)
                     {
                         transactionRequest.ShippingAddress = new AddressRequest
                         {
-                            FirstName = customer.ShippingAddress.FirstName,
-                            LastName = customer.ShippingAddress.LastName,
-                            StreetAddress = customer.ShippingAddress.Address1,
-                            PostalCode = customer.ShippingAddress.ZipPostalCode,
-                            Locality = customer.ShippingAddress.City,
-                            Company = customer.ShippingAddress.Company,
-                            Region = customer.ShippingAddress.StateProvince.Name
+                            FirstName = custshipaddress.FirstName,
+                            LastName = custshipaddress.LastName,
+                            StreetAddress = custshipaddress.Address1,
+                            PostalCode = custshipaddress.ZipPostalCode,
+                            Locality = custshipaddress.City,
+                            Company = custshipaddress.Company,
+                            Region = _stateProvinceService.GetStateProvinceById(custshipaddress.StateProvinceId.Value).Name
                         };
                     }
                     else
@@ -318,9 +329,8 @@ namespace Nop.Plugin.Payments.BrainTree
         /// <returns>Additional handling fee</returns>
         public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
         {
-            var result = this.CalculateAdditionalFee(_orderTotalCalculationService, cart,
+            return _paymentService.CalculateAdditionalFee(cart,
                 _brainTreePaymentSettings.AdditionalFee, _brainTreePaymentSettings.AdditionalFeePercentage);
-            return result;
         }
 
         /// <summary>
@@ -350,7 +360,8 @@ namespace Nop.Plugin.Payments.BrainTree
                 PublicKey = _brainTreePaymentSettings.PublicKey,
                 PrivateKey = _brainTreePaymentSettings.PrivateKey
             };
-            var trans = gateway.Transaction.Find((string)refundPaymentRequest.Order.DeserializeCustomValues()["Braintree.Id"]);
+            
+            var trans = gateway.Transaction.Find((string)_paymentService.DeserializeCustomValues(refundPaymentRequest.Order)["Braintree.Id"]);
             if (trans.Status == TransactionStatus.SETTLED || trans.Status == TransactionStatus.SETTLING)
             {
                 Result<Transaction> refundtrans;
@@ -453,11 +464,6 @@ namespace Nop.Plugin.Payments.BrainTree
             return paymentInfo;
         }
 
-        public void GetPublicViewComponent(out string viewComponentName)
-        {
-            viewComponentName = "PaymentBrainTree";
-        }
-
         public Type GetControllerType()
         {
             return typeof(PaymentBrainTreeController);
@@ -476,19 +482,26 @@ namespace Nop.Plugin.Payments.BrainTree
             _settingService.SaveSetting(settings);
 
             //locales
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.UseSandbox", "Use Sandbox");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.UseSandbox.Hint", "Check to enable Sandbox (testing environment).");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.MerchantId", "Merchant ID");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.MerchantId.Hint", "Enter Merchant ID");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.PublicKey", "Public Key");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.PublicKey.Hint", "Enter Public key");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.PrivateKey", "Private Key");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.PrivateKey.Hint", "Enter Private key");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.AdditionalFee", "Additional fee");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.AdditionalFee.Hint", "Enter additional fee to charge your customers.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.AdditionalFeePercentage", "Additional fee. Use percentage");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.Fields.AdditionalFeePercentage.Hint", "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Payments.BrainTree.PaymentMethodDescription", "Pay by credit / debit card");
+            _localizationService.AddPluginLocaleResource(new Dictionary<string, string>
+            {
+                ["Plugins.Payments.BrainTree.Fields.UseSandbox"] = "Use Sandbox",
+                ["Plugins.Payments.BrainTree.Fields.UseSandbox.Hint"] =
+                    "Check to enable Sandbox (testing environment).",
+                ["Plugins.Payments.BrainTree.Fields.MerchantId"] = "Merchant ID",
+                ["Plugins.Payments.BrainTree.Fields.MerchantId.Hint"] = "Enter Merchant ID",
+                ["Plugins.Payments.BrainTree.Fields.PublicKey"] = "Public Key",
+                ["Plugins.Payments.BrainTree.Fields.PublicKey.Hint"] = "Enter Public key",
+                ["Plugins.Payments.BrainTree.Fields.PrivateKey"] = "Private Key",
+                ["Plugins.Payments.BrainTree.Fields.PrivateKey.Hint"] = "Enter Private key",
+                ["Plugins.Payments.BrainTree.Fields.AdditionalFee"] = "Additional fee",
+                ["Plugins.Payments.BrainTree.Fields.AdditionalFee.Hint"] =
+                    "Enter additional fee to charge your customers.",
+                ["Plugins.Payments.BrainTree.Fields.AdditionalFeePercentage"] = "Additional fee. Use percentage",
+                ["Plugins.Payments.BrainTree.Fields.AdditionalFeePercentage.Hint"] =
+                    "Determines whether to apply a percentage additional fee to the order total. If not enabled, a fixed value is used.",
+                ["Plugins.Payments.BrainTree.PaymentMethodDescription"] = "Pay by credit / debit card"
+            });
+            
 
             base.Install();
         }
@@ -499,21 +512,14 @@ namespace Nop.Plugin.Payments.BrainTree
             _settingService.DeleteSetting<BrainTreePaymentSettings>();
 
             //locales
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.UseSandbox");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.UseSandbox.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.MerchantId");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.MerchantId.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.PublicKey");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.PublicKey.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.PrivateKey");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.PrivateKey.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.AdditionalFee");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.AdditionalFee.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.AdditionalFeePercentage");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.Fields.AdditionalFeePercentage.Hint");
-            this.DeletePluginLocaleResource("Plugins.Payments.BrainTree.PaymentMethodDescription");
+            _localizationService.DeletePluginLocaleResources("Plugins.Payments.BrainTree");
 
             base.Uninstall();
+        }
+
+        public string GetPublicViewComponentName()
+        {
+            return "PaymentBrainTree";
         }
 
         #endregion
