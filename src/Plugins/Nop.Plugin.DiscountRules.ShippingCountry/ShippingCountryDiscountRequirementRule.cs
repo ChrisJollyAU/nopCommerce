@@ -1,7 +1,6 @@
-using System;
+﻿using System;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Routing;
-using Nop.Core.Plugins;
 using Nop.Services.Configuration;
 using Nop.Services.Discounts;
 using Nop.Services.Localization;
@@ -9,6 +8,10 @@ using Microsoft.AspNetCore.Mvc;
 using Nop.Services.Orders;
 using System.Linq;
 using System.Collections.Generic;
+using Nop.Core;
+using Nop.Core.Domain.Discounts;
+using Nop.Services.Common;
+using Nop.Services.Plugins;
 
 namespace Nop.Plugin.DiscountRules.ShippingCountry
 {
@@ -20,7 +23,11 @@ namespace Nop.Plugin.DiscountRules.ShippingCountry
         private readonly IActionContextAccessor _actionContextAccessor;
         private readonly IUrlHelperFactory _urlHelperFactory;
         private readonly IOrderTotalCalculationService _orderTotalCalculationService;
-
+        private readonly IShoppingCartService _shoppingCartService;
+        private readonly IAddressService _addressService;
+        private readonly IWebHelper _webHelper;
+        private readonly ILocalizationService _localizationService;
+        private readonly IDiscountService _discountService;
         #endregion
 
         #region Ctor
@@ -28,12 +35,22 @@ namespace Nop.Plugin.DiscountRules.ShippingCountry
         public ShippingCountryDiscountRequirementRule(ISettingService settingService,
             IActionContextAccessor actionContextAccessor,
             IOrderTotalCalculationService orderTotalCalculationService,
+            IShoppingCartService shoppingCartService,
+            IAddressService addressService,
+            IWebHelper webHelper,
+            ILocalizationService localizationService,
+            IDiscountService discountService,
             IUrlHelperFactory urlHelperFactory)
         {
             this._settingService = settingService;
             this._actionContextAccessor = actionContextAccessor;
             this._urlHelperFactory = urlHelperFactory;
             this._orderTotalCalculationService = orderTotalCalculationService;
+            _shoppingCartService = shoppingCartService;
+            _addressService = addressService;
+            _webHelper = webHelper;
+            _localizationService = localizationService;
+            _discountService = discountService;
         }
 
         #endregion
@@ -56,7 +73,7 @@ namespace Nop.Plugin.DiscountRules.ShippingCountry
             if (request.Customer == null)
                 return result;
 
-            if (request.Customer.ShippingAddress == null)
+            if (request.Customer.ShippingAddressId == null)
                 return result;
 
             var shippingCountryId = _settingService.GetSettingByKey<int>($"DiscountRequirement.ShippingCountry-{request.DiscountRequirementId}");
@@ -64,10 +81,11 @@ namespace Nop.Plugin.DiscountRules.ShippingCountry
             if (shippingCountryId == 0)
                 return result;
 
-            _orderTotalCalculationService.GetShoppingCartSubTotal(request.Customer.ShoppingCartItems.ToList(), true, out decimal _, out List<DiscountForCaching> _, out decimal _, out decimal subTotalWithDiscountBase);
-
-            var isLocal = request.Customer.ShippingAddress.ZipPostalCode == "6430" || request.Customer.ShippingAddress.ZipPostalCode == "6432";
-            result.IsValid = request.Customer.ShippingAddress.CountryId == shippingCountryId && subTotalWithDiscountBase >= 50 && isLocal;
+            var cart = _shoppingCartService.GetShoppingCart(request.Customer);
+            _orderTotalCalculationService.GetShoppingCartSubTotal(cart.ToList(), true, out var _, out var _, out var _, out var subTotalWithDiscountBase);
+            var shipaddress = _addressService.GetAddressById(request.Customer.ShippingAddressId.Value);
+            var isLocal = shipaddress.ZipPostalCode == "6430" || shipaddress.ZipPostalCode == "6432";
+            result.IsValid = shipaddress.CountryId == shippingCountryId && subTotalWithDiscountBase >= 50 && isLocal;
 
             return result;
         }
@@ -81,25 +99,35 @@ namespace Nop.Plugin.DiscountRules.ShippingCountry
         public string GetConfigurationUrl(int discountId, int? discountRequirementId)
         {
             var urlHelper = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext);
+
             return urlHelper.Action("Configure", "DiscountRulesShippingCountry",
-                new { discountId = discountId, discountRequirementId = discountRequirementId }).TrimStart('/');
+                new { discountId = discountId, discountRequirementId = discountRequirementId }, _webHelper.CurrentRequestProtocol);
         }
 
         public override void Install()
         {
             //locales
-            this.AddOrUpdatePluginLocaleResource("Plugins.DiscountRules.ShippingCountry.Fields.SelectCountry", "Select country");
-            this.AddOrUpdatePluginLocaleResource("Plugins.DiscountRules.ShippingCountry.Fields.Country", "Shipping country");
-            this.AddOrUpdatePluginLocaleResource("Plugins.DiscountRules.ShippingCountry.Fields.Country.Hint", "Select required shipping country.");
+            _localizationService.AddPluginLocaleResource(new Dictionary<string, string>
+            {
+                ["Plugins.DiscountRules.ShippingCountry.Fields.SelectCountry"] = "Select country",
+                ["Plugins.DiscountRules.ShippingCountry.Fields.Country"] = "Shipping country",
+                ["Plugins.DiscountRules.ShippingCountry.Fields.Country.Hint"] = "Select required shipping country."
+            });
+
             base.Install();
         }
 
         public override void Uninstall()
         {
+            //discount requirements
+            var discountRequirements = _discountService.GetAllDiscountRequirements()
+                .Where(discountRequirement => discountRequirement.DiscountRequirementRuleSystemName == "DiscountRequirement.ShippingCountryIs");
+            foreach (var discountRequirement in discountRequirements)
+            {
+                _discountService.DeleteDiscountRequirement(discountRequirement, false);
+            }
             //locales
-            this.DeletePluginLocaleResource("Plugins.DiscountRules.ShippingCountry.Fields.SelectCountry");
-            this.DeletePluginLocaleResource("Plugins.DiscountRules.ShippingCountry.Fields.Country");
-            this.DeletePluginLocaleResource("Plugins.DiscountRules.ShippingCountry.Fields.Country.Hint");
+            _localizationService.DeletePluginLocaleResources("Plugins.DiscountRules.ShippingCountry");
             base.Uninstall();
         }
 
