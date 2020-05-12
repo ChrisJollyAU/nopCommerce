@@ -10,6 +10,7 @@ using Newtonsoft.Json.Linq;
 using Nop.Core;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Shipping;
+using Nop.Services.Common;
 using Nop.Services.Configuration;
 using Nop.Services.Directory;
 using Nop.Services.Localization;
@@ -49,7 +50,10 @@ namespace Nop.Plugin.Shipping.AustraliaPost
         private readonly ISettingService _settingService;
         private readonly IWebHelper _webHelper;
         private readonly AustraliaPostSettings _australiaPostSettings;
-
+        private readonly IAddressService _addressService;
+        private readonly ICountryService _countryService;
+        private readonly IStateProvinceService _stateProvinceService;
+        private readonly ILocalizationService _localizationService;
         #endregion
 
         #region Ctor
@@ -57,6 +61,10 @@ namespace Nop.Plugin.Shipping.AustraliaPost
             IMeasureService measureService,
             IShippingService shippingService, 
             ISettingService settingService, 
+            IAddressService addressService,
+            ICountryService countryService,
+            IStateProvinceService stateProvinceService,
+            ILocalizationService localizationService,
             IWebHelper webHelper, AustraliaPostSettings australiaPostSettings)
         {
             this._currencyService = currencyService;
@@ -65,6 +73,10 @@ namespace Nop.Plugin.Shipping.AustraliaPost
             this._settingService = settingService;
             this._webHelper = webHelper;
             this._australiaPostSettings = australiaPostSettings;
+            _addressService = addressService;
+            _countryService = countryService;
+            _stateProvinceService = stateProvinceService;
+            _localizationService = localizationService;
         }
         #endregion
 
@@ -215,8 +227,8 @@ namespace Nop.Plugin.Shipping.AustraliaPost
                 response.AddError("Shipping address is not set");
                 return response;
             }
-
-            var country = getShippingOptionRequest.ShippingAddress.Country;
+            
+            var country = _countryService.GetCountryByAddress(getShippingOptionRequest.ShippingAddress);
             if (country == null)
             {
                 response.AddError("Shipping country is not specified");
@@ -344,10 +356,10 @@ namespace Nop.Plugin.Shipping.AustraliaPost
             _settingService.SaveSetting(new AustraliaPostSettings());
 
             //locales
-            this.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.ApiKey", "Australia Post API Key");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.ApiKey.Hint", "Specify Australia Post API Key.");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge", "Additional handling charge");
-            this.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge.Hint", "Enter additional handling fee to charge your customers.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.ApiKey", "Australia Post API Key");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.ApiKey.Hint", "Specify Australia Post API Key.");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge", "Additional handling charge");
+            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge.Hint", "Enter additional handling fee to charge your customers.");
 
             base.Install();
         }
@@ -360,11 +372,9 @@ namespace Nop.Plugin.Shipping.AustraliaPost
             //settings
             _settingService.DeleteSetting<AustraliaPostSettings>();
 
+
             //locales
-            this.DeletePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.ApiKey");
-            this.DeletePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.ApiKey.Hint");
-            this.DeletePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge");
-            this.DeletePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge.Hint");
+            _localizationService.DeletePluginLocaleResources("Plugins.Shipping.AustraliaPost");
 
             base.Uninstall();
         }

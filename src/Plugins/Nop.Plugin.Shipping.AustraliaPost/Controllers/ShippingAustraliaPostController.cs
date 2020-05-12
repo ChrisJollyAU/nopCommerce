@@ -2,6 +2,7 @@
 using Nop.Plugin.Shipping.AustraliaPost.Models;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
+using Nop.Services.Messages;
 using Nop.Services.Security;
 using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
@@ -11,6 +12,7 @@ namespace Nop.Plugin.Shipping.AustraliaPost.Controllers
 {
     [AuthorizeAdmin]
     [Area(AreaNames.Admin)]
+    [AutoValidateAntiforgeryToken]
     public class ShippingAustraliaPostController : BasePluginController
     {
         #region Fields
@@ -19,7 +21,7 @@ namespace Nop.Plugin.Shipping.AustraliaPost.Controllers
         private readonly ILocalizationService _localizationService;
         private readonly IPermissionService _permissionService;
         private readonly ISettingService _settingService;
-
+        private readonly INotificationService _notificationService;
         #endregion
 
         #region Ctor
@@ -27,12 +29,14 @@ namespace Nop.Plugin.Shipping.AustraliaPost.Controllers
         public ShippingAustraliaPostController(AustraliaPostSettings australiaPostSettings,
             ILocalizationService localizationService,
             IPermissionService permissionService,
+            INotificationService notificationService,
             ISettingService settingService)
         {
             this._australiaPostSettings = australiaPostSettings;
             this._localizationService = localizationService;
             this._permissionService = permissionService;
             this._settingService = settingService;
+            _notificationService = notificationService;
         }
 
         #endregion
@@ -54,7 +58,6 @@ namespace Nop.Plugin.Shipping.AustraliaPost.Controllers
         }
 
         [HttpPost]
-        [AdminAntiForgery]
         public IActionResult Configure(AustraliaPostShippingModel model)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
@@ -68,7 +71,7 @@ namespace Nop.Plugin.Shipping.AustraliaPost.Controllers
             _australiaPostSettings.AdditionalHandlingCharge = model.AdditionalHandlingCharge;
             _settingService.SaveSetting(_australiaPostSettings);
 
-            SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
 
             return Configure();
         }
