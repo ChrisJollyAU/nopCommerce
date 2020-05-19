@@ -153,13 +153,13 @@
                 }
                 updateMasterCheckbox();
             });
-
-            $('#@Model.Name').on('page.dt', function () {
-                clearMasterCheckbox();
-            });
             </text>
         }
         $('#@Model.Name').DataTable().columns.adjust();
+
+        $('.panel').on('panel:toggle', function (e) {
+            updateTableWidth('#@Model.Name');
+        })
     });
 </script>
 
