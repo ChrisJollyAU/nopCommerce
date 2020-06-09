@@ -49,9 +49,6 @@ using ZipMoneySDK.Models;
 
 namespace Nop.Plugin.Payments.ZipMoney.Controllers
 {
-    [AuthorizeAdmin]
-    [Area(AreaNames.Admin)]
-    [AutoValidateAntiforgeryToken]
     public class PaymentZipMoneyController : BasePaymentController
     {
         private readonly IAffiliateService _affiliateService;
@@ -156,6 +153,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             _pictureService = pictureService;
         }
 
+        [AuthorizeAdmin]
+        [Area(AreaNames.Admin)]
+        [AutoValidateAntiforgeryToken]
         public IActionResult Configure()
         {
             //whether user has the authority
@@ -193,6 +193,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             return View("~/Plugins/Payments.ZipMoney/Views/Configure.cshtml", model);
         }
 
+        [AuthorizeAdmin]
+        [Area(AreaNames.Admin)]
+        [AutoValidateAntiforgeryToken]
         [HttpPost]
         public IActionResult Configure(ConfigurationModel model)
         {
@@ -237,6 +240,9 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             return Configure();
         }
 
+        [AuthorizeAdmin]
+        [Area(AreaNames.Admin)]
+        [AutoValidateAntiforgeryToken]
         public IActionResult CancelOrder()
         {
             Order order = _orderService.SearchOrders(_storeContext.CurrentStore.Id,

@@ -3,7 +3,7 @@
   "FriendlyName": "Zip",
   "SystemName": "Payments.ZipMoney",
   "Version": "1.00",
-  "SupportedVersions": [ "4.00" ],
+  "SupportedVersions": [ "4.30" ],
   "Author": "Chris",
   "DisplayOrder": 1,
   "FileName": "Nop.Plugin.Payments.ZipMoney.dll",
