@@ -204,6 +204,8 @@ namespace Nop.Plugin.Payments.ZipMoney
                 return result;
             }
             result.AddError(error.error.message);
+            
+            _logger.InsertLog(LogLevel.Debug, "zip refund response", zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
             _logger.InsertLog(LogLevel.Error, error.error.message, JsonConvert.SerializeObject(error));
             return result;
         }

@@ -230,7 +230,7 @@ namespace ZipMoneySDK
             string uri = _useSandbox ? "https://api.sandbox.zipmoney.com.au/merchant/v1/refunds/" : "https://api.zipmoney.com.au/merchant/v1/refunds/";
             Dictionary<string, string> vals = new Dictionary<string, string>
             {
-                ["charged_id"] = chargeId,
+                ["charge_id"] = chargeId,
                 ["reason"] = reason,
                 ["amount"] = amount.ToString(CultureInfo.InvariantCulture)
             };
