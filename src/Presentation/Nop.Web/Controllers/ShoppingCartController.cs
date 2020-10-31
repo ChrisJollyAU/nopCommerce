@@ -1133,7 +1133,6 @@ namespace Nop.Web.Controllers
             });
         }
 
-        [HttpsRequirement]
         public virtual IActionResult Cart()
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.EnableShoppingCart))
@@ -1391,8 +1390,8 @@ namespace Nop.Web.Controllers
 
             if (errors.Count > 0)
                 return Json(new { 
-                    success = false,
-                    errors = errors
+                    Success = false,
+                    Errors = errors
                 });
 
             var cart = _shoppingCartService.GetShoppingCart(_workContext.CurrentCustomer, ShoppingCartType.ShoppingCart, _storeContext.CurrentStore.Id);
@@ -1401,11 +1400,7 @@ namespace Nop.Web.Controllers
 
             var result = _shoppingCartModelFactory.PrepareEstimateShippingResultModel(cart, model.CountryId, model.StateProvinceId, model.ZipPostalCode, true);
 
-            return Json(new
-            {
-                success = true,
-                result = result
-            });
+            return Json(result);
         }
 
         [HttpPost, ActionName("Cart")]
@@ -1454,7 +1449,6 @@ namespace Nop.Web.Controllers
 
         #region Wishlist
 
-        [HttpsRequirement]
         public virtual IActionResult Wishlist(Guid? customerGuid)
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.EnableWishlist))
@@ -1612,7 +1606,6 @@ namespace Nop.Web.Controllers
             return View(model);
         }
 
-        [HttpsRequirement]
         public virtual IActionResult EmailWishlist()
         {
             if (!_permissionService.Authorize(StandardPermissionProvider.EnableWishlist) || !_shoppingCartSettings.EmailWishlistEnabled)
