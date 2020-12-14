@@ -179,7 +179,7 @@ namespace Nop.Web.Factories
                             }
 
                             //adjust rate
-                            var shippingTotal = _orderTotalCalculationService.AdjustShippingRate(point.PickupFee, cart, out var _, true);
+                            var shippingTotal = _orderTotalCalculationService.AdjustShippingRate(point.PickupFee, cart, out var _,point.Name, true);
                             var rateBase = _taxService.GetShippingPrice(shippingTotal, _workContext.CurrentCustomer);
                             var rate = _currencyService.ConvertFromPrimaryStoreCurrency(rateBase, _workContext.WorkingCurrency);
                             pickupPointModel.PickupFee = _priceFormatter.FormatShippingPrice(rate, true);
@@ -372,7 +372,7 @@ namespace Nop.Web.Factories
                     };
 
                     //adjust rate
-                    var shippingTotal = _orderTotalCalculationService.AdjustShippingRate(shippingOption.Rate, cart, out var _, shippingOption.IsPickupInStore);
+                    var shippingTotal = _orderTotalCalculationService.AdjustShippingRate(shippingOption.Rate, cart, out var _, shippingOption.Name, shippingOption.IsPickupInStore);
 
                     var rateBase = _taxService.GetShippingPrice(shippingTotal, _workContext.CurrentCustomer);
                     var rate = _currencyService.ConvertFromPrimaryStoreCurrency(rateBase, _workContext.WorkingCurrency);

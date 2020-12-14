@@ -1349,7 +1349,7 @@ namespace Nop.Web.Factories
                 {
                     foreach (var option in rawShippingOptions)
                     {
-                        var shippingRate = _orderTotalCalculationService.AdjustShippingRate(option.Rate, cart, out var _, option.IsPickupInStore);
+                        var shippingRate = _orderTotalCalculationService.AdjustShippingRate(option.Rate, cart, out var _, option.Name, option.IsPickupInStore);
                         shippingRate = _taxService.GetShippingPrice(shippingRate, _workContext.CurrentCustomer);
                         shippingRate = _currencyService.ConvertFromPrimaryStoreCurrency(shippingRate, _workContext.WorkingCurrency);
                         var shippingRateString = _priceFormatter.FormatShippingPrice(shippingRate, true);

@@ -974,14 +974,15 @@ namespace Nop.Services.Orders
         /// <param name="applyToPickupInStore">Adjust shipping rate to pickup in store shipping option rate</param>
         /// <returns>Adjusted shipping rate</returns>
         public virtual decimal AdjustShippingRate(decimal shippingRate, IList<ShoppingCartItem> cart, 
-            out List<Discount> appliedDiscounts, bool applyToPickupInStore = false)
+            out List<Discount> appliedDiscounts, string shippingName, bool applyToPickupInStore = false)
         {
             appliedDiscounts = new List<Discount>();
-
-            //free shipping
-            if (IsFreeShipping(cart))
-                return decimal.Zero;
-
+            if (shippingName == "Australia Post. Parcel Post")
+            {
+                //free shipping
+                if (IsFreeShipping(cart))
+                    return decimal.Zero;
+            }
             var customer = _customerService.GetShoppingCartCustomer(cart);
 
             //with additional shipping charges
@@ -1068,7 +1069,7 @@ namespace Nop.Services.Orders
             if (shippingOption != null)
             {
                 //use last shipping option (get from cache)
-                shippingTotal = AdjustShippingRate(shippingOption.Rate, cart, out appliedDiscounts, shippingOption.IsPickupInStore);
+                shippingTotal = AdjustShippingRate(shippingOption.Rate, cart, out appliedDiscounts,shippingOption.Name, shippingOption.IsPickupInStore);
             }
             else
             {
@@ -1106,7 +1107,7 @@ namespace Nop.Services.Orders
                     if (fixedRate.HasValue)
                     {
                         //adjust shipping rate
-                        shippingTotal = AdjustShippingRate(fixedRate.Value, cart, out appliedDiscounts);
+                        shippingTotal = AdjustShippingRate(fixedRate.Value, cart, out appliedDiscounts,"Fixed");
                     }
                 }
             }
