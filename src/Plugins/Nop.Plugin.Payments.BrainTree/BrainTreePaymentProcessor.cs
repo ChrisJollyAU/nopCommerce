@@ -98,11 +98,11 @@ namespace Nop.Plugin.Payments.BrainTree
                 PublicKey = publicKey,
                 PrivateKey = privateKey
             };
-            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "braintree customvalues", processPaymentRequest.CustomValues.ToString(), customer);
             string device_data = "", nonce = "";
             if (processPaymentRequest.CustomValues.ContainsKey("nonce"))
             {
                 nonce = (string)processPaymentRequest.CustomValues["nonce"];
+                _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree nonce", nonce, customer);
             }
             else
             {
@@ -461,6 +461,7 @@ namespace Nop.Plugin.Payments.BrainTree
             var paymentInfo = new ProcessPaymentRequest();
             paymentInfo.CustomValues["device_data"] = form["device_data"][0];
             paymentInfo.CustomValues["nonce"] = form["nonce"][0];
+            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "nonce get", form["nonce"][0]);
             return paymentInfo;
         }
 

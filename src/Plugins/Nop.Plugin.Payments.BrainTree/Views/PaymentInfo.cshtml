@@ -42,14 +42,8 @@
                   required: true
                 }
             },
-            paypal: {
-                flow: "checkout",
-                currency: "AUD",
-                amount: @Model.Amount
-            },
             dataCollector: {
-                kount: true, // Required if Kount fraud data collection is enabled
-                paypal: true // Required if PayPal fraud data collection is enabled
+                kount: true // Required if Kount fraud data collection is enabled
 
             }
         }, function (createErr, instance) {
