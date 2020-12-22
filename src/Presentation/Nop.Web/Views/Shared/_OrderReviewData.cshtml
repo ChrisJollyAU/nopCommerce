@@ -95,7 +95,7 @@
                             @Html.Raw(Model.BillingAddress.FormattedCustomAddressAttributes)
                         </li>
                     }
-                    @if (Model.CustomValues != null)
+                    <!-- @if (Model.CustomValues != null)
                     {
                         foreach (var item in Model.CustomValues)
                         {
@@ -108,7 +108,7 @@
                                 </span>
                             </li>
                         }
-                    }
+                    } -->
                 </ul>
             </div>
             @if (!string.IsNullOrEmpty(Model.PaymentMethod))
