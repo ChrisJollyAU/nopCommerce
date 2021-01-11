@@ -1058,10 +1058,6 @@ namespace Nop.Services.Orders
 
             var customer = _customerService.GetShoppingCartCustomer(cart);
 
-            var isFreeShipping = IsFreeShipping(cart);
-            if (isFreeShipping)
-                return decimal.Zero;
-
             ShippingOption shippingOption = null;
             if (customer != null)
                 shippingOption = _genericAttributeService.GetAttribute<ShippingOption>(customer, NopCustomerDefaults.SelectedShippingOptionAttribute, _storeContext.CurrentStore.Id);
