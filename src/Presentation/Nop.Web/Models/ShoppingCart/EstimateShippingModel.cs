@@ -5,7 +5,7 @@ using Nop.Web.Framework.Models;
 
 namespace Nop.Web.Models.ShoppingCart
 {
-    public partial class EstimateShippingModel : BaseNopModel
+    public partial record EstimateShippingModel : BaseNopModel
     {
         public EstimateShippingModel()
         {
@@ -13,17 +13,21 @@ namespace Nop.Web.Models.ShoppingCart
             AvailableStates = new List<SelectListItem>();
         }
 
+        public int RequestDelay { get; set; }
+
         public bool Enabled { get; set; }
 
         public int? CountryId { get; set; }
         public int? StateProvinceId { get; set; }
         public string ZipPostalCode { get; set; }
+        public bool UseCity { get; set; }
+        public string City { get; set; }
         
         public IList<SelectListItem> AvailableCountries { get; set; }
         public IList<SelectListItem> AvailableStates { get; set; }
     }
 
-    public partial class EstimateShippingResultModel : BaseNopModel
+    public partial record EstimateShippingResultModel : BaseNopModel
     {
         public EstimateShippingResultModel()
         {
@@ -39,7 +43,7 @@ namespace Nop.Web.Models.ShoppingCart
 
         #region Nested Classes
 
-        public partial class ShippingOptionModel : BaseNopModel
+        public partial record ShippingOptionModel : BaseNopModel
         {
             public string Name { get; set; }
 
