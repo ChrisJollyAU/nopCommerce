@@ -104,6 +104,7 @@ namespace Nop.Plugin.Payments.BrainTree
             if (processPaymentRequest.CustomValues.ContainsKey("nonce"))
             {
                 nonce = (string)processPaymentRequest.CustomValues["nonce"];
+                await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "Braintree nonce", nonce, customer);
             }
             else
             {
@@ -458,13 +459,14 @@ namespace Nop.Plugin.Payments.BrainTree
             return Task.FromResult<IList<string>>(warnings);
         }
 
-        public Task<ProcessPaymentRequest> GetPaymentInfoAsync(IFormCollection form)
+        public async Task<ProcessPaymentRequest> GetPaymentInfoAsync(IFormCollection form)
         {
             var paymentInfo = new ProcessPaymentRequest
             {
                 CustomValues = {["device_data"] = form["device_data"][0], ["nonce"] = form["nonce"][0]}
             };
-            return Task.FromResult(paymentInfo);
+            await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "nonce get", form["nonce"][0]);
+            return paymentInfo;
         }
 
         public Type GetControllerType()

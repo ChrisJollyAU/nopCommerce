@@ -34,7 +34,7 @@ namespace Nop.Services.Orders
         /// The task result contains the adjusted shipping rate. Applied discounts
         /// </returns>
         Task<(decimal adjustedShippingRate, List<Discount> appliedDiscounts)> AdjustShippingRateAsync(decimal shippingRate,
-            IList<ShoppingCartItem> cart, bool applyToPickupInStore = false);
+            IList<ShoppingCartItem> cart, string shippingName, bool applyToPickupInStore = false);
 
         /// <summary>
         /// Gets a value indicating whether shipping is free

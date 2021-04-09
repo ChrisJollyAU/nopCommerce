@@ -1000,11 +1000,14 @@ namespace Nop.Services.Orders
         /// The task result contains the adjusted shipping rate. Applied discounts
         /// </returns>
         public virtual async Task<(decimal adjustedShippingRate, List<Discount> appliedDiscounts)> AdjustShippingRateAsync(decimal shippingRate, IList<ShoppingCartItem> cart, 
-            bool applyToPickupInStore = false)
+            string shippingName, bool applyToPickupInStore = false)
         {
-            //free shipping
-            if (await IsFreeShippingAsync(cart))
-                return (decimal.Zero, new List<Discount>());
+            if (shippingName == "Australia Post. Parcel Post")
+            {
+                //free shipping
+                if (await IsFreeShippingAsync(cart))
+                    return (decimal.Zero, new List<Discount>());
+            }
 
             var customer = await _customerService.GetShoppingCartCustomerAsync(cart);
 
@@ -1062,10 +1065,6 @@ namespace Nop.Services.Orders
 
             var customer = await _customerService.GetShoppingCartCustomerAsync(cart);
 
-            var isFreeShipping = await IsFreeShippingAsync(cart);
-            if (isFreeShipping)
-                return (decimal.Zero, taxRate, appliedDiscounts);
-
             ShippingOption shippingOption = null;
             if (customer != null)
                 shippingOption = await _genericAttributeService.GetAttributeAsync<ShippingOption>(customer, NopCustomerDefaults.SelectedShippingOptionAttribute, (await _storeContext.GetCurrentStoreAsync()).Id);
@@ -1073,7 +1072,7 @@ namespace Nop.Services.Orders
             if (shippingOption != null)
             {
                 //use last shipping option (get from cache)
-                (shippingTotal, appliedDiscounts) = await AdjustShippingRateAsync(shippingOption.Rate, cart, shippingOption.IsPickupInStore);
+                (shippingTotal, appliedDiscounts) = await AdjustShippingRateAsync(shippingOption.Rate, cart,shippingOption.Name, shippingOption.IsPickupInStore);
             }
             else
             {
@@ -1111,7 +1110,7 @@ namespace Nop.Services.Orders
                     if (fixedRate.HasValue)
                     {
                         //adjust shipping rate
-                        (shippingTotal, appliedDiscounts) = await AdjustShippingRateAsync(fixedRate.Value, cart);
+                        (shippingTotal, appliedDiscounts) = await AdjustShippingRateAsync(fixedRate.Value, cart,"Fixed");
                     }
                 }
             }

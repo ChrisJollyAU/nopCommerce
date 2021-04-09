@@ -1361,7 +1361,7 @@ namespace Nop.Web.Factories
                 {
                     foreach (var option in rawShippingOptions)
                     {
-                        var (shippingRate, _) = await _orderTotalCalculationService.AdjustShippingRateAsync(option.Rate, cart, option.IsPickupInStore);
+                        var (shippingRate, _) = await _orderTotalCalculationService.AdjustShippingRateAsync(option.Rate, cart, option.Name, option.IsPickupInStore);
                         (shippingRate, _) = await _taxService.GetShippingPriceAsync(shippingRate, await _workContext.GetCurrentCustomerAsync());
                         shippingRate = await _currencyService.ConvertFromPrimaryStoreCurrencyAsync(shippingRate, await _workContext.GetWorkingCurrencyAsync());
                         var shippingRateString = await _priceFormatter.FormatShippingPriceAsync(shippingRate, true);
