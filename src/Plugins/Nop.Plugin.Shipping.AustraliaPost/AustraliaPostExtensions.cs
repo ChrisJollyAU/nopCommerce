@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 using Nop.Core.Domain.Shipping;
 using Nop.Services.Directory;
 
@@ -6,9 +7,9 @@ namespace Nop.Plugin.Shipping.AustraliaPost
 {
     public static class AustraliaPostExtensions
     {
-        public static ShippingOption ParseShippingOption(this JObject obj, ICurrencyService currencyService)
+        public static async Task<ShippingOption> ParseShippingOptionAsync(this JObject obj, ICurrencyService currencyService)
         {
-            var audCurrency = currencyService.GetCurrencyByCode("AUD");
+            var audCurrency = await currencyService.GetCurrencyByCodeAsync("AUD");
             if (obj.HasValues)
             {
                 var shippingOption = new ShippingOption();
@@ -22,7 +23,7 @@ namespace Nop.Plugin.Shipping.AustraliaPost
                         case "price":
                             if (decimal.TryParse(property.Value.ToString(), out decimal rate))
                             {
-                                var convertedRate = currencyService.ConvertToPrimaryStoreCurrency(rate, audCurrency);
+                                var convertedRate = await currencyService.ConvertToPrimaryStoreCurrencyAsync(rate, audCurrency);
                                 shippingOption.Rate = convertedRate;
                             }
                             break;

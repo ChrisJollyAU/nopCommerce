@@ -3,7 +3,7 @@ using Nop.Web.Framework.Mvc.ModelBinding;
 
 namespace Nop.Plugin.Shipping.AustraliaPost.Models
 {
-    public class AustraliaPostShippingModel : BaseNopModel
+    public record AustraliaPostShippingModel : BaseNopModel
     {
         [NopResourceDisplayName("Plugins.Shipping.AustraliaPost.Fields.ApiKey")]
         public string ApiKey { get; set; }

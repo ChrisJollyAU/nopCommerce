@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Nop.Plugin.Shipping.AustraliaPost.Models;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
@@ -43,9 +44,9 @@ namespace Nop.Plugin.Shipping.AustraliaPost.Controllers
 
         #region Methods
 
-        public IActionResult Configure()
+        public async Task<IActionResult> Configure()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManageShippingSettings))
                 return AccessDeniedView();
 
             var model = new AustraliaPostShippingModel()
@@ -58,22 +59,23 @@ namespace Nop.Plugin.Shipping.AustraliaPost.Controllers
         }
 
         [HttpPost]
-        public IActionResult Configure(AustraliaPostShippingModel model)
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public async Task<IActionResult> Configure(AustraliaPostShippingModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManageShippingSettings))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManageShippingSettings))
                 return AccessDeniedView();
 
             if (!ModelState.IsValid)
-                return Configure();
+                return await Configure();
             
             //save settings
             _australiaPostSettings.ApiKey = model.ApiKey;
             _australiaPostSettings.AdditionalHandlingCharge = model.AdditionalHandlingCharge;
-            _settingService.SaveSetting(_australiaPostSettings);
+            await _settingService.SaveSettingAsync(_australiaPostSettings);
 
-            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Admin.Plugins.Saved"));
 
-            return Configure();
+            return await Configure();
         }
 
         #endregion

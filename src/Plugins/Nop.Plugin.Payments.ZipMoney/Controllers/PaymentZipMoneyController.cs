@@ -156,16 +156,16 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         [AuthorizeAdmin]
         [Area(AreaNames.Admin)]
         [AutoValidateAntiforgeryToken]
-        public IActionResult Configure()
+        public async Task<IActionResult> Configure()
         {
             //whether user has the authority
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
+            int storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
             ZipMoneyPaymentSettings zipMoneyPaymentSettings =
-                _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
+                await _settingService.LoadSettingAsync<ZipMoneyPaymentSettings>(storeScope);
 
             ConfigurationModel model = new ConfigurationModel
             {
@@ -179,14 +179,14 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             if (storeScope > 0)
             {
                 model.UseSandbox_OverrideForStore =
-                    _settingService.SettingExists(zipMoneyPaymentSettings, x => x.UseSandbox, storeScope);
+                    await _settingService.SettingExistsAsync(zipMoneyPaymentSettings, x => x.UseSandbox, storeScope);
                 model.SandboxAPIKey_OverrideForStore =
-                    _settingService.SettingExists(zipMoneyPaymentSettings, x => x.SandboxAPIKey, storeScope);
+                    await _settingService.SettingExistsAsync(zipMoneyPaymentSettings, x => x.SandboxAPIKey, storeScope);
                 model.SandboxPublicKey_OverrideForStore =
-                    _settingService.SettingExists(zipMoneyPaymentSettings, x => x.SandboxPublicKey, storeScope);
+                    await _settingService.SettingExistsAsync(zipMoneyPaymentSettings, x => x.SandboxPublicKey, storeScope);
                 model.ProductionAPIKey_OverrideForStore =
-                    _settingService.SettingExists(zipMoneyPaymentSettings, x => x.ProductionAPIKey, storeScope);
-                model.ProductionPublicKey_OverrideForStore = _settingService.SettingExists(zipMoneyPaymentSettings,
+                    await _settingService.SettingExistsAsync(zipMoneyPaymentSettings, x => x.ProductionAPIKey, storeScope);
+                model.ProductionPublicKey_OverrideForStore = await _settingService.SettingExistsAsync(zipMoneyPaymentSettings,
                     x => x.ProductionPublicKey, storeScope);
             }
 
@@ -197,19 +197,19 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         [Area(AreaNames.Admin)]
         [AutoValidateAntiforgeryToken]
         [HttpPost]
-        public IActionResult Configure(ConfigurationModel model)
+        public async Task<IActionResult> Configure(ConfigurationModel model)
         {
             //whether user has the authority
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             if (!ModelState.IsValid)
-                return Configure();
+                return await Configure();
 
             //load settings for a chosen store scope
-            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
+            int storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
             ZipMoneyPaymentSettings zipMoneyPaymentSettings =
-                _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
+                await _settingService.LoadSettingAsync<ZipMoneyPaymentSettings>(storeScope);
 
             //save settings
             zipMoneyPaymentSettings.UseSandbox = model.UseSandbox;
@@ -221,32 +221,33 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
-            _settingService.SaveSettingOverridablePerStore(zipMoneyPaymentSettings, x => x.UseSandbox,
+            await _settingService.SaveSettingOverridablePerStoreAsync(zipMoneyPaymentSettings, x => x.UseSandbox,
                 model.UseSandbox_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(zipMoneyPaymentSettings, x => x.SandboxAPIKey,
+            await _settingService.SaveSettingOverridablePerStoreAsync(zipMoneyPaymentSettings, x => x.SandboxAPIKey,
                 model.SandboxAPIKey_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(zipMoneyPaymentSettings, x => x.SandboxPublicKey,
+            await _settingService.SaveSettingOverridablePerStoreAsync(zipMoneyPaymentSettings, x => x.SandboxPublicKey,
                 model.SandboxPublicKey_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(zipMoneyPaymentSettings, x => x.ProductionAPIKey,
+            await _settingService.SaveSettingOverridablePerStoreAsync(zipMoneyPaymentSettings, x => x.ProductionAPIKey,
                 model.ProductionAPIKey_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(zipMoneyPaymentSettings, x => x.ProductionPublicKey,
+            await _settingService.SaveSettingOverridablePerStoreAsync(zipMoneyPaymentSettings, x => x.ProductionPublicKey,
                 model.ProductionPublicKey_OverrideForStore, storeScope, false);
 
             //now clear settings cache
-            _settingService.ClearCache();
+            await _settingService.ClearCacheAsync();
 
-            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Admin.Plugins.Saved"));
 
-            return Configure();
+            return await Configure();
         }
 
         [AuthorizeAdmin]
         [Area(AreaNames.Admin)]
         [AutoValidateAntiforgeryToken]
-        public IActionResult CancelOrder()
+        public async Task<IActionResult> CancelOrder()
         {
-            Order order = _orderService.SearchOrders(_storeContext.CurrentStore.Id,
-                customerId: _workContext.CurrentCustomer.Id, pageSize: 1).FirstOrDefault();
+            var cust = await _workContext.GetCurrentCustomerAsync();
+            Order order = (await _orderService.SearchOrdersAsync((_storeContext.GetCurrentStoreAsync()).Id,
+                customerId: cust.Id, pageSize: 1)).FirstOrDefault();
             if (order != null)
                 return RedirectToRoute("OrderDetails", new {orderId = order.Id});
 
@@ -256,15 +257,16 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         [AllowAnonymous]
         public async Task<string> ZipCheckout()
         {
-            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
+            int storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
+            var cust = await _workContext.GetCurrentCustomerAsync();
             ZipMoneyPaymentSettings zipMoneyPaymentSettings =
-                _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
+                await _settingService.LoadSettingAsync<ZipMoneyPaymentSettings>(storeScope);
             ZipCheckoutRequest zipCheckout = new ZipCheckoutRequest();
             string apikey = zipMoneyPaymentSettings.UseSandbox
                 ? zipMoneyPaymentSettings.SandboxAPIKey
                 : zipMoneyPaymentSettings.ProductionAPIKey;
-            PlaceOrderContainer details = GetOrderDetails();
-            var orders = _orderService.SearchOrders(customerId: _workContext.CurrentCustomer.Id);
+            PlaceOrderContainer details = await PreparePlaceOrderDetailsAsync();
+            var orders = await _orderService.SearchOrdersAsync(customerId: cust.Id);
             var orderscount = orders.Count;
             var salestotalamount = orders.Sum(x => x.OrderTotal);
             decimal salesavgamount = 0;
@@ -285,8 +287,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 
             }
             var refundstotalamount = orders.Sum(x => x.RefundedAmount);
-            var billcountry = _countryService.GetCountryByAddress(details.BillingAddress);
-            var billstate = _stateProvinceService.GetStateProvinceByAddress(details.BillingAddress);
+            var billcountry = await _countryService.GetCountryByAddressAsync(details.BillingAddress);
+            var billstate = await _stateProvinceService.GetStateProvinceByAddressAsync(details.BillingAddress);
             zipCheckout.shopper = new ZipShopper
             {
                 billing_address = new ZipAddress
@@ -325,8 +327,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 },
                 items = new List<ZipOrderItem>()
             };
-            var shipcountry = _countryService.GetCountryByAddress(details.ShippingAddress);
-            var shipstate = _stateProvinceService.GetStateProvinceByAddress(details.ShippingAddress);
+            var shipcountry = await _countryService.GetCountryByAddressAsync(details.ShippingAddress);
+            var shipstate = await _stateProvinceService.GetStateProvinceByAddressAsync(details.ShippingAddress);
             if (details.ShippingAddress != null)
             {
                 zipCheckout.order.shipping.address = new ZipAddress
@@ -350,7 +352,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
 
             foreach (ShoppingCartItem item in details.Cart)
             {
-                var product = _productService.GetProductById(item.ProductId);
+                var product = await _productService.GetProductByIdAsync(item.ProductId);
                 ZipOrderItem zipOrderItem = new ZipOrderItem
                 {
                     amount = product.Price,
@@ -361,8 +363,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 };
 
                 string url = _webHelper.GetStoreLocation(null) + "content/images/";
-                var itempic = _pictureService.GetProductPicture(product, item.AttributesXml);
-                zipOrderItem.image_uri = _pictureService.GetPictureUrl(ref itempic);
+                var itempic = await _pictureService.GetProductPictureAsync(product, item.AttributesXml);
+                zipOrderItem.image_uri = (await _pictureService.GetPictureUrlAsync(itempic)).Url;
                 zipCheckout.order.items.Add(zipOrderItem);
             }
             ZipOrderItem taxItem = new ZipOrderItem();
@@ -391,29 +393,30 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 redirect_uri = _webHelper.GetStoreLocation(null) + "PaymentZipMoney/ZipRedirect"
             };
             zipCheckout.metadata =
-                new Dictionary<string, string> {{"CustomerId", _workContext.CurrentCustomer.CustomerGuid.ToString()}};
+                new Dictionary<string, string> {{"CustomerId", cust.CustomerGuid.ToString()}};
             ZipMoneyProcessor zm = new ZipMoneyProcessor(apikey, zipMoneyPaymentSettings.UseSandbox);
-            _logger.InsertLog(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout),_workContext.CurrentCustomer);
+            await _logger.InsertLogAsync(LogLevel.Debug,"Zip checkoutrequest",JsonConvert.SerializeObject(zipCheckout),cust);
             ZipCheckoutResponse zcr = await zm.CreateCheckout(zipCheckout);
-            _logger.InsertLog(LogLevel.Debug,"zip checkoutresponse",zm.GetLastResponse(),_workContext.CurrentCustomer);
+            await _logger.InsertLogAsync(LogLevel.Debug,"zip checkoutresponse",zm.GetLastResponse(),cust);
             if (zm.GetLastError() != null)
             {
-                _logger.InsertLog(LogLevel.Error, "zip error", zm.GetLastResponse());
+                await _logger.InsertLogAsync(LogLevel.Error, "zip error", zm.GetLastResponse());
             }
-            _genericAttributeService.SaveAttribute(_workContext.CurrentCustomer, "ZipCheckoutId", zcr.id);
+            await _genericAttributeService.SaveAttributeAsync(cust, "ZipCheckoutId", zcr.id);
             return JsonConvert.SerializeObject(zcr);
         }
 
         [AllowAnonymous]
-        public IActionResult ZipRedirect(string result, string checkoutid)
+        public async Task<IActionResult> ZipRedirect(string result, string checkoutid)
         {
-            _logger.InsertLog(LogLevel.Debug, "ZipRedirect called. " + result + ". " + checkoutid, "",
-                _workContext.CurrentCustomer);
+            var cust = await _workContext.GetCurrentCustomerAsync();
+            await _logger.InsertLogAsync(LogLevel.Debug, "ZipRedirect called. " + result + ". " + checkoutid, "",
+                cust);
             if (result == null) return null;
             if (checkoutid == null) return null;
-            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
+            int storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
             ZipMoneyPaymentSettings zipMoneyPaymentSettings =
-                _settingService.LoadSetting<ZipMoneyPaymentSettings>(storeScope);
+                await _settingService.LoadSettingAsync<ZipMoneyPaymentSettings>(storeScope);
             string apikey = zipMoneyPaymentSettings.UseSandbox
                 ? zipMoneyPaymentSettings.SandboxAPIKey
                 : zipMoneyPaymentSettings.ProductionAPIKey;
@@ -424,26 +427,26 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 if (checkoutr.metadata.ContainsKey("CustomerId"))
                 {
                     var custguid = checkoutr.metadata["CustomerId"];
-                    var cc = _customerService.GetCustomerByGuid(Guid.Parse(custguid));
+                    var cc = await _customerService.GetCustomerByGuidAsync(Guid.Parse(custguid));
                     if (cc != null)
                     {
-                        if (cc.CustomerGuid != _workContext.CurrentCustomer.CustomerGuid)
+                        if (cc.CustomerGuid != cust.CustomerGuid)
                         {
-                            _logger.InsertLog(LogLevel.Debug, "Different cust " + cc.CustomerGuid + " " +_workContext.CurrentCustomer.CustomerGuid,"",
-                _workContext.CurrentCustomer);
-                            _workContext.CurrentCustomer = cc;
+                            await _logger.InsertLogAsync(LogLevel.Debug, "Different cust " + cc.CustomerGuid + " " + cust.CustomerGuid,"",
+                cust);
+                            await _workContext.SetCurrentCustomerAsync(cc);
                         }
                     }
                 }
             }
             if (result.ToLowerInvariant().Equals("approved"))
             {
-                string savedcheckoutId = _genericAttributeService.GetAttribute<string>(_workContext.CurrentCustomer, "ZipCheckoutId");
-                _logger.InsertLog(LogLevel.Debug, "saved checkoutid " + savedcheckoutId, savedcheckoutId, _workContext.CurrentCustomer);
+                string savedcheckoutId = await _genericAttributeService.GetAttributeAsync<string>(cust, "ZipCheckoutId");
+                await _logger.InsertLogAsync(LogLevel.Debug, "saved checkoutid " + savedcheckoutId, savedcheckoutId, cust);
                 if (savedcheckoutId != null && savedcheckoutId.Equals(checkoutid))
                 {
 //same session
-                    PlaceOrderContainer details = GetOrderDetails();
+                    PlaceOrderContainer details = await PreparePlaceOrderDetailsAsync();
                     decimal amount = details.OrderTotal;
                     ZipChargeRequest zipCharge = new ZipChargeRequest
                     {
@@ -456,16 +459,16 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                         amount = amount,
                         currency = "AUD"
                     };
-                    _logger.InsertLog(LogLevel.Debug, "ZipCharge JSON", JsonConvert.SerializeObject(zipCharge),
-                        _workContext.CurrentCustomer);
+                    await _logger.InsertLogAsync(LogLevel.Debug, "ZipCharge JSON", JsonConvert.SerializeObject(zipCharge),
+                        cust);
                     ZipChargeResponse response = zm.CreateCharge(zipCharge).Result;
-                    _logger.InsertLog(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
-                        _workContext.CurrentCustomer);
+                    await _logger.InsertLogAsync(LogLevel.Debug, "ZipCharge Result JSON", zm.GetLastResponse(),
+                        cust);
                     if (zm.GetLastError() != null)
                     {
-                        _logger.InsertLog(LogLevel.Error, "ZipMoney Error",
+                        await _logger.InsertLogAsync(LogLevel.Error, "ZipMoney Error",
                             zm.GetLastResponse(),
-                            _workContext.CurrentCustomer);
+                            cust);
                         switch (zm.GetLastError().error.code)
                         {
                             case "account_insufficient_funds":
@@ -507,25 +510,25 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                         {"ZipCheckoutResult", result.ToLowerInvariant()}
                     };
                     FormCollection collection = new FormCollection(content);
-                    return EnterPaymentInfo(collection);
+                    return await EnterPaymentInfo(collection);
                 }
-                _logger.InsertLog(LogLevel.Debug, "Searching for checkoutid","", _workContext.CurrentCustomer);
+                await _logger.InsertLogAsync(LogLevel.Debug, "Searching for checkoutid","", cust);
                 //different session. most likely referral that is now approved
-                Order order =
-                    _orderService.GetOrderByAuthorizationTransactionIdAndPaymentMethod(checkoutid, "Payments.ZipMoney");
+                var orders = (await _orderService.SearchOrdersAsync(paymentMethodSystemName: "Payments.ZipMoney"));
+                var order = orders.FirstOrDefault(o => o.AuthorizationTransactionId == checkoutid);
                 if (order != null)
                 {
-                    _logger.InsertLog(LogLevel.Debug, "Searching for checkoutid: found","", _workContext.CurrentCustomer);
-                    _orderProcessingService.MarkAsAuthorized(order);
-                    var errors = _orderProcessingService.Capture(order);
+                    await _logger.InsertLogAsync(LogLevel.Debug, "Searching for checkoutid: found","", cust);
+                    await _orderProcessingService.MarkAsAuthorizedAsync(order);
+                    var errors = await _orderProcessingService.CaptureAsync(order);
                     if (order.PaymentStatus == PaymentStatus.Paid)
                         return RedirectToRoute("CheckoutCompleted", new {orderId = order.Id});
-                    _logger.InsertLog(LogLevel.Error, "Could not capture transaction. Checkout_id=" + checkoutid,
+                    await _logger.InsertLogAsync(LogLevel.Error, "Could not capture transaction. Checkout_id=" + checkoutid,
                         errors.ToString());
                 }
                 else
                 {
-                    _logger.InsertLog(LogLevel.Error, "Order not found","", _workContext.CurrentCustomer);
+                    await _logger.InsertLogAsync(LogLevel.Error, "Order not found","", cust);
                 }
             }
             else if (result.ToLowerInvariant().Equals("cancelled"))
@@ -553,7 +556,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     "If declined or you do not complete your payment within 2 days we will cancel your purchase");
                 HttpContext.Session.SetInt32("ZipShowReferred", 1);
                 FormCollection collection = new FormCollection(content);
-                return EnterPaymentInfo(collection);
+                return await EnterPaymentInfo(collection);
             }
             else if (result.ToLowerInvariant().Equals("declined"))
             {
@@ -566,13 +569,13 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             return RedirectToRoute("ShoppingCart");
         }
 
-        public virtual IActionResult EnterPaymentInfo(IFormCollection form)
+        public virtual async Task<IActionResult> EnterPaymentInfo(IFormCollection form)
         {
             //validation
             if (_orderSettings.CheckoutDisabled)
                 return RedirectToRoute("ShoppingCart");
 
-            var cart = _shoppingCartService.GetShoppingCart(_workContext.CurrentCustomer, ShoppingCartType.ShoppingCart, _storeContext.CurrentStore.Id);
+            var cart = await _shoppingCartService.GetShoppingCartAsync(await _workContext.GetCurrentCustomerAsync(), ShoppingCartType.ShoppingCart, (await _storeContext.GetCurrentStoreAsync()).Id);
 
             if (!cart.Any())
                 return RedirectToRoute("ShoppingCart");
@@ -580,30 +583,31 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             if (_orderSettings.OnePageCheckoutEnabled)
                 return RedirectToRoute("CheckoutOnePage");
 
-            if (_customerService.IsGuest(_workContext.CurrentCustomer) && !_orderSettings.AnonymousCheckoutAllowed)
+            if (await _customerService.IsGuestAsync(await _workContext.GetCurrentCustomerAsync()) && !_orderSettings.AnonymousCheckoutAllowed)
                 return Challenge();
 
             //Check whether payment workflow is required
-            var isPaymentWorkflowRequired = _orderProcessingService.IsPaymentWorkflowRequired(cart);
+            var isPaymentWorkflowRequired = await _orderProcessingService.IsPaymentWorkflowRequiredAsync(cart);
             if (!isPaymentWorkflowRequired)
             {
                 return RedirectToRoute("CheckoutConfirm");
             }
 
             //load payment method
-            var paymentMethodSystemName = _genericAttributeService.GetAttribute<string>(_workContext.CurrentCustomer,
-                NopCustomerDefaults.SelectedPaymentMethodAttribute, _storeContext.CurrentStore.Id);
-            var paymentMethod = _paymentPluginManager.LoadPluginBySystemName(paymentMethodSystemName);
+            var paymentMethodSystemName = await _genericAttributeService.GetAttributeAsync<string>(await _workContext.GetCurrentCustomerAsync(),
+                NopCustomerDefaults.SelectedPaymentMethodAttribute, (await _storeContext.GetCurrentStoreAsync()).Id);
+            var paymentMethod = await _paymentPluginManager
+                .LoadPluginBySystemNameAsync(paymentMethodSystemName, await _workContext.GetCurrentCustomerAsync(), (await _storeContext.GetCurrentStoreAsync()).Id);
             if (paymentMethod == null)
                 return RedirectToRoute("CheckoutPaymentMethod");
 
-            var warnings = paymentMethod.ValidatePaymentForm(form);
+            var warnings = await paymentMethod.ValidatePaymentFormAsync(form);
             foreach (var warning in warnings)
                 ModelState.AddModelError("", warning);
             if (ModelState.IsValid)
             {
                 //get payment info
-                var paymentInfo = paymentMethod.GetPaymentInfo(form);
+                var paymentInfo = await paymentMethod.GetPaymentInfoAsync(form);
                 //set previous order GUID (if exists)
                 _paymentService.GenerateOrderGuid(paymentInfo);
 
@@ -614,108 +618,117 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
 
             //If we got this far, something failed, redisplay form
             //model
-            var model = _checkoutModelFactory.PreparePaymentInfoModel(paymentMethod);
+            var model = await _checkoutModelFactory.PreparePaymentInfoModelAsync(paymentMethod);
             return View(model);
         }
 
-        private PlaceOrderContainer GetOrderDetails()
+        /// <summary>
+        /// Prepare details to place an order. It also sets some properties to "processPaymentRequest"
+        /// </summary>
+        /// <param name="processPaymentRequest">Process payment request</param>
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the details
+        /// </returns>
+        protected virtual async Task<PlaceOrderContainer> PreparePlaceOrderDetailsAsync()
         {
-            int StoreId = _storeContext.CurrentStore.Id;
+            var storeId = (await _storeContext.GetCurrentStoreAsync()).Id;
+            var customerid = (await _workContext.GetCurrentCustomerAsync()).Id;
             var details = new PlaceOrderContainer
             {
                 //customer
-                Customer = _customerService.GetCustomerById(_workContext.CurrentCustomer.Id)
+                Customer = await _customerService.GetCustomerByIdAsync(customerid)
             };
             if (details.Customer == null)
                 throw new ArgumentException("Customer is not set");
 
             //affiliate
-            var affiliate = _affiliateService.GetAffiliateById(details.Customer.AffiliateId);
+            var affiliate = await _affiliateService.GetAffiliateByIdAsync(details.Customer.AffiliateId);
             if (affiliate != null && affiliate.Active && !affiliate.Deleted)
                 details.AffiliateId = affiliate.Id;
 
             //check whether customer is guest
-            if (_customerService.IsGuest(details.Customer) && !_orderSettings.AnonymousCheckoutAllowed)
+            if (await _customerService.IsGuestAsync(details.Customer) && !_orderSettings.AnonymousCheckoutAllowed)
                 throw new NopException("Anonymous checkout is not allowed");
 
             //customer currency
-            var currencyTmp = _currencyService.GetCurrencyById(
-                _genericAttributeService.GetAttribute<int>(details.Customer, NopCustomerDefaults.CurrencyIdAttribute, StoreId));
-            var customerCurrency = currencyTmp != null && currencyTmp.Published ? currencyTmp : _workContext.WorkingCurrency;
-            var primaryStoreCurrency = _currencyService.GetCurrencyById(_currencySettings.PrimaryStoreCurrencyId);
+            var currencyTmp = await _currencyService.GetCurrencyByIdAsync(
+                await _genericAttributeService.GetAttributeAsync<int>(details.Customer, NopCustomerDefaults.CurrencyIdAttribute, storeId));
+            var customerCurrency = currencyTmp != null && currencyTmp.Published ? currencyTmp : await _workContext.GetWorkingCurrencyAsync();
+            var primaryStoreCurrency = await _currencyService.GetCurrencyByIdAsync(_currencySettings.PrimaryStoreCurrencyId);
             details.CustomerCurrencyCode = customerCurrency.CurrencyCode;
             details.CustomerCurrencyRate = customerCurrency.Rate / primaryStoreCurrency.Rate;
 
             //customer language
-            details.CustomerLanguage = _languageService.GetLanguageById(
-                _genericAttributeService.GetAttribute<int>(details.Customer, NopCustomerDefaults.LanguageIdAttribute, StoreId));
+            details.CustomerLanguage = await _languageService.GetLanguageByIdAsync(
+                await _genericAttributeService.GetAttributeAsync<int>(details.Customer, NopCustomerDefaults.LanguageIdAttribute, storeId));
             if (details.CustomerLanguage == null || !details.CustomerLanguage.Published)
-                details.CustomerLanguage = _workContext.WorkingLanguage;
+                details.CustomerLanguage = await _workContext.GetWorkingLanguageAsync();
 
             //billing address
             if (details.Customer.BillingAddressId is null)
                 throw new NopException("Billing address is not provided");
 
-            var billingAddress = _customerService.GetCustomerBillingAddress(details.Customer);
+            var billingAddress = await _customerService.GetCustomerBillingAddressAsync(details.Customer);
 
             if (!CommonHelper.IsValidEmail(billingAddress?.Email))
                 throw new NopException("Email is not valid");
 
             details.BillingAddress = _addressService.CloneAddress(billingAddress);
 
-            if (_countryService.GetCountryByAddress(details.BillingAddress) is Country billingCountry && !billingCountry.AllowsBilling)
+            if (await _countryService.GetCountryByAddressAsync(details.BillingAddress) is Country billingCountry && !billingCountry.AllowsBilling)
                 throw new NopException($"Country '{billingCountry.Name}' is not allowed for billing");
 
             //checkout attributes
-            details.CheckoutAttributesXml = _genericAttributeService.GetAttribute<string>(details.Customer, NopCustomerDefaults.CheckoutAttributes, StoreId);
-            details.CheckoutAttributeDescription = _checkoutAttributeFormatter.FormatAttributes(details.CheckoutAttributesXml, details.Customer);
+            details.CheckoutAttributesXml = await _genericAttributeService.GetAttributeAsync<string>(details.Customer, NopCustomerDefaults.CheckoutAttributes, storeId);
+            details.CheckoutAttributeDescription = await _checkoutAttributeFormatter.FormatAttributesAsync(details.CheckoutAttributesXml, details.Customer);
 
             //load shopping cart
-            details.Cart = _shoppingCartService.GetShoppingCart(details.Customer, ShoppingCartType.ShoppingCart, StoreId);
+            details.Cart = await _shoppingCartService.GetShoppingCartAsync(details.Customer, ShoppingCartType.ShoppingCart, storeId);
 
             if (!details.Cart.Any())
                 throw new NopException("Cart is empty");
 
             //validate the entire shopping cart
-            var warnings = _shoppingCartService.GetShoppingCartWarnings(details.Cart, details.CheckoutAttributesXml, true);
+            var warnings = await _shoppingCartService.GetShoppingCartWarningsAsync(details.Cart, details.CheckoutAttributesXml, true);
             if (warnings.Any())
                 throw new NopException(warnings.Aggregate(string.Empty, (current, next) => $"{current}{next};"));
 
             //validate individual cart items
             foreach (var sci in details.Cart)
             {
-                var product = _productService.GetProductById(sci.ProductId);
+                var product = await _productService.GetProductByIdAsync(sci.ProductId);
 
-                var sciWarnings = _shoppingCartService.GetShoppingCartItemWarnings(details.Customer,
-                    sci.ShoppingCartType, product, StoreId, sci.AttributesXml,
+                var sciWarnings = await _shoppingCartService.GetShoppingCartItemWarningsAsync(details.Customer,
+                    sci.ShoppingCartType, product, storeId, sci.AttributesXml,
                     sci.CustomerEnteredPrice, sci.RentalStartDateUtc, sci.RentalEndDateUtc, sci.Quantity, false, sci.Id);
                 if (sciWarnings.Any())
                     throw new NopException(sciWarnings.Aggregate(string.Empty, (current, next) => $"{current}{next};"));
             }
 
             //min totals validation
-            if (!ValidateMinOrderSubtotalAmount(details.Cart))
+            if (!await ValidateMinOrderSubtotalAmountAsync(details.Cart))
             {
-                var minOrderSubtotalAmount = _currencyService.ConvertFromPrimaryStoreCurrency(_orderSettings.MinOrderSubtotalAmount, _workContext.WorkingCurrency);
-                throw new NopException(string.Format(_localizationService.GetResource("Checkout.MinOrderSubtotalAmount"),
-                    _priceFormatter.FormatPrice(minOrderSubtotalAmount, true, false)));
+                var minOrderSubtotalAmount = await _currencyService.ConvertFromPrimaryStoreCurrencyAsync(_orderSettings.MinOrderSubtotalAmount, await _workContext.GetWorkingCurrencyAsync());
+                throw new NopException(string.Format(await _localizationService.GetResourceAsync("Checkout.MinOrderSubtotalAmount"),
+                    await _priceFormatter.FormatPriceAsync(minOrderSubtotalAmount, true, false)));
             }
 
-            if (!ValidateMinOrderTotalAmount(details.Cart))
+            if (!await ValidateMinOrderTotalAmountAsync(details.Cart))
             {
-                var minOrderTotalAmount = _currencyService.ConvertFromPrimaryStoreCurrency(_orderSettings.MinOrderTotalAmount, _workContext.WorkingCurrency);
-                throw new NopException(string.Format(_localizationService.GetResource("Checkout.MinOrderTotalAmount"),
-                    _priceFormatter.FormatPrice(minOrderTotalAmount, true, false)));
+                var minOrderTotalAmount = await _currencyService.ConvertFromPrimaryStoreCurrencyAsync(_orderSettings.MinOrderTotalAmount, await _workContext.GetWorkingCurrencyAsync());
+                throw new NopException(string.Format(await _localizationService.GetResourceAsync("Checkout.MinOrderTotalAmount"),
+                    await _priceFormatter.FormatPriceAsync(minOrderTotalAmount, true, false)));
             }
 
             //tax display type
             if (_taxSettings.AllowCustomersToSelectTaxDisplayType)
-                details.CustomerTaxDisplayType = (TaxDisplayType)_genericAttributeService.GetAttribute<int>(details.Customer, NopCustomerDefaults.TaxDisplayTypeIdAttribute, StoreId);
+                details.CustomerTaxDisplayType = (TaxDisplayType)await _genericAttributeService.GetAttributeAsync<int>(details.Customer, NopCustomerDefaults.TaxDisplayTypeIdAttribute, storeId);
             else
                 details.CustomerTaxDisplayType = _taxSettings.TaxDisplayType;
 
             //sub total (incl tax)
-            _orderTotalCalculationService.GetShoppingCartSubTotal(details.Cart, true, out var orderSubTotalDiscountAmount, out var orderSubTotalAppliedDiscounts, out var subTotalWithoutDiscountBase, out var _);
+            var (orderSubTotalDiscountAmount, orderSubTotalAppliedDiscounts, subTotalWithoutDiscountBase, _, _) = await _orderTotalCalculationService.GetShoppingCartSubTotalAsync(details.Cart, true);
             details.OrderSubTotalInclTax = subTotalWithoutDiscountBase;
             details.OrderSubTotalDiscountInclTax = orderSubTotalDiscountAmount;
 
@@ -725,20 +738,19 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     details.AppliedDiscounts.Add(disc);
 
             //sub total (excl tax)
-            _orderTotalCalculationService.GetShoppingCartSubTotal(details.Cart, false, out orderSubTotalDiscountAmount,
-                out orderSubTotalAppliedDiscounts, out subTotalWithoutDiscountBase, out _);
+            (orderSubTotalDiscountAmount, _, subTotalWithoutDiscountBase, _, _) = await _orderTotalCalculationService.GetShoppingCartSubTotalAsync(details.Cart, false);
             details.OrderSubTotalExclTax = subTotalWithoutDiscountBase;
             details.OrderSubTotalDiscountExclTax = orderSubTotalDiscountAmount;
 
             //shipping info
-            if (_shoppingCartService.ShoppingCartRequiresShipping(details.Cart))
+            if (await _shoppingCartService.ShoppingCartRequiresShippingAsync(details.Cart))
             {
-                var pickupPoint = _genericAttributeService.GetAttribute<PickupPoint>(details.Customer,
-                    NopCustomerDefaults.SelectedPickupPointAttribute, StoreId);
+                var pickupPoint = await _genericAttributeService.GetAttributeAsync<PickupPoint>(details.Customer,
+                    NopCustomerDefaults.SelectedPickupPointAttribute, storeId);
                 if (_shippingSettings.AllowPickupInStore && pickupPoint != null)
                 {
-                    var country = _countryService.GetCountryByTwoLetterIsoCode(pickupPoint.CountryCode);
-                    var state = _stateProvinceService.GetStateProvinceByAbbreviation(pickupPoint.StateAbbreviation, country?.Id);
+                    var country = await _countryService.GetCountryByTwoLetterIsoCodeAsync(pickupPoint.CountryCode);
+                    var state = await _stateProvinceService.GetStateProvinceByAbbreviationAsync(pickupPoint.StateAbbreviation, country?.Id);
 
                     details.PickupInStore = true;
                     details.PickupAddress = new Address
@@ -757,7 +769,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     if (details.Customer.ShippingAddressId == null)
                         throw new NopException("Shipping address is not provided");
 
-                    var shippingAddress = _customerService.GetCustomerShippingAddress(details.Customer);
+                    var shippingAddress = await _customerService.GetCustomerShippingAddressAsync(details.Customer);
 
                     if (!CommonHelper.IsValidEmail(shippingAddress?.Email))
                         throw new NopException("Email is not valid");
@@ -765,12 +777,12 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     //clone shipping address
                     details.ShippingAddress = _addressService.CloneAddress(shippingAddress);
 
-                    if (_countryService.GetCountryByAddress(details.ShippingAddress) is Country shippingCountry && !shippingCountry.AllowsShipping)
+                    if (await _countryService.GetCountryByAddressAsync(details.ShippingAddress) is Country shippingCountry && !shippingCountry.AllowsShipping)
                         throw new NopException($"Country '{shippingCountry.Name}' is not allowed for shipping");
                 }
 
-                var shippingOption = _genericAttributeService.GetAttribute<ShippingOption>(details.Customer,
-                    NopCustomerDefaults.SelectedShippingOptionAttribute, StoreId);
+                var shippingOption = await _genericAttributeService.GetAttributeAsync<ShippingOption>(details.Customer,
+                    NopCustomerDefaults.SelectedShippingOptionAttribute, storeId);
                 if (shippingOption != null)
                 {
                     details.ShippingMethodName = shippingOption.Name;
@@ -783,8 +795,8 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 details.ShippingStatus = ShippingStatus.ShippingNotRequired;
 
             //shipping total
-            var orderShippingTotalInclTax = _orderTotalCalculationService.GetShoppingCartShippingTotal(details.Cart, true, out var _, out var shippingTotalDiscounts);
-            var orderShippingTotalExclTax = _orderTotalCalculationService.GetShoppingCartShippingTotal(details.Cart, false);
+            var (orderShippingTotalInclTax, _, shippingTotalDiscounts) = await _orderTotalCalculationService.GetShoppingCartShippingTotalAsync(details.Cart, true);
+            var (orderShippingTotalExclTax, _, _) = await _orderTotalCalculationService.GetShoppingCartShippingTotalAsync(details.Cart, false);
             if (!orderShippingTotalInclTax.HasValue || !orderShippingTotalExclTax.HasValue)
                 throw new NopException("Shipping total couldn't be calculated");
 
@@ -796,24 +808,25 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     details.AppliedDiscounts.Add(disc);
 
             //payment total
-            var paymentAdditionalFee = _paymentService.GetAdditionalHandlingFee(details.Cart, "Payment.ZipMoney");
-            details.PaymentAdditionalFeeInclTax = _taxService.GetPaymentMethodAdditionalFee(paymentAdditionalFee, true, details.Customer);
-            details.PaymentAdditionalFeeExclTax = _taxService.GetPaymentMethodAdditionalFee(paymentAdditionalFee, false, details.Customer);
+            var paymentAdditionalFee = await _paymentService.GetAdditionalHandlingFeeAsync(details.Cart, "Payments.BrainTree");
+            details.PaymentAdditionalFeeInclTax = (await _taxService.GetPaymentMethodAdditionalFeeAsync(paymentAdditionalFee, true, details.Customer)).price;
+            details.PaymentAdditionalFeeExclTax = (await _taxService.GetPaymentMethodAdditionalFeeAsync(paymentAdditionalFee, false, details.Customer)).price;
 
             //tax amount
-            details.OrderTaxTotal = _orderTotalCalculationService.GetTaxTotal(details.Cart, out var taxRatesDictionary);
+            SortedDictionary<decimal, decimal> taxRatesDictionary;
+            (details.OrderTaxTotal, taxRatesDictionary) = await _orderTotalCalculationService.GetTaxTotalAsync(details.Cart);
 
             //VAT number
-            var customerVatStatus = (VatNumberStatus)_genericAttributeService.GetAttribute<int>(details.Customer, NopCustomerDefaults.VatNumberStatusIdAttribute);
+            var customerVatStatus = (VatNumberStatus)await _genericAttributeService.GetAttributeAsync<int>(details.Customer, NopCustomerDefaults.VatNumberStatusIdAttribute);
             if (_taxSettings.EuVatEnabled && customerVatStatus == VatNumberStatus.Valid)
-                details.VatNumber = _genericAttributeService.GetAttribute<string>(details.Customer, NopCustomerDefaults.VatNumberAttribute);
+                details.VatNumber = await _genericAttributeService.GetAttributeAsync<string>(details.Customer, NopCustomerDefaults.VatNumberAttribute);
 
             //tax rates
             details.TaxRates = taxRatesDictionary.Aggregate(string.Empty, (current, next) =>
                 $"{current}{next.Key.ToString(CultureInfo.InvariantCulture)}:{next.Value.ToString(CultureInfo.InvariantCulture)};   ");
 
             //order total (and applied discounts, gift cards, reward points)
-            var orderTotal = _orderTotalCalculationService.GetShoppingCartTotal(details.Cart, out var orderDiscountAmount, out var orderAppliedDiscounts, out var appliedGiftCards, out var redeemedRewardPoints, out var redeemedRewardPointsAmount);
+            var (orderTotal, orderDiscountAmount, orderAppliedDiscounts, appliedGiftCards, redeemedRewardPoints, redeemedRewardPointsAmount) = await _orderTotalCalculationService.GetShoppingCartTotalAsync(details.Cart);
             if (!orderTotal.HasValue)
                 throw new NopException("Order total couldn't be calculated");
 
@@ -829,18 +842,14 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                     details.AppliedDiscounts.Add(disc);
 
             //recurring or standard shopping cart?
-            details.IsRecurringShoppingCart = _shoppingCartService.ShoppingCartIsRecurring(details.Cart);
+            details.IsRecurringShoppingCart = await _shoppingCartService.ShoppingCartIsRecurringAsync(details.Cart);
             if (!details.IsRecurringShoppingCart)
                 return details;
 
-            var recurringCyclesError = _shoppingCartService.GetRecurringCycleInfo(details.Cart,
-                out var recurringCycleLength, out var recurringCyclePeriod, out var recurringTotalCycles);
+            var (recurringCyclesError, recurringCycleLength, recurringCyclePeriod, recurringTotalCycles) = await _shoppingCartService.GetRecurringCycleInfoAsync(details.Cart);
+
             if (!string.IsNullOrEmpty(recurringCyclesError))
                 throw new NopException(recurringCyclesError);
-
-            //processPaymentRequest.RecurringCycleLength = recurringCycleLength;
-            //processPaymentRequest.RecurringCyclePeriod = recurringCyclePeriod;
-            //processPaymentRequest.RecurringTotalCycles = recurringTotalCycles;
 
             return details;
         }
@@ -849,8 +858,11 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         /// Validate minimum order sub-total amount
         /// </summary>
         /// <param name="cart">Shopping cart</param>
-        /// <returns>true - OK; false - minimum order sub-total amount is not reached</returns>
-        public virtual bool ValidateMinOrderSubtotalAmount(IList<ShoppingCartItem> cart)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the rue - OK; false - minimum order sub-total amount is not reached
+        /// </returns>
+        public virtual async Task<bool> ValidateMinOrderSubtotalAmountAsync(IList<ShoppingCartItem> cart)
         {
             if (cart == null)
                 throw new ArgumentNullException(nameof(cart));
@@ -860,7 +872,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
                 return true;
 
             //subtotal
-            _orderTotalCalculationService.GetShoppingCartSubTotal(cart, _orderSettings.MinOrderSubtotalAmountIncludingTax, out var _, out var _, out var subTotalWithoutDiscountBase, out var _);
+            var (_, _, subTotalWithoutDiscountBase, _, _) = await _orderTotalCalculationService.GetShoppingCartSubTotalAsync(cart, _orderSettings.MinOrderSubtotalAmountIncludingTax);
 
             if (subTotalWithoutDiscountBase < _orderSettings.MinOrderSubtotalAmount)
                 return false;
@@ -872,8 +884,11 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
         /// Validate minimum order total amount
         /// </summary>
         /// <param name="cart">Shopping cart</param>
-        /// <returns>true - OK; false - minimum order total amount is not reached</returns>
-        public virtual bool ValidateMinOrderTotalAmount(IList<ShoppingCartItem> cart)
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the rue - OK; false - minimum order total amount is not reached
+        /// </returns>
+        public virtual async Task<bool> ValidateMinOrderTotalAmountAsync(IList<ShoppingCartItem> cart)
         {
             if (cart == null)
                 throw new ArgumentNullException(nameof(cart));
@@ -881,7 +896,7 @@ namespace Nop.Plugin.Payments.ZipMoney.Controllers
             if (!cart.Any() || _orderSettings.MinOrderTotalAmount <= decimal.Zero)
                 return true;
 
-            var shoppingCartTotalBase = _orderTotalCalculationService.GetShoppingCartTotal(cart);
+            var shoppingCartTotalBase = (await _orderTotalCalculationService.GetShoppingCartTotalAsync(cart)).shoppingCartTotal;
 
             if (shoppingCartTotalBase.HasValue && shoppingCartTotalBase.Value < _orderSettings.MinOrderTotalAmount)
                 return false;

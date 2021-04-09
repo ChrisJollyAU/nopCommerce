@@ -5,7 +5,7 @@ using Nop.Web.Framework.Mvc.ModelBinding;
 
 namespace Nop.Plugin.Payments.BrainTree.Models
 {
-    public class PaymentInfoModel : BaseNopModel
+    public record PaymentInfoModel : BaseNopModel
     {
         public string Token { get; set; }
         public decimal Amount { get; set; }

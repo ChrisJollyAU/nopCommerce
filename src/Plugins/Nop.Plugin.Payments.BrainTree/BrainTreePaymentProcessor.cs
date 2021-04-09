@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Braintree;
 using Microsoft.AspNetCore.Http;
 using Nop.Core;
@@ -79,11 +80,11 @@ namespace Nop.Plugin.Payments.BrainTree
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
         /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
+        public async Task<ProcessPaymentResult> ProcessPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
             var processPaymentResult = new ProcessPaymentResult();
             //get customer
-            var customer = _customerService.GetCustomerById(processPaymentRequest.CustomerId);
+            var customer = await _customerService.GetCustomerByIdAsync(processPaymentRequest.CustomerId);
             //get settings
             var useSandBox = _brainTreePaymentSettings.UseSandBox;
             var merchantId = _brainTreePaymentSettings.MerchantId;
@@ -98,7 +99,7 @@ namespace Nop.Plugin.Payments.BrainTree
                 PublicKey = publicKey,
                 PrivateKey = privateKey
             };
-            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "braintree customvalues", processPaymentRequest.CustomValues.ToString(), customer);
+            await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "braintree customvalues", processPaymentRequest.CustomValues.ToString(), customer);
             string device_data = "", nonce = "";
             if (processPaymentRequest.CustomValues.ContainsKey("nonce"))
             {
@@ -106,7 +107,7 @@ namespace Nop.Plugin.Payments.BrainTree
             }
             else
             {
-                _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree cannot find nonce", null, customer);
+                await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "Braintree cannot find nonce", null, customer);
             }
             if (processPaymentRequest.CustomValues.ContainsKey("device_data"))
             {
@@ -114,24 +115,24 @@ namespace Nop.Plugin.Payments.BrainTree
             }
             else
             {
-                _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree cannot find device_data", null, customer);
+                await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "Braintree cannot find device_data", null, customer);
             }
-            PaymentMethodNonce paymentMethodNonce = gateway.PaymentMethodNonce.Find(nonce);
-            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "braintree nonce", paymentMethodNonce != null ? paymentMethodNonce.ToString() : "", customer);
+            PaymentMethodNonce paymentMethodNonce = await gateway.PaymentMethodNonce.FindAsync(nonce);
+            await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "braintree nonce", paymentMethodNonce != null ? paymentMethodNonce.ToString() : "", customer);
             ThreeDSecureInfo info = paymentMethodNonce.ThreeDSecureInfo;
             if (paymentMethodNonce.Type == "CreditCard")
             {
                 if (info == null || (info != null && info.LiabilityShifted == false))
                 {
                     processPaymentResult.AddError("3D Secure not verified. Please go back to payment methods and try again");
-                    _logger.InsertLog(Core.Domain.Logging.LogLevel.Error,"Braintree error. 3DS not provided or not shifted", null, customer);
+                    await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Error,"Braintree error. 3DS not provided or not shifted", null, customer);
                     return processPaymentResult;
                 }
             }
-            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create transactionrequest", null, customer);
+            await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "Braintree create transactionrequest", null, customer);
             //new transaction request
-            var custbilladdress = _addressService.GetAddressById(customer.BillingAddressId.Value);
-            var custshipaddress = _addressService.GetAddressById(customer.ShippingAddressId.Value);
+            var custbilladdress = await _addressService.GetAddressByIdAsync(customer.BillingAddressId.Value);
+            var custshipaddress = await _addressService.GetAddressByIdAsync(customer.ShippingAddressId.Value);
             var transactionRequest = new TransactionRequest
             {
                 Amount = processPaymentRequest.OrderTotal,
@@ -153,13 +154,13 @@ namespace Nop.Plugin.Payments.BrainTree
                     Fax = custbilladdress.FaxNumber
                 }
             };
-            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create billingaddress", null, customer);
+            await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "Braintree create billingaddress", null, customer);
             try
             {
-                var order = _orderService.GetOrderByGuid(processPaymentRequest.OrderGuid);
+                var order = await _orderService.GetOrderByGuidAsync(processPaymentRequest.OrderGuid);
                 if (order != null)
                 {
-                    var orderbilladdress = _addressService.GetAddressById(order.BillingAddressId);
+                    var orderbilladdress = await _addressService.GetAddressByIdAsync(order.BillingAddressId);
                     if (orderbilladdress != null)
                     {
                         //address request
@@ -171,7 +172,7 @@ namespace Nop.Plugin.Payments.BrainTree
                             PostalCode = orderbilladdress.ZipPostalCode,
                             Locality = orderbilladdress.City,
                             Company = orderbilladdress.Company,
-                            Region = _stateProvinceService.GetStateProvinceById(orderbilladdress.StateProvinceId.Value).Name
+                            Region = (await _stateProvinceService.GetStateProvinceByIdAsync(orderbilladdress.StateProvinceId.Value)).Name
                         };
                         transactionRequest.BillingAddress = addressRequest;
                     }
@@ -186,11 +187,11 @@ namespace Nop.Plugin.Payments.BrainTree
                             PostalCode = custbilladdress.ZipPostalCode,
                             Locality = custbilladdress.City,
                             Company = custbilladdress.Company,
-                            Region = _stateProvinceService.GetStateProvinceById(custbilladdress.StateProvinceId.Value).Name
+                            Region = (await _stateProvinceService.GetStateProvinceByIdAsync(custbilladdress.StateProvinceId.Value)).Name
                         };
                         transactionRequest.BillingAddress = addressRequest;
                     }
-                    _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create shippingrequest", null, customer);
+                    await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "Braintree create shippingrequest", null, customer);
                     if (!order.PickupInStore)
                     {
                         if (custshipaddress != null)
@@ -203,7 +204,7 @@ namespace Nop.Plugin.Payments.BrainTree
                                 PostalCode = custshipaddress.ZipPostalCode,
                                 Locality = custshipaddress.City,
                                 Company = custshipaddress.Company,
-                                Region = _stateProvinceService.GetStateProvinceById(custshipaddress.StateProvinceId.Value).Name
+                                Region = (await _stateProvinceService.GetStateProvinceByIdAsync(custshipaddress.StateProvinceId.Value)).Name
                             };
                         }
                         else
@@ -218,7 +219,7 @@ namespace Nop.Plugin.Payments.BrainTree
                 }
                 else
                 {
-                    _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree order guid is null", null, customer);
+                    await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "Braintree order guid is null", null, customer);
                     //address request
                     var addressRequest = new AddressRequest
                     {
@@ -228,7 +229,7 @@ namespace Nop.Plugin.Payments.BrainTree
                         PostalCode = custbilladdress.ZipPostalCode,
                         Locality = custbilladdress.City,
                         Company = custbilladdress.Company,
-                        Region = _stateProvinceService.GetStateProvinceById(custbilladdress.StateProvinceId.Value).Name
+                        Region = (await _stateProvinceService.GetStateProvinceByIdAsync(custbilladdress.StateProvinceId.Value)).Name
                     };
                     transactionRequest.BillingAddress = addressRequest;
                     if (custshipaddress != null)
@@ -241,7 +242,7 @@ namespace Nop.Plugin.Payments.BrainTree
                             PostalCode = custshipaddress.ZipPostalCode,
                             Locality = custshipaddress.City,
                             Company = custshipaddress.Company,
-                            Region = _stateProvinceService.GetStateProvinceById(custshipaddress.StateProvinceId.Value).Name
+                            Region = (await _stateProvinceService.GetStateProvinceByIdAsync(custshipaddress.StateProvinceId.Value)).Name
                         };
                     }
                     else
@@ -256,14 +257,14 @@ namespace Nop.Plugin.Payments.BrainTree
                 return processPaymentResult;
             }
             
-            _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree create sale", null, customer);
+            await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "Braintree create sale", null, customer);
             //sending a request
-            var result = gateway.Transaction.Sale(transactionRequest);
+            var result = await gateway.Transaction.SaleAsync(transactionRequest);
 
             //result
             if (result.IsSuccess())
             {
-                _logger.InsertLog(Core.Domain.Logging.LogLevel.Debug, "Braintree sale success", null, customer);
+                await _logger.InsertLogAsync(Core.Domain.Logging.LogLevel.Debug, "Braintree sale success", null, customer);
                 processPaymentResult.NewPaymentStatus = PaymentStatus.Paid;
                 processPaymentRequest.CustomValues["Braintree.Id"] = result.Target.Id;
                 if (result.Target.RiskData != null)
@@ -293,7 +294,7 @@ namespace Nop.Plugin.Payments.BrainTree
             else
             {
                 processPaymentResult.AddError("Error processing payment." + result.Message);
-                _logger.Error("Braintree error " + result.Message, null, customer);
+                await _logger.ErrorAsync("Braintree error " + result.Message, null, customer);
                 
             }
 
@@ -304,9 +305,10 @@ namespace Nop.Plugin.Payments.BrainTree
         /// Post process payment (used by payment gateways that require redirecting to a third-party URL)
         /// </summary>
         /// <param name="postProcessPaymentRequest">Payment info required for an order processing</param>
-        public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
+        public Task PostProcessPaymentAsync(PostProcessPaymentRequest postProcessPaymentRequest)
         {
             //nothing
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -314,12 +316,12 @@ namespace Nop.Plugin.Payments.BrainTree
         /// </summary>
         /// <param name="cart">Shoping cart</param>
         /// <returns>true - hide; false - display.</returns>
-        public bool HidePaymentMethod(IList<ShoppingCartItem> cart)
+        public Task<bool> HidePaymentMethodAsync(IList<ShoppingCartItem> cart)
         {
             //you can put any logic here
             //for example, hide this payment method if all products in the cart are downloadable
             //or hide this payment method if current customer is from certain country
-            return false;
+            return Task.FromResult(false);
         }
 
         /// <summary>
@@ -327,9 +329,9 @@ namespace Nop.Plugin.Payments.BrainTree
         /// </summary>
         /// <param name="cart">Shoping cart</param>
         /// <returns>Additional handling fee</returns>
-        public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
+        public async Task<decimal> GetAdditionalHandlingFeeAsync(IList<ShoppingCartItem> cart)
         {
-            return _paymentService.CalculateAdditionalFee(cart,
+            return await _paymentService.CalculateAdditionalFeeAsync(cart,
                 _brainTreePaymentSettings.AdditionalFee, _brainTreePaymentSettings.AdditionalFeePercentage);
         }
 
@@ -338,11 +340,11 @@ namespace Nop.Plugin.Payments.BrainTree
         /// </summary>
         /// <param name="capturePaymentRequest">Capture payment request</param>
         /// <returns>Capture payment result</returns>
-        public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
+        public Task<CapturePaymentResult> CaptureAsync(CapturePaymentRequest capturePaymentRequest)
         {
             var result = new CapturePaymentResult();
             result.AddError("Capture method not supported");
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -350,7 +352,7 @@ namespace Nop.Plugin.Payments.BrainTree
         /// </summary>
         /// <param name="refundPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
+        public Task<RefundPaymentResult> RefundAsync(RefundPaymentRequest refundPaymentRequest)
         {
             var result = new RefundPaymentResult();
             var gateway = new BraintreeGateway
@@ -390,7 +392,7 @@ namespace Nop.Plugin.Payments.BrainTree
             {
                 result.AddError("Transaction not available for refund. Try void");
             }
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -398,11 +400,11 @@ namespace Nop.Plugin.Payments.BrainTree
         /// </summary>
         /// <param name="voidPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
+        public Task<VoidPaymentResult> VoidAsync(VoidPaymentRequest voidPaymentRequest)
         {
             var result = new VoidPaymentResult();
             result.AddError("Void method not supported");
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -410,11 +412,11 @@ namespace Nop.Plugin.Payments.BrainTree
         /// </summary>
         /// <param name="processPaymentRequest">Payment info required for an order processing</param>
         /// <returns>Process payment result</returns>
-        public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
+        public Task<ProcessPaymentResult> ProcessRecurringPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
             var result = new ProcessPaymentResult();
             result.AddError("Recurring payment not supported");
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -422,11 +424,11 @@ namespace Nop.Plugin.Payments.BrainTree
         /// </summary>
         /// <param name="cancelPaymentRequest">Request</param>
         /// <returns>Result</returns>
-        public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
+        public Task<CancelRecurringPaymentResult> CancelRecurringPaymentAsync(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
             var result = new CancelRecurringPaymentResult();
             result.AddError("Recurring payment not supported");
-            return result;
+            return Task.FromResult(result);
         }
 
         /// <summary>
@@ -434,13 +436,13 @@ namespace Nop.Plugin.Payments.BrainTree
         /// </summary>
         /// <param name="order">Order</param>
         /// <returns>Result</returns>
-        public bool CanRePostProcessPayment(Order order)
+        public Task<bool> CanRePostProcessPaymentAsync(Order order)
         {
             if (order == null)
                 throw new ArgumentNullException(nameof(order));
 
             //it's not a redirection payment method. So we always return false
-            return false;
+            return Task.FromResult(false);
         }
 
         public override string GetConfigurationPageUrl()
@@ -450,18 +452,19 @@ namespace Nop.Plugin.Payments.BrainTree
 
         
 
-        public IList<string> ValidatePaymentForm(IFormCollection form)
+        public Task<IList<string>> ValidatePaymentFormAsync(IFormCollection form)
         {
             var warnings = new List<string>();
-            return warnings;
+            return Task.FromResult<IList<string>>(warnings);
         }
 
-        public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
+        public Task<ProcessPaymentRequest> GetPaymentInfoAsync(IFormCollection form)
         {
-            var paymentInfo = new ProcessPaymentRequest();
-            paymentInfo.CustomValues["device_data"] = form["device_data"][0];
-            paymentInfo.CustomValues["nonce"] = form["nonce"][0];
-            return paymentInfo;
+            var paymentInfo = new ProcessPaymentRequest
+            {
+                CustomValues = {["device_data"] = form["device_data"][0], ["nonce"] = form["nonce"][0]}
+            };
+            return Task.FromResult(paymentInfo);
         }
 
         public Type GetControllerType()
@@ -469,7 +472,7 @@ namespace Nop.Plugin.Payments.BrainTree
             return typeof(PaymentBrainTreeController);
         }
 
-        public override void Install()
+        public override async Task InstallAsync()
         {
             //settings
             var settings = new BrainTreePaymentSettings
@@ -479,10 +482,10 @@ namespace Nop.Plugin.Payments.BrainTree
                 PrivateKey = "",
                 PublicKey = ""
             };
-            _settingService.SaveSetting(settings);
+            await _settingService.SaveSettingAsync(settings);
 
             //locales
-            _localizationService.AddPluginLocaleResource(new Dictionary<string, string>
+            await _localizationService.AddLocaleResourceAsync(new Dictionary<string, string>
             {
                 ["Plugins.Payments.BrainTree.Fields.UseSandbox"] = "Use Sandbox",
                 ["Plugins.Payments.BrainTree.Fields.UseSandbox.Hint"] =
@@ -503,23 +506,31 @@ namespace Nop.Plugin.Payments.BrainTree
             });
             
 
-            base.Install();
+            await base.InstallAsync();
         }
 
-        public override void Uninstall()
+        public override async Task UninstallAsync()
         {
             //settings
-            _settingService.DeleteSetting<BrainTreePaymentSettings>();
+            await _settingService.DeleteSettingAsync<BrainTreePaymentSettings>();
 
             //locales
-            _localizationService.DeletePluginLocaleResources("Plugins.Payments.BrainTree");
+            await _localizationService.DeleteLocaleResourcesAsync("Plugins.Payments.BrainTree");
 
-            base.Uninstall();
+            await base.UninstallAsync();
         }
 
         public string GetPublicViewComponentName()
         {
             return "PaymentBrainTree";
+        }
+
+        /// <summary>
+        /// Gets a payment method description that will be displayed on checkout pages in the public store
+        /// </summary>
+        public async Task<string> GetPaymentMethodDescriptionAsync()
+        {
+            return await _localizationService.GetResourceAsync("Plugins.Payments.BrainTree.PaymentMethodDescription");
         }
 
         #endregion
@@ -598,14 +609,6 @@ namespace Nop.Plugin.Payments.BrainTree
         public bool SkipPaymentInfo
         {
             get { return false; }
-        }
-
-        /// <summary>
-        /// Gets a payment method description that will be displayed on checkout pages in the public store
-        /// </summary>
-        public string PaymentMethodDescription
-        {
-            get { return _localizationService.GetResource("Plugins.Payments.BrainTree.PaymentMethodDescription"); }
         }
 
         #endregion

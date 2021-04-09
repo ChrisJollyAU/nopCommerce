@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Threading.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Plugin.Payments.BrainTree.Models;
 using Nop.Services.Configuration;
@@ -49,15 +50,15 @@ namespace Nop.Plugin.Payments.BrainTree.Controllers
         #endregion
 
         #region Methods
-        
-        public IActionResult Configure()
+
+        public async Task<IActionResult> Configure()
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             //load settings for a chosen store scope
-            int storeScope = _storeContext.ActiveStoreScopeConfiguration;
-            var brainTreePaymentSettings = _settingService.LoadSetting<BrainTreePaymentSettings>(storeScope);
+            var storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
+            var brainTreePaymentSettings = await _settingService.LoadSettingAsync<BrainTreePaymentSettings>(storeScope);
 
             var model = new ConfigurationModel
             {
@@ -72,29 +73,30 @@ namespace Nop.Plugin.Payments.BrainTree.Controllers
 
             if (storeScope > 0)
             {
-                model.UseSandbox_OverrideForStore = _settingService.SettingExists(brainTreePaymentSettings, x => x.UseSandBox, storeScope);
-                model.PublicKey_OverrideForStore = _settingService.SettingExists(brainTreePaymentSettings, x => x.PublicKey, storeScope);
-                model.PrivateKey_OverrideForStore = _settingService.SettingExists(brainTreePaymentSettings, x => x.PrivateKey, storeScope);
-                model.MerchantId_OverrideForStore = _settingService.SettingExists(brainTreePaymentSettings, x => x.MerchantId, storeScope);
-                model.AdditionalFee_OverrideForStore = _settingService.SettingExists(brainTreePaymentSettings, x => x.AdditionalFee, storeScope);
-                model.AdditionalFeePercentage_OverrideForStore = _settingService.SettingExists(brainTreePaymentSettings, x => x.AdditionalFeePercentage, storeScope);
+                model.UseSandbox_OverrideForStore = await _settingService.SettingExistsAsync(brainTreePaymentSettings, x => x.UseSandBox, storeScope);
+                model.PublicKey_OverrideForStore = await _settingService.SettingExistsAsync(brainTreePaymentSettings, x => x.PublicKey, storeScope);
+                model.PrivateKey_OverrideForStore = await _settingService.SettingExistsAsync(brainTreePaymentSettings, x => x.PrivateKey, storeScope);
+                model.MerchantId_OverrideForStore = await _settingService.SettingExistsAsync(brainTreePaymentSettings, x => x.MerchantId, storeScope);
+                model.AdditionalFee_OverrideForStore = await _settingService.SettingExistsAsync(brainTreePaymentSettings, x => x.AdditionalFee, storeScope);
+                model.AdditionalFeePercentage_OverrideForStore = await _settingService.SettingExistsAsync(brainTreePaymentSettings, x => x.AdditionalFeePercentage, storeScope);
             }
 
             return View("~/Plugins/Payments.BrainTree/Views/Configure.cshtml", model);
         }
 
         [HttpPost]
-        public IActionResult Configure(ConfigurationModel model)
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public async Task<IActionResult> Configure(ConfigurationModel model)
         {
-            if (!_permissionService.Authorize(StandardPermissionProvider.ManagePaymentMethods))
+            if (!await _permissionService.AuthorizeAsync(StandardPermissionProvider.ManagePaymentMethods))
                 return AccessDeniedView();
 
             if (!ModelState.IsValid)
-                return Configure();
+                return await Configure();
 
             //load settings for a chosen store scope
-            var storeScope = _storeContext.ActiveStoreScopeConfiguration;
-            var brainTreePaymentSettings = _settingService.LoadSetting<BrainTreePaymentSettings>(storeScope);
+            var storeScope = await _storeContext.GetActiveStoreScopeConfigurationAsync();
+            var brainTreePaymentSettings = await _settingService.LoadSettingAsync<BrainTreePaymentSettings>(storeScope);
 
             //save settings
             brainTreePaymentSettings.UseSandBox = model.UseSandBox;
@@ -107,19 +109,19 @@ namespace Nop.Plugin.Payments.BrainTree.Controllers
             /* We do not clear cache after each setting update.
              * This behavior can increase performance because cached settings will not be cleared 
              * and loaded from database after each update */
-            _settingService.SaveSettingOverridablePerStore(brainTreePaymentSettings, x => x.UseSandBox, model.UseSandbox_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(brainTreePaymentSettings, x => x.PublicKey, model.PublicKey_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(brainTreePaymentSettings, x => x.PrivateKey, model.PrivateKey_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(brainTreePaymentSettings, x => x.MerchantId, model.MerchantId_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(brainTreePaymentSettings, x => x.AdditionalFee, model.AdditionalFee_OverrideForStore, storeScope, false);
-            _settingService.SaveSettingOverridablePerStore(brainTreePaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(brainTreePaymentSettings, x => x.UseSandBox, model.UseSandbox_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(brainTreePaymentSettings, x => x.PublicKey, model.PublicKey_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(brainTreePaymentSettings, x => x.PrivateKey, model.PrivateKey_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(brainTreePaymentSettings, x => x.MerchantId, model.MerchantId_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(brainTreePaymentSettings, x => x.AdditionalFee, model.AdditionalFee_OverrideForStore, storeScope, false);
+            await _settingService.SaveSettingOverridablePerStoreAsync(brainTreePaymentSettings, x => x.AdditionalFeePercentage, model.AdditionalFeePercentage_OverrideForStore, storeScope, false);
 
             //now clear settings cache
-            _settingService.ClearCache();
+            await _settingService.ClearCacheAsync();
 
-            _notificationService.SuccessNotification(_localizationService.GetResource("Admin.Plugins.Saved"));
+            _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Admin.Plugins.Saved"));
 
-            return Configure();
+            return await Configure();
         }
 
         #endregion

@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 using Nop.Core;
@@ -68,16 +70,17 @@ namespace Nop.Plugin.Payments.ZipMoney
 
         #endregion
 
-        public ProcessPaymentResult ProcessPayment(ProcessPaymentRequest processPaymentRequest)
+        public async Task<ProcessPaymentResult> ProcessPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
             ProcessPaymentResult result;
-            _logger.InsertLog(LogLevel.Debug, "ZipMoney: Process Payment called", "", _workContext.CurrentCustomer);
+            var cust = await _workContext.GetCurrentCustomerAsync();
+            await _logger.InsertLogAsync(LogLevel.Debug, "ZipMoney: Process Payment called", "", cust);
             if (processPaymentRequest.CustomValues["ZipCheckoutResult"].ToString().ToLowerInvariant().Equals("approved"))
             {
                 ZipChargeResponse response = zipMoney
                     .CaptureCharge(processPaymentRequest.CustomValues["ZipChargeId"].ToString(),
                         processPaymentRequest.OrderTotal).Result;
-                _logger.InsertLog(LogLevel.Debug, "ZipMoney: CaptureCharge", zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
+                await _logger.InsertLogAsync(LogLevel.Debug, "ZipMoney: CaptureCharge", zipMoney.GetLastResponse(), cust);
                 if (zipMoney.GetLastError() == null)
                 {
                     if (response.state == ChargeState.captured)
@@ -92,10 +95,10 @@ namespace Nop.Plugin.Payments.ZipMoney
                         return result;
                     }
                 }
-                _logger.InsertLog(LogLevel.Debug, "ZipMoney Capture Error",
-                    JsonConvert.SerializeObject(zipMoney.GetLastError()), _workContext.CurrentCustomer);
-                _logger.InsertLog(LogLevel.Debug, "ZipMoney Capture Error Response",
-                    zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
+                await _logger.InsertLogAsync(LogLevel.Debug, "ZipMoney Capture Error",
+                    JsonConvert.SerializeObject(zipMoney.GetLastError()), cust);
+                await _logger.InsertLogAsync(LogLevel.Debug, "ZipMoney Capture Error Response",
+                    zipMoney.GetLastResponse(), cust);
                 return new ProcessPaymentResult
                 {
                     AllowStoringCreditCardNumber = false,
@@ -122,24 +125,29 @@ namespace Nop.Plugin.Payments.ZipMoney
             return result;
         }
 
-        public void PostProcessPayment(PostProcessPaymentRequest postProcessPaymentRequest)
+        public Task PostProcessPaymentAsync(PostProcessPaymentRequest postProcessPaymentRequest)
         {
-            return;
+            //nothing
+            return Task.CompletedTask;
         }
 
-        public bool HidePaymentMethod(IList<ShoppingCartItem> cart)
+        public Task<bool> HidePaymentMethodAsync(IList<ShoppingCartItem> cart)
         {
-            return false;
+            //you can put any logic here
+            //for example, hide this payment method if all products in the cart are downloadable
+            //or hide this payment method if current customer is from certain country
+            return Task.FromResult(false);
         }
 
-        public decimal GetAdditionalHandlingFee(IList<ShoppingCartItem> cart)
+        public Task<decimal> GetAdditionalHandlingFeeAsync(IList<ShoppingCartItem> cart)
         {
-            return 0;
+            return Task.FromResult((decimal)0);
         }
 
-        public CapturePaymentResult Capture(CapturePaymentRequest capturePaymentRequest)
+        public async Task<CapturePaymentResult> CaptureAsync(CapturePaymentRequest capturePaymentRequest)
         {
-            _logger.InsertLog(LogLevel.Debug, "ZipMoney: Capture called", "", _workContext.CurrentCustomer);
+            var cust = await _workContext.GetCurrentCustomerAsync();
+            await _logger.InsertLogAsync(LogLevel.Debug, "ZipMoney: Capture called", "", cust);
             string chargeId = capturePaymentRequest.Order.AuthorizationTransactionCode;
             string chargeresult = capturePaymentRequest.Order.AuthorizationTransactionResult;
             CapturePaymentResult result;
@@ -147,7 +155,7 @@ namespace Nop.Plugin.Payments.ZipMoney
             if (chargeresult.ToLowerInvariant().Equals("authorised"))
             {
                 response = zipMoney.CaptureCharge(chargeId, capturePaymentRequest.Order.OrderTotal).Result;
-                _logger.InsertLog(LogLevel.Debug, "ZipMoney: Capture Charge", zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
+                await _logger.InsertLogAsync(LogLevel.Debug, "ZipMoney: Capture Charge", zipMoney.GetLastResponse(), cust);
                 result = new CapturePaymentResult {NewPaymentStatus = PaymentStatus.Authorized};
                 if (response?.state == ChargeState.captured)
                 {
@@ -155,8 +163,8 @@ namespace Nop.Plugin.Payments.ZipMoney
                     result.CaptureTransactionId = response.id;
                     return result;
                 }
-                _logger.InsertLog(LogLevel.Error, "ZipMoney Capture Fail",
-                    zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
+                await _logger.InsertLogAsync(LogLevel.Error, "ZipMoney Capture Fail",
+                    zipMoney.GetLastResponse(), cust);
                 result.AddError("ZipMoney Capture Failed. Check log for more info");
                 return result;
             }
@@ -172,10 +180,10 @@ namespace Nop.Plugin.Payments.ZipMoney
                 amount = capturePaymentRequest.Order.OrderTotal,
                 currency = "AUD"
             };
-            _logger.InsertLog(LogLevel.Debug, "zip capture",
-                JsonConvert.SerializeObject(zipCharge), _workContext.CurrentCustomer);
+            await _logger.InsertLogAsync(LogLevel.Debug, "zip capture",
+                JsonConvert.SerializeObject(zipCharge), cust);
             response = zipMoney.CreateCharge(zipCharge).Result;
-            _logger.InsertLog(LogLevel.Debug, "zip capture response", zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
+            await _logger.InsertLogAsync(LogLevel.Debug, "zip capture response", zipMoney.GetLastResponse(), cust);
             result = new CapturePaymentResult();
             if (response?.state == ChargeState.captured)
             {
@@ -184,14 +192,15 @@ namespace Nop.Plugin.Payments.ZipMoney
                 result.CaptureTransactionResult = response.state.ToString();
                 return result;
             }
-            _logger.InsertLog(LogLevel.Error, "Zip capture/charge error",
+            await _logger.InsertLogAsync(LogLevel.Error, "Zip capture/charge error",
                 JsonConvert.SerializeObject(zipMoney.GetLastError()));
             result.Errors.Add(zipMoney.GetLastError().error.message);
             return result;
         }
 
-        public RefundPaymentResult Refund(RefundPaymentRequest refundPaymentRequest)
+        public async Task<RefundPaymentResult> RefundAsync(RefundPaymentRequest refundPaymentRequest)
         {
+            var cust = await _workContext.GetCurrentCustomerAsync();
             RefundPaymentResult result = new RefundPaymentResult();
             var response = zipMoney.CreateRefund(refundPaymentRequest.Order.CaptureTransactionId, "plugin called refund",
                 refundPaymentRequest.AmountToRefund).Result;
@@ -205,32 +214,37 @@ namespace Nop.Plugin.Payments.ZipMoney
             }
             result.AddError(error.error.message);
             
-            _logger.InsertLog(LogLevel.Debug, "zip refund response", zipMoney.GetLastResponse(), _workContext.CurrentCustomer);
-            _logger.InsertLog(LogLevel.Error, error.error.message, JsonConvert.SerializeObject(error));
+            await _logger.InsertLogAsync(LogLevel.Debug, "zip refund response", zipMoney.GetLastResponse(), cust);
+            await _logger.InsertLogAsync(LogLevel.Error, error.error.message, JsonConvert.SerializeObject(error));
             return result;
         }
 
-        public VoidPaymentResult Void(VoidPaymentRequest voidPaymentRequest)
+        public Task<VoidPaymentResult> VoidAsync(VoidPaymentRequest voidPaymentRequest)
         {
-            return new VoidPaymentResult();
+            return Task.FromResult(new VoidPaymentResult { Errors = new[] { "Void method not supported" } });
         }
 
-        public ProcessPaymentResult ProcessRecurringPayment(ProcessPaymentRequest processPaymentRequest)
+        public Task<ProcessPaymentResult> ProcessRecurringPaymentAsync(ProcessPaymentRequest processPaymentRequest)
         {
-            return new ProcessPaymentResult();
+            return Task.FromResult(new ProcessPaymentResult());
         }
 
-        public CancelRecurringPaymentResult CancelRecurringPayment(CancelRecurringPaymentRequest cancelPaymentRequest)
+        public Task<CancelRecurringPaymentResult> CancelRecurringPaymentAsync(CancelRecurringPaymentRequest cancelPaymentRequest)
         {
-            return new CancelRecurringPaymentResult();
+            //always success
+            return Task.FromResult(new CancelRecurringPaymentResult());
         }
 
-        public bool CanRePostProcessPayment(Order order)
+        public Task<bool> CanRePostProcessPaymentAsync(Order order)
         {
-            return false;
+            if (order == null)
+                throw new ArgumentNullException(nameof(order));
+
+            //it's not a redirection payment method. So we always return false
+            return Task.FromResult(false);
         }
 
-        public IList<string> ValidatePaymentForm(IFormCollection form)
+        public Task<IList<string>> ValidatePaymentFormAsync(IFormCollection form)
         {
             var result =  new List<string>();
             if (!form.ContainsKey("ZipCheckoutId"))
@@ -251,10 +265,10 @@ namespace Nop.Plugin.Payments.ZipMoney
                     result.Add("Does not contain valid ZipMoney result");
                 }
             }
-            return result;
+            return Task.FromResult<IList<string>>(result);
         }
 
-        public ProcessPaymentRequest GetPaymentInfo(IFormCollection form)
+        public Task<ProcessPaymentRequest> GetPaymentInfoAsync(IFormCollection form)
         {
             ProcessPaymentRequest processPaymentRequest = new ProcessPaymentRequest();
             form.TryGetValue("ZipChargeId", out StringValues chargeid);
@@ -263,7 +277,7 @@ namespace Nop.Plugin.Payments.ZipMoney
             processPaymentRequest.CustomValues["ZipChargeId"] = chargeid[0];
             processPaymentRequest.CustomValues["ZipCheckoutId"] = checkoutid[0];
             processPaymentRequest.CustomValues["ZipCheckoutResult"] = checkoutresult[0];
-            return processPaymentRequest;
+            return Task.FromResult(processPaymentRequest);
         }
 
         public string GetPublicViewComponentName()
@@ -284,30 +298,42 @@ namespace Nop.Plugin.Payments.ZipMoney
         public RecurringPaymentType RecurringPaymentType => RecurringPaymentType.NotSupported;
         public PaymentMethodType PaymentMethodType => PaymentMethodType.Standard;
         public bool SkipPaymentInfo => false;
-        public string PaymentMethodDescription => "Buy Now, Pay Later with ZipMoney";
 
-
-        public override void Install()
+        /// <summary>
+        /// Gets a payment method description that will be displayed on checkout pages in the public store
+        /// </summary>
+        /// <remarks>
+        /// return description of this payment method to be display on "payment method" checkout step. good practice is to make it localizable
+        /// for example, for a redirection payment method, description may be like this: "You will be redirected to PayPal site to complete the payment"
+        /// </remarks>
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public Task<string> GetPaymentMethodDescriptionAsync()
         {
-            base.Install();
+            return Task.FromResult("Buy Now, Pay Later with ZipMoney");
         }
 
-        public override void Uninstall()
+        public override async Task InstallAsync()
         {
-            base.Uninstall();
+            await base.InstallAsync();
+        }
+
+        public override async Task UninstallAsync()
+        {
+            await base.UninstallAsync();
         }
 
         public bool HideInWidgetList { get; }
 
-        public IList<string> GetWidgetZones()
+        public Task<IList<string>> GetWidgetZonesAsync()
         {
-            return new List<string>()
-            {
-                "checkout_payment_method_top",
-                "order_summary_cart_footer",
-                "productdetails_inside_overview_buttons_before",
-                "checkout_confirm_top"
-            };
+            return Task.FromResult<IList<string>>(new List<string>()
+                {
+                    "checkout_payment_method_top",
+                    "order_summary_cart_footer",
+                    "productdetails_inside_overview_buttons_before",
+                    "checkout_confirm_top"
+                }
+            );
         }
 
         public string GetWidgetViewComponentName(string widgetZone)

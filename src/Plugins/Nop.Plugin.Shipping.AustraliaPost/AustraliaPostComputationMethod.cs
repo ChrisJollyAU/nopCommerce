@@ -6,6 +6,7 @@ using System.Linq;
 using System.Linq.Dynamic;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 using Nop.Core;
 using Nop.Core.Domain.Directory;
@@ -82,30 +83,24 @@ namespace Nop.Plugin.Shipping.AustraliaPost
 
         #region Utilities
 
-        private MeasureWeight GatewayMeasureWeight
+        private async Task<MeasureWeight> GatewayMeasureWeightAsync()
         {
-            get
-            {
-                return this._measureService.GetMeasureWeightBySystemKeyword("grams");
-            }
+            return await this._measureService.GetMeasureWeightBySystemKeywordAsync("grams");
         }
 
-        private MeasureDimension GatewayMeasureDimension
+        private async Task<MeasureDimension> GatewayMeasureDimensionAsync()
         {
-            get
-            {
-                return this._measureService.GetMeasureDimensionBySystemKeyword("millimetres");
-            }
+            return await this._measureService.GetMeasureDimensionBySystemKeywordAsync("millimetres");
         }
 
-        private int GetWeight(GetShippingOptionRequest getShippingOptionRequest)
+        private async Task<int> GetWeightAsync(GetShippingOptionRequest getShippingOptionRequest)
         {
-            var totalWeigth = _shippingService.GetTotalWeight(getShippingOptionRequest, ignoreFreeShippedItems: true);
-            int value = Convert.ToInt32(Math.Ceiling(this._measureService.ConvertFromPrimaryMeasureWeight(totalWeigth, this.GatewayMeasureWeight)));
+            var totalWeigth = await _shippingService.GetTotalWeightAsync(getShippingOptionRequest, ignoreFreeShippedItems: true);
+            int value = Convert.ToInt32(Math.Ceiling(await this._measureService.ConvertFromPrimaryMeasureWeightAsync(totalWeigth, await this.GatewayMeasureWeightAsync())));
             return (value < MIN_WEIGHT ? MIN_WEIGHT : value);
         }
 
-        private IList<ShippingOption> RequestShippingOptions(string countryTwoLetterIsoCode, string fromPostcode, string toPostcode, decimal weight, int length, int width, int heigth, int totalPackages)
+        private async Task<IList<ShippingOption>> RequestShippingOptionsAsync(string countryTwoLetterIsoCode, string fromPostcode, string toPostcode, decimal weight, int length, int width, int heigth, int totalPackages)
         {
             var shippingOptions = new List<ShippingOption>();
             var cultureInfo = new CultureInfo("en-AU");
@@ -147,7 +142,7 @@ namespace Nop.Plugin.Shipping.AustraliaPost
             //parse JSON from response
             using (var reader = new StreamReader(stream))
             {
-                var json = reader.ReadToEnd();
+                var json = await reader.ReadToEndAsync();
                 if (!string.IsNullOrEmpty(json))
                 {
                     var parsed = JObject.Parse(json);
@@ -161,7 +156,7 @@ namespace Nop.Plugin.Shipping.AustraliaPost
                             foreach (var option in options)
                             {
                                 var service = (JObject)option;
-                                var shippingOption = service.ParseShippingOption(_currencyService);
+                                var shippingOption = await service.ParseShippingOptionAsync(_currencyService);
                                 if (shippingOption != null)
                                 {
                                     shippingOption.Rate = shippingOption.Rate * totalPackages;
@@ -203,7 +198,7 @@ namespace Nop.Plugin.Shipping.AustraliaPost
         /// </summary>
         /// <param name="getShippingOptionRequest">A request for getting shipping options</param>
         /// <returns>Represents a response of getting shipping rate options</returns>
-        public GetShippingOptionResponse GetShippingOptions(GetShippingOptionRequest getShippingOptionRequest)
+        public async Task<GetShippingOptionResponse> GetShippingOptionsAsync(GetShippingOptionRequest getShippingOptionRequest)
         {
             if (getShippingOptionRequest == null)
                 throw new ArgumentNullException(nameof(getShippingOptionRequest));
@@ -228,7 +223,7 @@ namespace Nop.Plugin.Shipping.AustraliaPost
                 return response;
             }
             
-            var country = _countryService.GetCountryByAddress(getShippingOptionRequest.ShippingAddress);
+            var country = await _countryService.GetCountryByAddressAsync(getShippingOptionRequest.ShippingAddress);
             if (country == null)
             {
                 response.AddError("Shipping country is not specified");
@@ -243,11 +238,11 @@ namespace Nop.Plugin.Shipping.AustraliaPost
 
             string zipPostalCodeFrom = getShippingOptionRequest.ZipPostalCodeFrom;
             string zipPostalCodeTo = getShippingOptionRequest.ShippingAddress.ZipPostalCode;
-            int weight = GetWeight(getShippingOptionRequest);
-            _shippingService.GetDimensions(getShippingOptionRequest.Items, out decimal widthTmp, out decimal lengthTmp, out decimal heightTmp, true);
-            int length = Math.Max(Convert.ToInt32(Math.Ceiling(this._measureService.ConvertFromPrimaryMeasureDimension(lengthTmp, this.GatewayMeasureDimension))), MIN_LENGTH);
-            int width = Math.Max(Convert.ToInt32(Math.Ceiling(this._measureService.ConvertFromPrimaryMeasureDimension(widthTmp, this.GatewayMeasureDimension))), MIN_LENGTH);
-            int height = Math.Max(Convert.ToInt32(Math.Ceiling(this._measureService.ConvertFromPrimaryMeasureDimension(heightTmp, this.GatewayMeasureDimension))), MIN_LENGTH);
+            int weight = await GetWeightAsync(getShippingOptionRequest);
+            var dims = await _shippingService.GetDimensionsAsync(getShippingOptionRequest.Items, true);
+            int length = Math.Max(Convert.ToInt32(Math.Ceiling(await this._measureService.ConvertFromPrimaryMeasureDimensionAsync(dims.length, await this.GatewayMeasureDimensionAsync()))), MIN_LENGTH);
+            int width = Math.Max(Convert.ToInt32(Math.Ceiling(await this._measureService.ConvertFromPrimaryMeasureDimensionAsync(dims.width, await this.GatewayMeasureDimensionAsync()))), MIN_LENGTH);
+            int height = Math.Max(Convert.ToInt32(Math.Ceiling(await this._measureService.ConvertFromPrimaryMeasureDimensionAsync(dims.height, await this.GatewayMeasureDimensionAsync()))), MIN_LENGTH);
 
             //estimate packaging
             int totalPackagesDims = 1;
@@ -303,7 +298,7 @@ namespace Nop.Plugin.Shipping.AustraliaPost
 
             try
             {
-                var shippingOptions = RequestShippingOptions(country.TwoLetterIsoCode,
+                var shippingOptions = await RequestShippingOptionsAsync(country.TwoLetterIsoCode,
                     zipPostalCodeFrom, zipPostalCodeTo, kgWeight, length, width, height, totalPackages);
 
                 foreach (var shippingOption in shippingOptions)
@@ -334,9 +329,9 @@ namespace Nop.Plugin.Shipping.AustraliaPost
         /// </summary>
         /// <param name="getShippingOptionRequest">A request for getting shipping options</param>
         /// <returns>Fixed shipping rate; or null in case there's no fixed shipping rate</returns>
-        public decimal? GetFixedRate(GetShippingOptionRequest getShippingOptionRequest)
+        public Task<decimal?> GetFixedRateAsync(GetShippingOptionRequest getShippingOptionRequest)
         {
-            return null;
+            return Task.FromResult<decimal?>(null);
         }
 
         /// <summary>
@@ -350,45 +345,39 @@ namespace Nop.Plugin.Shipping.AustraliaPost
         /// <summary>
         /// Install plugin
         /// </summary>
-        public override void Install()
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public override async Task InstallAsync()
         {
             //settings
-            _settingService.SaveSetting(new AustraliaPostSettings());
+            await _settingService.SaveSettingAsync(new AustraliaPostSettings());
 
             //locales
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.ApiKey", "Australia Post API Key");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.ApiKey.Hint", "Specify Australia Post API Key.");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge", "Additional handling charge");
-            _localizationService.AddOrUpdatePluginLocaleResource("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge.Hint", "Enter additional handling fee to charge your customers.");
+            await _localizationService.AddOrUpdateLocaleResourceAsync("Plugins.Shipping.AustraliaPost.Fields.ApiKey", "Australia Post API Key");
+            await _localizationService.AddOrUpdateLocaleResourceAsync("Plugins.Shipping.AustraliaPost.Fields.ApiKey.Hint", "Specify Australia Post API Key.");
+            await _localizationService.AddOrUpdateLocaleResourceAsync("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge", "Additional handling charge");
+            await _localizationService.AddOrUpdateLocaleResourceAsync("Plugins.Shipping.AustraliaPost.Fields.AdditionalHandlingCharge.Hint", "Enter additional handling fee to charge your customers.");
 
-            base.Install();
+            await base.InstallAsync();
         }
 
         /// <summary>
         /// Uninstall plugin
         /// </summary>
-        public override void Uninstall()
+        /// <returns>A task that represents the asynchronous operation</returns>
+        public override async Task UninstallAsync()
         {
             //settings
-            _settingService.DeleteSetting<AustraliaPostSettings>();
+            await _settingService.DeleteSettingAsync<AustraliaPostSettings>();
 
 
             //locales
-            _localizationService.DeletePluginLocaleResources("Plugins.Shipping.AustraliaPost");
+            await _localizationService.DeleteLocaleResourcesAsync("Plugins.Shipping.AustraliaPost");
 
-            base.Uninstall();
+            await base.UninstallAsync();
         }
         #endregion
 
         #region Properties
-
-        /// <summary>
-        /// Gets a shipping rate computation method type
-        /// </summary>
-        public ShippingRateComputationMethodType ShippingRateComputationMethodType
-        {
-            get { return ShippingRateComputationMethodType.Realtime; }
-        }
 
         /// <summary>
         /// Gets a shipment tracker
