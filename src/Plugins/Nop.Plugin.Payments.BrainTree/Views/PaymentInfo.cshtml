@@ -2,8 +2,8 @@
     Layout = "";
 }
 @model Nop.Plugin.Payments.BrainTree.Models.PaymentInfoModel
-<script src="https://js.braintreegateway.com/web/dropin/1.18.0/js/dropin.min.js"></script>
-<script src="~/lib/jquery/jquery-3.4.1.min.js"></script>
+<script src='https://js.braintreegateway.com/web/dropin/1.27.0/js/dropin.min.js'></script>
+<script src="~/lib_npm/jquery/jquery.min.js"></script>
 <div id="dropin-container"></div>
 
 <button id="submit-button" class="button-1" type="button">Submit Details</button>
@@ -31,12 +31,40 @@
             nonceInput.type = 'hidden';
             form.appendChild(nonceInput);
         }
+
+        var threeDSecureParameters = {
+            amount: @Model.Amount,
+            email: '@Model.Email',
+            billingAddress: {
+                givenName: '@Model.BillFirstName',
+                surname: '@Model.BillLastName', 
+                phoneNumber: '@Model.BillPhoneNumber',
+                streetAddress: '@Model.BillAddress1',
+                extendedAddress: '@Model.BillAddress2',
+                locality: '@Model.BillCity',
+                region: '@Model.BillState',
+                postalCode: '@Model.BillPostCode',
+                countryCodeAlpha2: '@Model.BillCountry'
+            },
+            additionalInformation: {
+                shippingGivenName: '@Model.ShipFirstName',
+                shippingSurname: '@Model.ShipLastName',
+                shippingPhone: '@Model.ShipPhoneNumber',
+                shippingAddress: {
+                    streetAddress: '@Model.ShipAddress1',
+                    extendedAddress: '@Model.ShipAddress2',
+                    locality: '@Model.ShipCity',
+                    region: '@Model.ShipState',
+                    postalCode: '@Model.ShipPostCode',
+                    countryCodeAlpha2: '@Model.ShipCountry'
+                }
+            },
+        };
+
         braintree.dropin.create({
             authorization: '@Model.Token',
             container: '#dropin-container',
-            threeDSecure: {
-                amount: @Model.Amount,
-            },
+            threeDSecure: true,
             card: {
                 cardholderName: {
                   required: true
@@ -47,8 +75,11 @@
 
             }
         }, function (createErr, instance) {
-            button.addEventListener('click', function () {
-                instance.requestPaymentMethod(function (requestPaymentMethodErr, payload) {
+            button.addEventListener('click', function (e) {
+                e.preventDefault();
+                instance.requestPaymentMethod({
+                    threeDSecure: threeDSecureParameters
+                }, function (requestPaymentMethodErr, payload) {
                     //if (payload.liabilityShifted || payload.type !== 'CreditCard') {
                         // Submit payload.nonce to your server
                             deviceDataInput.value = payload.deviceData;

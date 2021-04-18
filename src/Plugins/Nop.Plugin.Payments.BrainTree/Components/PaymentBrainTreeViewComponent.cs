@@ -130,7 +130,42 @@ namespace Nop.Plugin.Payments.BrainTree.Components
             var clientToken = gateway.ClientToken.Generate();
             model.Token = clientToken;
             var details = PreparePlaceOrderDetailsAsync().Result;
+            var bstateProvince = _stateProvinceService.GetStateProvinceByAddressAsync(details.BillingAddress).Result;
+            var bcountry = _countryService.GetCountryByAddressAsync(details.BillingAddress).Result;
+            var sstateProvince = _stateProvinceService.GetStateProvinceByAddressAsync(details.ShippingAddress).Result;
+            var scountry = _countryService.GetCountryByAddressAsync(details.ShippingAddress).Result;
             model.Amount = details.OrderTotal;
+            model.Email = details.BillingAddress.Email;
+            model.BillFirstName = details.BillingAddress.FirstName;
+            model.BillLastName = details.BillingAddress.LastName;
+            model.BillPhoneNumber = details.BillingAddress.PhoneNumber;
+            model.BillAddress1 = details.BillingAddress.Address1;
+            model.BillAddress2 = details.BillingAddress.Address2;
+            model.BillCity = details.BillingAddress.City;
+            model.BillState = bstateProvince.Abbreviation;
+            model.BillPostCode = details.BillingAddress.ZipPostalCode;
+            model.BillCountry = bcountry.TwoLetterIsoCode;
+            model.ShipFirstName = details.ShippingAddress.FirstName;
+            model.ShipLastName = details.ShippingAddress.LastName;
+            model.ShipPhoneNumber = details.ShippingAddress.PhoneNumber;
+            model.ShipAddress1 = details.ShippingAddress.Address1;
+            model.ShipAddress2 = details.ShippingAddress.Address2;
+            model.ShipCity = details.ShippingAddress.City;
+            model.ShipState = sstateProvince.Abbreviation;
+            model.ShipPostCode = details.ShippingAddress.ZipPostalCode;
+            model.ShipCountry = scountry.TwoLetterIsoCode;
+            if (details.PickupInStore)
+            {
+                model.ShipFirstName = model.BillFirstName;
+                model.ShipLastName = model.BillLastName;
+                model.ShipPhoneNumber = model.BillPhoneNumber;
+                model.ShipAddress1 = model.BillAddress1;
+                model.ShipAddress2 = model.BillAddress2;
+                model.ShipCity = model.BillCity;
+                model.ShipPostCode = model.BillPostCode;
+                model.ShipState = model.BillState;
+                model.ShipCountry = model.BillCountry;
+            }
             return View("~/Plugins/Payments.BrainTree/Views/PaymentInfo.cshtml", model);
         }
 
