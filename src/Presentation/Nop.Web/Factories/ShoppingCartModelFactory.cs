@@ -1224,7 +1224,7 @@ namespace Nop.Web.Factories
                         foreach (var shippingOption in getShippingOptionResponse.ShippingOptions)
                         {
                             //calculate discounted and taxed rate
-                            var shippingRate = _orderTotalCalculationService.AdjustShippingRate(shippingOption.Rate, cart, out List<DiscountForCaching> _);
+                            var shippingRate = _orderTotalCalculationService.AdjustShippingRate(shippingOption.Rate, cart, out List<DiscountForCaching> _,shippingOption.Name);
                             shippingRate = _taxService.GetShippingPrice(shippingRate, _workContext.CurrentCustomer);
                             shippingRate = _currencyService.ConvertFromPrimaryStoreCurrency(shippingRate, _workContext.WorkingCurrency);
                             var shippingRateString = _priceFormatter.FormatShippingPrice(shippingRate, true);

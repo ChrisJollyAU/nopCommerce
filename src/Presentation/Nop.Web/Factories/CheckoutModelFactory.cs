@@ -309,7 +309,7 @@ namespace Nop.Web.Factories
                                       };
 
                     //adjust rate
-                    var shippingTotal = _orderTotalCalculationService.AdjustShippingRate(shippingOption.Rate, cart, out List<DiscountForCaching> _);
+                    var shippingTotal = _orderTotalCalculationService.AdjustShippingRate(shippingOption.Rate, cart, out List<DiscountForCaching> _, shippingOption.Name);
 
                     var rateBase = _taxService.GetShippingPrice(shippingTotal, _workContext.CurrentCustomer);
                     var rate = _currencyService.ConvertFromPrimaryStoreCurrency(rateBase, _workContext.WorkingCurrency);

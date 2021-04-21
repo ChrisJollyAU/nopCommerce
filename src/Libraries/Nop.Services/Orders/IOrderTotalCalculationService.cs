@@ -48,7 +48,7 @@ namespace Nop.Services.Orders
         /// <param name="appliedDiscounts">Applied discounts</param>
         /// <returns>Adjusted shipping rate</returns>
         decimal AdjustShippingRate(decimal shippingRate,
-            IList<ShoppingCartItem> cart, out List<DiscountForCaching> appliedDiscounts);
+            IList<ShoppingCartItem> cart, out List<DiscountForCaching> appliedDiscounts, string shippingName);
         
         /// <summary>
         /// Gets shopping cart additional shipping charge

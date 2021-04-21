@@ -972,17 +972,18 @@ namespace Nop.Services.Orders
         /// <param name="appliedDiscounts">Applied discounts</param>
         /// <returns>Adjusted shipping rate</returns>
         public virtual decimal AdjustShippingRate(decimal shippingRate,
-            IList<ShoppingCartItem> cart, out List<DiscountForCaching> appliedDiscounts)
+            IList<ShoppingCartItem> cart, out List<DiscountForCaching> appliedDiscounts,string shippingName)
         {
             appliedDiscounts = new List<DiscountForCaching>();
-
-            //free shipping
-            if (IsFreeShipping(cart))
-                return decimal.Zero;
-            
+            if (shippingName == "Australia Post. Parcel Post")
+            {
+                //free shipping
+                if (IsFreeShipping(cart))
+                    return decimal.Zero;
+            }
             //with additional shipping charges
             var adjustedRate = shippingRate + GetShoppingCartAdditionalShippingCharge(cart);
-
+            
             //discount
             var discountAmount = GetShippingDiscount(cart.GetCustomer(), adjustedRate, out appliedDiscounts);
             adjustedRate -= discountAmount;
@@ -1048,8 +1049,8 @@ namespace Nop.Services.Orders
             var customer = cart.GetCustomer();
 
             var isFreeShipping = IsFreeShipping(cart);
-            if (isFreeShipping)
-                return decimal.Zero;
+            /*if (isFreeShipping)
+                return decimal.Zero;*/
 
             ShippingOption shippingOption = null;
             if (customer != null)
@@ -1058,7 +1059,7 @@ namespace Nop.Services.Orders
             if (shippingOption != null)
             {
                 //use last shipping option (get from cache)
-                shippingTotal = AdjustShippingRate(shippingOption.Rate, cart, out appliedDiscounts);
+                shippingTotal = AdjustShippingRate(shippingOption.Rate, cart, out appliedDiscounts, shippingOption.Name);
             }
             else
             {
@@ -1096,7 +1097,7 @@ namespace Nop.Services.Orders
                     if (fixedRate.HasValue)
                     {
                         //adjust shipping rate
-                        shippingTotal = AdjustShippingRate(fixedRate.Value, cart, out appliedDiscounts);
+                        shippingTotal = AdjustShippingRate(fixedRate.Value, cart, out appliedDiscounts,"");
                     }
                 }
             }
