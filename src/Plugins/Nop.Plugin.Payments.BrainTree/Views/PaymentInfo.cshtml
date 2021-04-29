@@ -6,16 +6,11 @@
 <script src="~/lib_npm/jquery/jquery.min.js"></script>
 <div id="dropin-container"></div>
 
-<button id="submit-button" class="button-1" type="button">Submit Details</button>
 <script>
-    $(document).ready(function () {
-        $("input[class='button-1 payment-info-next-step-button']").attr("disabled", "disabled");
-        $("input[class='button-1 payment-info-next-step-button']").css("background-color", "grey");
-    })
 </script>
 <script>
     window.onload = function () {
-        var button = document.querySelector('#submit-button');
+        var button = $("button[class='button-1 payment-info-next-step-button']")[0];
         var form = document.getElementsByTagName('form')[1];
         var deviceDataInput = null;
         var nonceInput = null;
@@ -84,12 +79,15 @@
                         // Submit payload.nonce to your server
                             deviceDataInput.value = payload.deviceData;
                             nonceInput.value = payload.nonce;
-                            $("input[class='button-1 payment-info-next-step-button']").removeAttr("disabled");
-                            $("input[class='button-1 payment-info-next-step-button']").css("background-color","#4ab2f1")
+                            var ns = document.createElement('input');
+                            ns.name = 'nextstep';
+                            ns.type = 'hidden';
+                            form.appendChild(ns);
+                            form.submit();
                     //} else {
-                        // Decide if you will force the user to enter a different
-                        // payment method if liablity was not shifted
-                        //instance.clearSelectedPaymentMethod();
+                    // Decide if you will force the user to enter a different
+                    // payment method if liablity was not shifted
+                    //instance.clearSelectedPaymentMethod();
                     //}
                 });
             });
